@@ -1532,7 +1532,7 @@ namespace ELTECSharp
             if (inp.Last() >= 1 && inp.Last() <= 16 && new ByteArrayComparer().Equals(inp.Skip(inp.Length - (int)inp.Last()).ToArray(), Enumerable.Repeat(inp.Last(), (int)inp.Last()).ToArray())) return inp.Take(inp.Length - (int)inp.Last()).ToArray();
             throw new ArgumentException();
         }
-        static private byte[] MTCipher(ushort seed, byte [] input)
+        static private byte[] MTCipher(ushort seed, byte[] input)
         {
             MersenneTwister mt = new MersenneTwister();
             mt.Initialize((uint)seed);
@@ -1927,14 +1927,14 @@ namespace ELTECSharp
             }
             Console.WriteLine("Found password token seed: " + (true));
         }
-        static byte [] edit(byte [] input, byte [] key, int offset, byte [] plaintext)
+        static byte[] edit(byte[] input, byte[] key, int offset, byte[] plaintext)
         {
             byte[] o = crypt_ctr(0, key, input);
             plaintext.CopyTo(o, offset);
             return crypt_ctr(0, key, o);
         }
         //RFC 2104 HMAC(k,m)=H((K' xor opad) || H((K' xor ipad) || m))
-        static byte [] hmac(byte [] key, byte [] message)
+        static byte[] hmac(byte[] key, byte[] message)
         {
             SHA1Context sc = new SHA1Context(); //64 bit block size for SHA-1 and MD4
             if (key.Length > 64)
@@ -1947,7 +1947,7 @@ namespace ELTECSharp
                 key = key.Concat(Enumerable.Repeat((byte)0, 64 - key.Length)).ToArray();
             }
             SHA1_Algo.SHA1Reset(sc);
-            byte [] b = new byte[20];
+            byte[] b = new byte[20];
             SHA1_Algo.SHA1Input(sc, FixedXOR(Enumerable.Repeat((byte)0x36, 64).ToArray(), key).Concat(message).ToArray());
             SHA1_Algo.SHA1Result(sc, b);
             SHA1_Algo.SHA1Reset(sc);
@@ -1955,7 +1955,7 @@ namespace ELTECSharp
             SHA1_Algo.SHA1Result(sc, b);
             return b;
         }
-        static bool insecure_compare(byte [] o, byte [] sig, int millisec)
+        static bool insecure_compare(byte[] o, byte[] sig, int millisec)
         {
             for (int i = 0; i < o.Length; i++)
             {
@@ -1971,14 +1971,14 @@ namespace ELTECSharp
             {
                 string file = System.Web.HttpUtility.ParseQueryString(url.Substring(iqs + 1))["file"];
                 byte[] sig = HexDecode(System.Web.HttpUtility.ParseQueryString(url.Substring(iqs + 1))["signature"]);
-                byte [] o = hmac(System.Text.Encoding.ASCII.GetBytes(file), System.Text.Encoding.ASCII.GetBytes("bar"));
+                byte[] o = hmac(System.Text.Encoding.ASCII.GetBytes(file), System.Text.Encoding.ASCII.GetBytes("bar"));
                 return insecure_compare(o, sig, millisec);
             }
             return false;
         }
-        static byte [] breakurlkey(int millisec, int rds)
+        static byte[] breakurlkey(int millisec, int rds)
         {
-            byte [] key = Enumerable.Repeat((byte)0, 20).ToArray();
+            byte[] key = Enumerable.Repeat((byte)0, 20).ToArray();
             for (int c = 0; c < 20; c++)
             {
                 int gttime = 0;
@@ -2194,7 +2194,7 @@ namespace ELTECSharp
             }
             public bool SeeSimpleReceiveHMAC(DHClient Other, DHClient First, byte[] hmc)
             {
-                string [] passlist = { "test", "password", "YELLOW SUBMARINE", "already found" };
+                string[] passlist = { "test", "password", "YELLOW SUBMARINE", "already found" };
                 for (int i = 0; i < passlist.Length; i++)
                 {
                     SHA256 hsh = SHA256.Create();
@@ -2277,7 +2277,7 @@ namespace ELTECSharp
                 rnd.GetBytes(iv);
                 return m == null ? ReceiveMsg(m, this, encrypt_cbc(iv, _key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("msg"), 16)), iv) : m.SeeMsg(Other, this, encrypt_cbc(iv, _key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("msg"), 16)), iv);
             }
-            public bool ReceiveMsg(ManInTheMiddle m, DHClient Other, byte [] c, byte [] iv)
+            public bool ReceiveMsg(ManInTheMiddle m, DHClient Other, byte[] c, byte[] iv)
             {
                 if (Encoding.ASCII.GetString(PKCS7Strip(decrypt_cbc(iv, _key, c))) != "msg") return false;
                 RandomNumberGenerator rnd = RandomNumberGenerator.Create();
@@ -2285,7 +2285,7 @@ namespace ELTECSharp
                 rnd.GetBytes(iv);
                 return m == null ? OtherReceiveMsg(m, this, encrypt_cbc(iv, _key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("a's msg"), 16)), iv) : m.SeeNextMsg(Other, this, encrypt_cbc(iv, _key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("a's msg"), 16)), iv);
             }
-            public bool OtherReceiveMsg(ManInTheMiddle m, DHClient Other, byte [] c, byte [] iv)
+            public bool OtherReceiveMsg(ManInTheMiddle m, DHClient Other, byte[] c, byte[] iv)
             {
                 return (Encoding.ASCII.GetString(PKCS7Strip(decrypt_cbc(iv, _key, c))) == "a's msg");
             }
@@ -2358,7 +2358,7 @@ namespace ELTECSharp
                 HMACSHA256 hmac = new HMACSHA256(hsh.ComputeHash(BigIntToBytes(BigInteger.ModPow(BigInteger.Multiply(_o, BigInteger.ModPow(BigInteger.ModPow(_g, BytesToBigInt(hsh.ComputeHash(BitConverter.GetBytes(_Salt).Concat(System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE")).ToArray())), _p), _s, _p)), _ab, _p))));
                 return Other.OtherReceiveHMAC(this, new ByteArrayComparer().Equals(hmc, hmac.ComputeHash(BitConverter.GetBytes(_Salt))));
             }
-            public bool ReceiveHMAC(DHClient Other, byte [] hmc)
+            public bool ReceiveHMAC(DHClient Other, byte[] hmc)
             {
                 SHA256 hsh = SHA256.Create();
                 HMACSHA256 hmac = new HMACSHA256(hsh.ComputeHash(BigIntToBytes(BigInteger.ModPow(BigInteger.Multiply(_o, BigInteger.ModPow(_s, BytesToBigInt(hsh.ComputeHash(BigIntToBytes(_o).Concat(BigIntToBytes(_AB)).ToArray())), _p)), _ab, _p))));
@@ -2572,7 +2572,7 @@ namespace ELTECSharp
             } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
             BigInteger n2 = _p * _q;
             BigInteger c2 = BigInteger.ModPow(m, 3, n2);
-            BigInteger result = BigInteger.Remainder(c * n1 *n2 * modInverse(n1 * n2, n) + c1 * n * n2 * modInverse(n * n2, n1) + c2 * n * n1 * modInverse(n * n1, n2), n * n1 * n2);
+            BigInteger result = BigInteger.Remainder(c * n1 * n2 * modInverse(n1 * n2, n) + c1 * n * n2 * modInverse(n * n2, n1) + c2 * n * n1 * modInverse(n * n1, n2), n * n1 * n2);
             Console.WriteLine("5.40 Integer cube root result: " + icbrt2(result));
         }
         static BigInteger GetPivotRandom(RandomNumberGenerator rng, int BitSize)
@@ -2596,7 +2596,7 @@ namespace ELTECSharp
             r[r.Length - 1] &= (byte)((1 << (BitSize % 8)) - 1); //make sure it wont be interpreted as negative in little-endian order
             return new BigInteger(r);
         }
-        static byte [] PadToSize(byte [] arr, int size)
+        static byte[] PadToSize(byte[] arr, int size)
         {
             return (arr.Length >= size ? arr.Skip(arr.Length - size).ToArray() : Enumerable.Repeat((byte)0, size - arr.Length).Concat(arr).ToArray());
         }
@@ -2605,11 +2605,11 @@ namespace ELTECSharp
             BigInteger r = BigInteger.Remainder(dividend, divisor);
             return r < 0 ? r + divisor : r;
         }
-        static BigInteger BytesToBigInt(byte [] b)
+        static BigInteger BytesToBigInt(byte[] b)
         {
             return new BigInteger(b[0] == 0 ? b.Reverse().ToArray() : b.Reverse().Concat(new byte[] { 0 }).ToArray());
         }
-        static byte [] BigIntToBytes(BigInteger b)
+        static byte[] BigIntToBytes(BigInteger b)
         {
             return b.ToByteArray().Reverse().SkipWhile((bt) => bt == 0).ToArray(); //maximum of one 0 byte so this is okay...
         }
@@ -2622,7 +2622,7 @@ namespace ELTECSharp
         }
         static bool IsPKCSConforming(BigInteger c, BigInteger d, BigInteger n)
         {
-            byte [] b = BigIntToBytes(BigInteger.ModPow(c, d, n));
+            byte[] b = BigIntToBytes(BigInteger.ModPow(c, d, n));
             return (b.Length == (GetBitSize(n) - 1) / 8 && b[0] == 2);
         }
         static BigInteger BleichenBacherPaddingOracle(RandomNumberGenerator rng, BigInteger n, BigInteger e, BigInteger d, BigInteger c)
@@ -2694,7 +2694,7 @@ namespace ELTECSharp
             } while (true);
             return BigInteger.Remainder(Intervals[j][0] * modInverse(s0, n), n);
         }
-        class BigIntArrayComparer : IEqualityComparer<BigInteger []>
+        class BigIntArrayComparer : IEqualityComparer<BigInteger[]>
         {
             public bool Equals(BigInteger[] x, BigInteger[] y)
             {
@@ -2953,7 +2953,7 @@ namespace ELTECSharp
             private const int N = 256;
             private byte[] _sbox;
             private readonly byte[] _seedKey;
-            private byte [] _text;
+            private byte[] _text;
             private int _i, _j;
             public Rc4(byte[] seedKey, byte[] text)
             {
@@ -2964,8 +2964,7 @@ namespace ELTECSharp
             {
                 _seedKey = seedKey;
             }
-            public byte[] Text
-            {
+            public byte[] Text {
                 get {
                     return _text;
                 }
@@ -2973,7 +2972,7 @@ namespace ELTECSharp
                     _text = value;
                 }
             }
-            public byte [] EnDeCrypt()
+            public byte[] EnDeCrypt()
             {
                 Rc4Initialize();
                 byte[] cipher = new byte[_text.Length];
@@ -2997,7 +2996,7 @@ namespace ELTECSharp
             }
             public void Rc4Initialize(int drop)
             {
-                Initialize(); 
+                Initialize();
                 for (int i = 0; i < drop; i++) {
                     GetNextKeyByte();
                 }
@@ -3339,10 +3338,10 @@ namespace ELTECSharp
             Console.WriteLine("Forged prediction hash is identical to prior prediction hash: " + (new ByteArrayComparer().Equals(cols[cols.Length - 1], MD(forgery, 16))));
 
             //SET 7 CHALLENGE 55
-            uint[] m1 =         { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
-            uint[] m1prime =    { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
-            uint[] m2 =         { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
-            uint[] m2prime =    { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
+            uint[] m1 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
+            uint[] m1prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
+            uint[] m2 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
+            uint[] m2prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
             MD4 md4 = new MD4();
             forgery = MD4.WangsAttack(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), false, false);
             Console.WriteLine("7.55 Verify paper hash meets first round conditions: " + (new ByteArrayComparer().Equals(forgery, m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
@@ -3460,6 +3459,35 @@ namespace ELTECSharp
             }
             return BigInteger.Zero;
         }
+        static BigInteger PollardKangarooEC(BigInteger a, BigInteger b, int k, Tuple<BigInteger, BigInteger> G, int Ea, BigInteger p, Tuple<BigInteger, BigInteger> y)
+        {//modular exponentiation/multiplication is scalar multiplication/group addition on the elliptical curve
+            BigInteger xT = BigInteger.Zero;
+            Tuple<BigInteger, BigInteger> yT = scaleEC(G, b, Ea, p);
+            //N is then derived from f -take the mean of all possible outputs of f and multiply it by a small constant, e.g. 4.
+            int N = ((1 << (k + 1)) - 1) * 4 / k;
+            //make the constant bigger to better your chances of finding a collision at the(obvious) cost of extra computation.
+            for (int i = 1; i <= N; i++)
+            {
+                BigInteger KF = BigInteger.Remainder(KangF(yT.Item1, k), p);
+                xT = xT + KF;
+                yT = addEC(yT, scaleEC(G, KF, Ea, p), Ea, p);
+            }
+            //now yT = g^(b + xT)
+            //Console.WriteLine("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
+            BigInteger xW = BigInteger.Zero;
+            Tuple<BigInteger, BigInteger> yW = y;
+            while (xW < (b - a + xT))
+            {
+                BigInteger KF = BigInteger.Remainder(KangF(yW.Item1, k), p);
+                xW = xW + KF;
+                yW = addEC(yW, scaleEC(G, KF, Ea, p), Ea, p);
+                if (yW == yT)
+                {
+                    return b + xT - xW;
+                }
+            }
+            return BigInteger.Zero;
+        }
         static BigInteger KangF(BigInteger y, int k)
         {
             return BigInteger.Pow(2, (int)BigInteger.Remainder(y, k));
@@ -3516,6 +3544,49 @@ namespace ELTECSharp
                 M = i; c = BigInteger.Remainder(b * b, p); t = BigInteger.Remainder(t * c, p); R = BigInteger.Remainder(R * b, p);
             }
         }
+        static Tuple<BigInteger, BigInteger> cswap(BigInteger a, BigInteger b, bool swap)
+        {
+            return swap ? new Tuple<BigInteger, BigInteger>(b, a) : new Tuple<BigInteger, BigInteger>(a, b);
+        }
+        static BigInteger ladder(BigInteger u, BigInteger k, int Ea, BigInteger p)
+        {
+            BigInteger u2 = 1, w2 = 0;
+            BigInteger u3 = u, w3 = 1;
+            for (int i = GetBitSize(p); i >= 0; i--) {
+                bool b = (1 & (k >> i)) != BigInteger.Zero;
+                Tuple<BigInteger, BigInteger> tup;
+                tup = cswap(u2, u3, b); u2 = tup.Item1; u3 = tup.Item2;
+                tup = cswap(w2, w3, b); w2 = tup.Item1; w3 = tup.Item2;
+                BigInteger temp = posRemainder(u2 * u3 - w2 * w3, p),
+                    temp2 = posRemainder(u2 * w3 - w2 * u3, p);
+                u3 = temp * temp;
+                w3 = u * temp2 * temp2;
+                temp = u2 * u2; temp2 = w2 * w2;
+                w2 = posRemainder(4 * u2 * w2 * (temp + Ea * u2 * w2 + temp2), p);
+                temp = posRemainder(temp - temp2, p);
+                u2 = temp * temp;
+                tup = cswap(u2, u3, b); u2 = tup.Item1; u3 = tup.Item2;
+                tup = cswap(w2, w3, b); w2 = tup.Item1; w3 = tup.Item2;
+            }
+            return BigInteger.Remainder(u2 * BigInteger.ModPow(w2, p - 2, p), p);
+        }
+        static Tuple<BigInteger, BigInteger> signECDSA(RNGCryptoServiceProvider rng, BigInteger m, BigInteger d, BigInteger n, Tuple<BigInteger, BigInteger> G, int Ea, BigInteger GF)
+        {
+            BigInteger k, r, s;
+            do {
+                do {
+                    do { k = Crypto.GetNextRandomBig(rng, n); } while (k <= 1);
+                    r = scaleEC(G, k, Ea, GF).Item1;
+                } while (r.Equals(BigInteger.Zero));
+                s = BigInteger.Remainder((m + d * r) * modInverse(k, n), n);
+            } while (s.Equals(BigInteger.Zero));
+            return new Tuple<BigInteger, BigInteger>(r, s);
+        }
+        static bool verifyECDSA(BigInteger m, Tuple<BigInteger, BigInteger> rs, Tuple<BigInteger, BigInteger> Q, BigInteger n, Tuple<BigInteger, BigInteger> G, int Ea, BigInteger GF)
+        {
+            BigInteger inv = modInverse(rs.Item2, n), u1 = BigInteger.Remainder(m * inv, n), u2 = BigInteger.Remainder(rs.Item1 * inv, n);
+            return rs.Item1.Equals(addEC(scaleEC(G, u1, Ea, GF), scaleEC(Q, u2, Ea, GF), Ea, GF).Item1);
+        }
         static void Set8()
         {
             //SET 8 CHALLENGE 57
@@ -3532,7 +3603,7 @@ namespace ELTECSharp
             int curr = 0;
             BigInteger x;
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            goto p58;
+            goto p59;
             for (int i = 2; i < 1 << 16; i++) {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(j, i, out Rem);
                 if (Rem == BigInteger.Zero) {
@@ -3653,13 +3724,14 @@ namespace ELTECSharp
             BigInteger Mprime = PollardKangaroo(0, (q - 1) / rcum, 23, Gprime, p, Yprime); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
             Console.WriteLine("8.58 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
-            p58:
+            p59:
             //SET 8 CHALLENGE 59
-            int Ea = -95051, Eb = 11279326;
+            int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
                 GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743"), Ord = BPOrd * 2 * 2 * 2;
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
+            goto p60;
             //http://magma.maths.usyd.edu.au/calc/
             //E: y^2+a_1xy+a_3y=x^3+a_2x^2+a_4x+a_6 over GF(p)
             //K:=GF(233970423115425145524320034830162017933);
@@ -3719,7 +3791,7 @@ namespace ELTECSharp
                     do { hx = Crypto.GetNextRandomBig(rng, Ords[rsidx[curr]]); } while (hx <= 1);
                     hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + PickGys[rsidx[curr]], GF), GF);
                     h = scaleEC(new Tuple<BigInteger, BigInteger>(hx, hy), Ords[rsidx[curr]] / rs[curr], Ea, GF);
-                } while (hy == 0 || h.Equals(new Tuple<BigInteger, BigInteger>(0, 1)));
+                } while (hy == BigInteger.Zero || h.Equals(new Tuple<BigInteger, BigInteger>(0, 1)));
                 //Console.WriteLine(BigInteger.Remainder(h.Item1 * h.Item1 * h.Item1 + Ea * h.Item1 + PickGys[rsidx[curr]], GF) + " " + BigInteger.Remainder(h.Item2 * h.Item2, GF));
                 //h = new Tuple<BigInteger, BigInteger>(hx, hy);
                 Tuple<BigInteger, BigInteger> K = scaleEC(h, x, Ea, GF);
@@ -3734,33 +3806,160 @@ namespace ELTECSharp
                         break;
                     }
                 }
-                if (i == rs[curr]) {
+                if (i == rs[curr] || i == 0) {
                     //Console.WriteLine(rs[curr]);
                     rs.RemoveAt(curr);
                     rsidx.RemoveAt(curr);
                 } else {
                     //k*u = -k*u, resulting in a combinatorial explosion of potential CRT outputs. 
                     //i or rs[curr] - i
-                    Console.WriteLine(rs[curr] + " " + (rs[curr] - i) + " " + i + " " + BigInteger.Remainder(x, rs[curr]));
-                    bs.Add(i);
+                    //Console.WriteLine(rs[curr] + " " + (rs[curr] - i) + " " + i + " " + BigInteger.Remainder(x, rs[curr]));
+                    bs.Add(i); //i or rs[curr] - i, only know i^2
                     rcum *= rs[curr];
                     curr++;
                 }
             } while (rcum <= BPOrd);
             //Chinese Remainder Theorem - arbitrary size by interpolation
             //K = b1 (mod h1), K = b_n (mod r_n)
+            //CRT trick: compute with bi^2 mod pi compute sqrt(s^2) over all integers (Z) BUT NEED rcum > BPOrd * BPOrd
+            //combinatoric brute force search, could try combinations for each of the curves to group by positive/negative
+            //then a combination to combine them also but makes for more code with same final result based on the different curves
+            //but this is hardly a slow search in this context
+            {
+                BigInteger hx, hy;
+                Tuple<BigInteger, BigInteger> h;
+                do
+                {
+                    //random point with between x value between 1..Ord
+                    do { hx = Crypto.GetNextRandomBig(rng, BPOrd); } while (hx <= 1);
+                    hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + Eb, GF), GF);
+                } while (hy == BigInteger.Zero);
+                h = new Tuple<BigInteger, BigInteger>(hx, hy);
+                Tuple<BigInteger, BigInteger> finK = scaleEC(h, x, Ea, GF);
+                byte[] t = hmac(finK.Item1.ToByteArray(), m);
+                for (int r = 0; r < 1 << curr; r++) {
+                    RecX = BigInteger.Zero;
+                    for (int i = 0; i < curr; i++) {
+                        BigInteger curcum = rcum / rs[i];
+                        RecX += ((r & (1 << i)) != 0 ? bs[i] : rs[i] - bs[i]) * curcum * modInverse(curcum, rs[i]);
+                    }
+                    RecX = BigInteger.Remainder(RecX, rcum);
+                    Tuple<BigInteger, BigInteger> testK = scaleEC(h, RecX, Ea, GF);
+                    if (new ByteArrayComparer().Equals(t, hmac(testK.Item1.ToByteArray(), m))) {
+                        break;
+                    }
+                }
+            }
+            Console.WriteLine("8.59 Secret key recovered: " + RecX);
+
+        //SET 8 CHALLENGE 60
+        p60:
+            goto p61;
+            Ea = 534; Gx = Gx - 178;
+            Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
+            BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
+            Console.WriteLine(ladder(Pt, 11, Ea, GF)); //0 or infinite
+            Console.WriteLine(TonelliShanks(rng, posRemainder(Pt * Pt * Pt + Ea * Pt * Pt + Pt, GF), GF)); //0 meaning non-existent
+            BigInteger TwistOrd = 2 * GF + 2 - Ord;
+            rs = new List<int>();
+            p = TwistOrd; //Montgomery curve order are always divisible by 4
+            for (int i = 2; i < 1 << 24; i++) {
+                BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(p, i, out Rem);
+                if (Rem == BigInteger.Zero) {
+                    rs.Add(i);
+                    do {
+                        p = Quot;
+                        Quot = BigInteger.DivRem(p, i, out Rem); //reduce powers of factors:
+                        //(Friendly tip: maybe avoid any repeated factors. They only complicate things.)
+                        if (Rem == BigInteger.Zero) {
+                            Console.WriteLine(i);
+                        }
+                    } while (Rem == BigInteger.Zero);
+                }
+            }
+            bs = new List<int>();
+            rcum = 1;
+            curr = 0;
+            do { x = Crypto.GetNextRandomBig(rng, BPOrd); } while (x <= 1); //Bob's secret key
+            Tuple<BigInteger, BigInteger> Y = new Tuple<BigInteger, BigInteger>(ladder(Gx, x, Ea, GF), G.Item2);
+            Console.WriteLine("Secret key generated: " + x);
+            do {
+                BigInteger u, hy;
+                do
+                {
+                    //random point with between x value between 1..Ord
+                    do { u = Crypto.GetNextRandomBig(rng, GF); } while (u <= 1);
+                    hy = TonelliShanks(rng, posRemainder(u * u * u + Ea * u * u + u, GF), GF);
+                } while (hy != BigInteger.Zero);
+                u = ladder(u, TwistOrd / rs[curr], Ea, GF);
+                //hy = TonelliShanks(rng, posRemainder(u * u * u + EaOrig * u + Eb, GF), GF);
+                //Console.WriteLine(BigInteger.Remainder(h.Item1 * h.Item1 * h.Item1 + Ea * h.Item1 + PickGys[rsidx[curr]], GF) + " " + BigInteger.Remainder(h.Item2 * h.Item2, GF));
+                //Tuple<BigInteger, BigInteger> h = new Tuple<BigInteger, BigInteger>(u, hy);
+                //Tuple<BigInteger, BigInteger> K = scaleEC(h, x, EaOrig, GF);
+                BigInteger K = ladder(u, x, Ea, GF);
+                //Console.WriteLine(K); //x mod r = 0, then K = infinity
+                //Console.WriteLine(scaleEC(h, Ord, Ea, GF));
+                byte[] t = hmac(K.ToByteArray(), m);
+                //Tuple<BigInteger, BigInteger> testK;
+                BigInteger testK;
+                int i;
+                for (i = 0; i < rs[curr]; i++)
+                {
+                    //testK = scaleEC(h, i, EaOrig, GF);
+                    testK = ladder(u, i, Ea, GF);
+                    //if (new ByteArrayComparer().Equals(t, hmac(testK.Item1.ToByteArray(), m)))
+                    if (new ByteArrayComparer().Equals(t, hmac(testK.ToByteArray(), m)))
+                    {
+                        break;
+                    }
+                }
+                if (i == rs[curr]) {
+                    //Console.WriteLine(rs[curr]);
+                    rs.RemoveAt(curr);
+                } else {
+                    //k*u = -k*u, resulting in a combinatorial explosion of potential CRT outputs. 
+                    //i or rs[curr] - i
+                    Console.WriteLine(rs[curr] + " " + (rs[curr] - i) + " " + i + " " + BigInteger.Remainder(x, rs[curr]));
+                    bs.Add(BigInteger.Remainder(x, rs[curr]).Equals(i) ? i : rs[curr] - i);
+                    rcum *= rs[curr];
+                    curr++;
+                }
+            } while (curr < rs.Count); //(rcum <= q);
+            //Chinese Remainder Theorem - arbitrary size by interpolation
+            //K = b1 (mod h1), K = b_n (mod r_n)
             RecX = BigInteger.Zero;
-            for (int i = 0; i < curr; i++) {
+            for (int i = 0; i < curr; i++)
+            {
                 BigInteger curcum = rcum / rs[i];
                 RecX += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
             RecX = BigInteger.Remainder(RecX, rcum);
-            Console.WriteLine("8.59 Secret key recovered: " + RecX);
-
-            //SET 8 CHALLENGE 60
-            Console.WriteLine("8.60");
+            Console.WriteLine("CRT recovered: " + HexEncode(RecX.ToByteArray()));
+            //[0, (q-1)/r]
+            //x = n mod r, x = n + m * r therefore transform
+            //y = xG=nG+mrG
+            //y' = mG', y'=y-nG, G'=rG
+            Tuple<BigInteger, BigInteger> GprimeEC = scaleEC(G, rcum, EaOrig, GF);
+            Tuple<BigInteger, BigInteger> YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
+            Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+            Console.WriteLine("8.60 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
             //SET 8 CHALLENGE 61
+            p61:
+            BigInteger d;
+            do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
+            Tuple<BigInteger, BigInteger> Q = scaleEC(G, d, EaOrig, GF);
+            SHA1 hf = SHA1.Create();
+            BigInteger hm = BytesToBigInt(hf.ComputeHash(m));
+            Tuple<BigInteger, BigInteger> res = signECDSA(rng, hm, d, BPOrd, G, EaOrig, GF);
+            //now generate a fake signer public key Q'
+            BigInteger inv = modInverse(res.Item2, BPOrd), u1 = BigInteger.Remainder(hm * inv, BPOrd), u2 = BigInteger.Remainder(res.Item1 * inv, BPOrd);
+            BigInteger dprime;
+            do { dprime = Crypto.GetNextRandomBig(rng, BPOrd); } while (dprime <= 1);
+            BigInteger tmp = u1 + u2 * dprime;
+            GprimeEC = scaleEC(addEC(scaleEC(G, u1, EaOrig, GF), scaleEC(Q, u2, EaOrig, GF), EaOrig, GF), modInverse(tmp, BPOrd), EaOrig, GF);
+            Tuple<BigInteger, BigInteger> Qprime = scaleEC(GprimeEC, dprime, EaOrig, GF);
+            Console.WriteLine("Q and Q' verify: " + verifyECDSA(hm, res, Q, BPOrd, G, EaOrig, GF) + " " + verifyECDSA(hm, res, Qprime, BPOrd, GprimeEC, EaOrig, GF));
             Console.WriteLine("8.61");
 
             //SET 8 CHALLENGE 62
