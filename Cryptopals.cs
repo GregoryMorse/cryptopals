@@ -3587,6 +3587,44 @@ namespace ELTECSharp
             BigInteger inv = modInverse(rs.Item2, n), u1 = BigInteger.Remainder(m * inv, n), u2 = BigInteger.Remainder(rs.Item1 * inv, n);
             return rs.Item1.Equals(addEC(scaleEC(G, u1, Ea, GF), scaleEC(Q, u2, Ea, GF), Ea, GF).Item1);
         }
+        static BigInteger rhog(BigInteger x, BigInteger n)
+        {
+            return BigInteger.Remainder(x * x + 1, n);
+        }
+        static BigInteger PollardRho(BigInteger n)
+        {
+            BigInteger x = 2, y = 2, d = 1;
+            while (d.Equals(BigInteger.One)) {
+                x = rhog(x, n);
+                y = rhog(rhog(y, n), n);
+                d = BigInteger.GreatestCommonDivisor(BigInteger.Abs(x - y), n);
+            }
+            if (d.Equals(n)) {
+                return 0;
+            } else {
+                return d;
+            }
+        }
+        static List<BigInteger> PollardRhoAll(BigInteger n)
+        {
+            List<BigInteger> facs = new List<BigInteger>();
+            do {
+                BigInteger fac = PollardRho(n);
+                if (fac.Equals(BigInteger.Zero)) break;
+                facs.Add(fac);
+                n = n / fac;
+                BigInteger remainder, quot = BigInteger.DivRem(n, fac, out remainder);
+                while (remainder.Equals(BigInteger.Zero)) {
+                    if (fac != 2) return new List<BigInteger>(); //if repeated factor is not 2, should abort
+                    n = quot;
+                    quot = BigInteger.DivRem(n, fac, out remainder);
+                }
+                if (IsProbablePrime(n, 64)) {
+                    facs.Add(n); return facs;
+                }
+            } while (true);
+            facs.Clear(); return facs;
+        }
         static void Set8()
         {
             //SET 8 CHALLENGE 57
@@ -3925,15 +3963,35 @@ namespace ELTECSharp
                     curr++;
                 }
             } while (curr < rs.Count); //(rcum <= q);
-            //Chinese Remainder Theorem - arbitrary size by interpolation
-            //K = b1 (mod h1), K = b_n (mod r_n)
-            RecX = BigInteger.Zero;
-            for (int i = 0; i < curr; i++)
+                                       //Chinese Remainder Theorem - arbitrary size by interpolation
+                                       //K = b1 (mod h1), K = b_n (mod r_n)
             {
-                BigInteger curcum = rcum / rs[i];
-                RecX += bs[i] * curcum * modInverse(curcum, rs[i]);
+                BigInteger u, hy;
+                Tuple<BigInteger, BigInteger> h;
+                do
+                {
+                    //random point with between x value between 1..Ord
+                    do { u = Crypto.GetNextRandomBig(rng, GF); } while (u <= 1);
+                    hy = TonelliShanks(rng, posRemainder(u * u * u + Ea * u * u + u, GF), GF);
+                } while (hy != BigInteger.Zero);
+                u = ladder(u, TwistOrd, Ea, GF);
+                BigInteger K = ladder(u, x, Ea, GF);
+                byte[] t = hmac(K.ToByteArray(), m);
+                for (int r = 0; r < 1 << curr; r++)
+                {
+                    RecX = BigInteger.Zero;
+                    for (int i = 0; i < curr; i++)
+                    {
+                        BigInteger curcum = rcum / rs[i];
+                        RecX += ((r & (1 << i)) != 0 ? bs[i] : rs[i] - bs[i]) * curcum * modInverse(curcum, rs[i]);
+                    }
+                    RecX = BigInteger.Remainder(RecX, rcum);
+                    BigInteger testK = ladder(u, RecX, Ea, GF);
+                    if (new ByteArrayComparer().Equals(t, hmac(testK.ToByteArray(), m))) {
+                        break;
+                    }
+                }
             }
-            RecX = BigInteger.Remainder(RecX, rcum);
             Console.WriteLine("CRT recovered: " + HexEncode(RecX.ToByteArray()));
             //[0, (q-1)/r]
             //x = n mod r, x = n + m * r therefore transform
@@ -3960,6 +4018,97 @@ namespace ELTECSharp
             GprimeEC = scaleEC(addEC(scaleEC(G, u1, EaOrig, GF), scaleEC(Q, u2, EaOrig, GF), EaOrig, GF), modInverse(tmp, BPOrd), EaOrig, GF);
             Tuple<BigInteger, BigInteger> Qprime = scaleEC(GprimeEC, dprime, EaOrig, GF);
             Console.WriteLine("Q and Q' verify: " + verifyECDSA(hm, res, Q, BPOrd, G, EaOrig, GF) + " " + verifyECDSA(hm, res, Qprime, BPOrd, GprimeEC, EaOrig, GF));
+            //RSA
+            //sign: s=pad(m)^d mod N
+            BigInteger _p;
+            BigInteger _q;
+            BigInteger et;
+            do {
+                do {
+                    _p = GetPivotRandom(rng, 128);
+                } while (!IsProbablePrime(_p, 64));
+                do {
+                    _q = GetPivotRandom(rng, 128);
+                } while (!IsProbablePrime(_q, 64));
+            } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
+            BigInteger n = _p * _q;
+            d = modInverse(3, et);
+            BigInteger s = BigInteger.ModPow(hm, d, n);
+            //verify: s^e = pad(m) mod N
+            //smooth p-1 (many small factors)
+            BigInteger pprime, qprime;
+            List<BigInteger> rsq = new List<BigInteger>();
+            do
+            {
+                do
+                {
+                    pprime = GetPivotRandom(rng, 128);
+                } while (!IsProbablePrime(pprime, 64));
+                rsq = PollardRhoAll(pprime - 1); //check smoothness with Pollard's rho
+                if (rsq.Count == 0 || rsq.Max() > (1 << 24)) continue;
+                int i = 0;
+                for (; i < rsq.Count; i++) {
+                    if (BigInteger.ModPow(s, (pprime - 1) / rsq[i], pprime).Equals(BigInteger.One)) break;
+                }
+                if (i == rsq.Count) break;
+            } while (true);
+            rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
+            do
+            {
+                do {
+                    qprime = GetPivotRandom(rng, 128);
+                    if (pprime * qprime <= n) continue;
+                } while (!IsProbablePrime(qprime, 64));
+                int i = 0;
+                for (; i < rs.Count; i++) {
+                    if (rs[i] != 2 && BigInteger.Remainder(qprime, rs[i]) != 0) break;
+                }
+                if (i != rs.Count) continue;
+                rsq = PollardRhoAll(qprime - 1); //check smoothness with Pollard's rho
+                if (rsq.Count == 0 || rsq.Max() > (1 << 24)) continue;
+                i = 0;
+                for (; i < rsq.Count; i++)
+                {
+                    if (BigInteger.ModPow(s, (pprime - 1) / rsq[i], pprime).Equals(BigInteger.One)) break;
+                }
+                if (i == rsq.Count) break;
+            } while (true);
+            bs = new List<int>();
+            BigInteger nprime = pprime * qprime, npp = nprime / (p - 1), npq = nprime / (q - 1), ep = BigInteger.Zero, eq = BigInteger.Zero;
+            //Pohlig-Hellman s^e=pad(m) mod n, s^ep=pad(m) mod p, s^eq=pad(m) mod q
+            for (curr = 0; curr < rs.Count; curr++) {
+                BigInteger gprime = BigInteger.ModPow(s, (pprime - 1) / rs[curr], pprime);
+                BigInteger hprime = BigInteger.ModPow(hm, (pprime - 1) / rs[curr], pprime);
+                for (int i = 0; i < rs[curr]; i++) {
+                    if (BigInteger.ModPow(gprime, i, pprime).Equals(hprime)) {
+                        bs.Add(i); break;
+                    }
+                }
+            }
+            for (int i = 0; i < rs.Count; i++)
+            {
+                BigInteger curcum = rcum / rs[i];
+                ep += bs[i] * curcum * modInverse(curcum, rs[i]);
+            }
+            bs.Clear();
+            rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
+            for (curr = 0; curr < rs.Count; curr++) {
+                BigInteger gprime = BigInteger.ModPow(s, (qprime - 1) / rs[curr], qprime);
+                BigInteger hprime = BigInteger.ModPow(hm, (qprime - 1) / rs[curr], qprime);
+                for (int i = 0; i < rs[curr]; i++) {
+                    if (BigInteger.ModPow(gprime, i, qprime).Equals(hprime)) {
+                        bs.Add(i); break;
+                    }
+                }
+            }
+            for (int i = 0; i < rs.Count; i++)
+            {
+                BigInteger curcum = rcum / rs[i];
+                eq += bs[i] * curcum * modInverse(curcum, rs[i]);
+            }
+            //CRT
+            BigInteger eprime = ep * npp * modInverse(npp, nprime) + eq * npq * modInverse(npq, nprime);
+            Console.WriteLine("e and e' verify: " + BigInteger.ModPow(s, 3, n).Equals(hm) + " " + BigInteger.ModPow(s, eprime, nprime).Equals(hm));
             Console.WriteLine("8.61");
 
             //SET 8 CHALLENGE 62
