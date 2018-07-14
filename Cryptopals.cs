@@ -3490,7 +3490,8 @@ namespace ELTECSharp
         }
         //Montgomery gives in his paper "Speeding the Pollard and Elliptic Curve Methods of Factorization" from 1987 the formula on page 19:
         //x3=((y1-y2)/(x1-x2))^2-A-x1-x2, x coordinate point addition
-        static BigInteger PollardKangarooECmontg(BigInteger a, BigInteger b, int k, Tuple<BigInteger, BigInteger> G, int Ea, int Eb, BigInteger p, Tuple<BigInteger, BigInteger> y)
+        //Affine addition/doubling formulae: http://hyperelliptic.org/EFD/g1p/auto-montgom.html
+        static BigInteger PollardKangarooECmontg(BigInteger a, BigInteger b, int k, Tuple<BigInteger, BigInteger> G, int Ea, int Eb, BigInteger p, Tuple<BigInteger, BigInteger> y, int conv)
         {//modular exponentiation/multiplication is scalar multiplication/group addition on the elliptical curve
             BigInteger xT = BigInteger.Zero;
             Tuple<BigInteger, BigInteger> yT = ladder2(G, b, Ea, Eb, p);
@@ -3501,7 +3502,7 @@ namespace ELTECSharp
             {
                 BigInteger KF = BigInteger.Remainder(KangF(yT.Item1, k), p);
                 xT = xT + KF;
-                yT = addECmontg(yT, ladder2(G, KF, Ea, Eb, p), Ea, p);
+                yT = addEC(yT, ladder2(G, KF, Ea, Eb, p), Ea, p);
             }
             //now yT = g^(b + xT)
             //Console.WriteLine("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
@@ -3511,7 +3512,7 @@ namespace ELTECSharp
             {
                 BigInteger KF = BigInteger.Remainder(KangF(yW.Item1, k), p);
                 xW = xW + KF;
-                yW = addECmontg(yW, scaleEC(G, KF, Ea, p), Ea, p);
+                yW = addEC(yW, scaleEC(G, KF, Ea, p), Ea, p);
                 if (yW == yT)
                 {
                     return b + xT - xW;
@@ -3522,10 +3523,6 @@ namespace ELTECSharp
         static BigInteger KangF(BigInteger y, int k)
         {
             return BigInteger.Pow(2, (int)BigInteger.Remainder(y, k));
-        }
-        static Tuple<BigInteger, BigInteger> addECmontg(Tuple<BigInteger, BigInteger> P1, Tuple<BigInteger, BigInteger> P2, int a, BigInteger GF)
-        { //Affine addition/doubling formulae: http://hyperelliptic.org/EFD/g1p/auto-montgom.html
-            return 0;
         }
         static Tuple<BigInteger, BigInteger> invertEC(Tuple<BigInteger, BigInteger> P, BigInteger GF)
         {
@@ -3667,7 +3664,7 @@ namespace ELTECSharp
         static BigInteger PollardRho(BigInteger n)
         {
             //128 bit integer has maximum factor of 64 bits
-            int limit = 1 << 15; //sqrt(factor) time would imply 2^32 maximum but we dont want factors over 2^24 which is 2^12 iterations maximum
+            int limit = 1 << 16; //sqrt(factor) time would imply 2^32 maximum but we dont want factors over 2^24 which averages to 2^12 iterations maximum, and increase 2^4 more so its less than 1/16 of missing it
             BigInteger x = 2, y = 2, d = 1;
             while (d.Equals(BigInteger.One)) {
                 x = rhog(x, n);
@@ -3968,7 +3965,7 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 60
         p60:
-            //goto p61;
+            goto p61;
             Ea = 534; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
             BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
@@ -4141,6 +4138,7 @@ namespace ELTECSharp
                 {
                     pprime = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(pprime, 64));
+                //pprime = BigInteger.Parse("249432555245681551807782559228068531089");
                 rsq = PollardRhoAll(pprime - 1); //check smoothness with Pollard's rho
                 if (rsq.Count == 0 || rsq.Max() > (1 << 24)) continue;
                 int i = 0;
@@ -4156,9 +4154,10 @@ namespace ELTECSharp
                     qprime = GetPivotRandom(rng, 128);
                     if (pprime * qprime <= n) continue;
                 } while (!IsProbablePrime(qprime, 64));
+                //qprime = BigInteger.Parse("311709173981390741830018526443754440657");
                 int i = 0;
                 for (; i < rs.Count; i++) {
-                    if (rs[i] != 2 && BigInteger.Remainder(qprime, rs[i]) != 0) break;
+                    if (rs[i] != 2 && BigInteger.Remainder(qprime, rs[i]) == 0) break;
                 }
                 if (i != rs.Count) continue;
                 rsq = PollardRhoAll(qprime - 1); //check smoothness with Pollard's rho
@@ -4170,15 +4169,15 @@ namespace ELTECSharp
                 }
                 if (i == rsq.Count) break;
             } while (true);
-            bs = new List<int>();
-            BigInteger nprime = pprime * qprime, npp = nprime / (p - 1), npq = nprime / (q - 1), ep = BigInteger.Zero, eq = BigInteger.Zero;
+            bs = new List<int>(); rcum = 1;
+            BigInteger nprime = pprime * qprime, npp = nprime / (_p - 1), npq = nprime / (_q - 1), ep = BigInteger.Zero, eq = BigInteger.Zero;
             //Pohlig-Hellman s^e=pad(m) mod n, s^ep=pad(m) mod p, s^eq=pad(m) mod q
             for (curr = 0; curr < rs.Count; curr++) {
                 BigInteger gprime = BigInteger.ModPow(s, (pprime - 1) / rs[curr], pprime);
                 BigInteger hprime = BigInteger.ModPow(hm, (pprime - 1) / rs[curr], pprime);
                 for (int i = 0; i < rs[curr]; i++) {
                     if (BigInteger.ModPow(gprime, i, pprime).Equals(hprime)) {
-                        bs.Add(i); break;
+                        bs.Add(i); rcum *= rs[curr]; break;
                     }
                 }
             }
@@ -4187,14 +4186,14 @@ namespace ELTECSharp
                 BigInteger curcum = rcum / rs[i];
                 ep += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
-            bs.Clear();
+            bs.Clear(); rcum = 1;
             rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
             for (curr = 0; curr < rs.Count; curr++) {
                 BigInteger gprime = BigInteger.ModPow(s, (qprime - 1) / rs[curr], qprime);
                 BigInteger hprime = BigInteger.ModPow(hm, (qprime - 1) / rs[curr], qprime);
                 for (int i = 0; i < rs[curr]; i++) {
                     if (BigInteger.ModPow(gprime, i, qprime).Equals(hprime)) {
-                        bs.Add(i); break;
+                        bs.Add(i); rcum *= rs[curr]; break;
                     }
                 }
             }
@@ -4204,7 +4203,7 @@ namespace ELTECSharp
                 eq += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
             //CRT
-            BigInteger eprime = ep * npp * modInverse(npp, nprime) + eq * npq * modInverse(npq, nprime);
+            BigInteger eprime = ep * npp * modInverse(npp, nprime) + eq * npq * modInverse(npq, rcum);
             Console.WriteLine("e and e' verify: " + BigInteger.ModPow(s, 3, n).Equals(hm) + " " + BigInteger.ModPow(s, eprime, nprime).Equals(hm));
             Console.WriteLine("8.61");
 
