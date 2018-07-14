@@ -4121,9 +4121,11 @@ namespace ELTECSharp
                 do {
                     _p = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_p, 64));
+                _p = BigInteger.Parse("252919978488117916147778994275562072491");
                 do {
                     _q = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_q, 64));
+                _q = BigInteger.Parse("212353757101997844028225694411779588517");
             } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
             BigInteger n = _p * _q;
             d = modInverse(3, et);
@@ -4138,7 +4140,7 @@ namespace ELTECSharp
                 {
                     pprime = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(pprime, 64));
-                //pprime = BigInteger.Parse("249432555245681551807782559228068531089");
+                pprime = BigInteger.Parse("254020701007860332256656456025272804327");
                 rsq = PollardRhoAll(pprime - 1); //check smoothness with Pollard's rho
                 if (rsq.Count == 0 || rsq.Max() > (1 << 24)) continue;
                 int i = 0;
@@ -4154,7 +4156,7 @@ namespace ELTECSharp
                     qprime = GetPivotRandom(rng, 128);
                     if (pprime * qprime <= n) continue;
                 } while (!IsProbablePrime(qprime, 64));
-                //qprime = BigInteger.Parse("311709173981390741830018526443754440657");
+                qprime = BigInteger.Parse("172760095752777414470818437006698692537");
                 int i = 0;
                 for (; i < rs.Count; i++) {
                     if (rs[i] != 2 && BigInteger.Remainder(qprime, rs[i]) == 0) break;
@@ -4203,7 +4205,7 @@ namespace ELTECSharp
                 eq += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
             //CRT
-            BigInteger eprime = ep * npp * modInverse(npp, nprime) + eq * npq * modInverse(npq, rcum);
+            BigInteger eprime = ep * npp * modInverse(npp, npq) + eq * npq * modInverse(npq, npp);
             Console.WriteLine("e and e' verify: " + BigInteger.ModPow(s, 3, n).Equals(hm) + " " + BigInteger.ModPow(s, eprime, nprime).Equals(hm));
             Console.WriteLine("8.61");
 
