@@ -3700,6 +3700,53 @@ namespace ELTECSharp
             } while (true);
             facs.Clear(); return facs;
         }
+        static List<Tuple<BigInteger, BigInteger>> proj(List<Tuple<BigInteger, BigInteger>> u, List<Tuple<BigInteger, BigInteger>> v)
+        {
+            if (u.All((Tuple<BigInteger, BigInteger> el) => el.Item1 == 0)) return u;
+            Tuple<BigInteger, BigInteger> m = mu(u, v);
+            return u.Select((Tuple<BigInteger, BigInteger> el) => new Tuple<BigInteger, BigInteger>(m.Item1 * el.Item1, m.Item2 * el.Item2)).ToList();
+        }
+        static List<List<Tuple<BigInteger, BigInteger>>> gramschmidt(List<List<Tuple<BigInteger, BigInteger>>> B)
+        {
+            List<List<Tuple<BigInteger, BigInteger>>> Q = new List<List<Tuple<BigInteger, BigInteger>>>();
+            foreach (List<Tuple<BigInteger, BigInteger>> v in B) {
+                for (int i = 0; i < v.Count; i++) {
+                    List<Tuple<BigInteger, BigInteger>> u;
+                    //proj(u, v).Sum();
+                }
+            }
+            return Q;
+        }
+        static Tuple<BigInteger, BigInteger> mu(List<Tuple<BigInteger, BigInteger>> i, List<Tuple<BigInteger, BigInteger>> j)
+        {
+            Tuple<BigInteger, BigInteger> uv = i.Zip(j, (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item1, u.Item2 * v.Item2)).Aggregate((Tuple<BigInteger, BigInteger> val, Tuple<BigInteger, BigInteger> acc) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1, val.Item2));
+            Tuple<BigInteger, BigInteger> u2 = j.Aggregate((Tuple<BigInteger, BigInteger> val, Tuple<BigInteger, BigInteger> acc) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 * val.Item2 + val.Item1 * val.Item1, val.Item2 * val.Item2));
+            return new Tuple<BigInteger, BigInteger>(uv.Item1 * u2.Item2, uv.Item2 * u2.Item1);
+        }
+        static List<List<Tuple<BigInteger, BigInteger>>> LLL(List<List<Tuple<BigInteger, BigInteger>>> B, Tuple<BigInteger, BigInteger> delta)
+        {
+            List<List<Tuple<BigInteger, BigInteger>>> Q = gramschmidt(B);
+            int n = B.Count;
+            int k = 1;
+            while (k < n) {
+                for (int j = k; j > 0; j--) {
+                    if (mu(Q[j], B[k])) {
+                        B[k] = B[k].Select();
+                        Q = gramschmidt(B);
+                    }
+                    if (Q[k] * Q[k] >= (delta - mu(Q[k-1], B[k]) * mu(Q[k - 1], B[k])) * (Q[k-1] * Q[k-1])) {
+                        k++;
+                    } else {
+                        List<Tuple<BigInteger, BigInteger>> swap = B[k];
+                        B[k] = B[k - 1];
+                        B[k - 1] = swap;
+                        Q = gramschmidt(B);
+                        k = Math.Max(k - 1, 1);
+                    }
+                }
+            }
+            return B;
+        }
         static void Set8()
         {
             //SET 8 CHALLENGE 57
