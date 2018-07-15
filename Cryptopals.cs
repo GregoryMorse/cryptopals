@@ -2594,7 +2594,7 @@ namespace ELTECSharp
             byte[] r = new byte[(BitSize >> 3) + 1];
             rng.GetBytes(r);
             r[r.Length - 1] &= (byte)((1 << (BitSize % 8)) - 1); //make sure it wont be interpreted as negative in little-endian order
-            return new BigInteger(r);
+            return new BigInteger(r) >= Max ? Max - 1 : new BigInteger(r);
         }
         static byte[] PadToSize(byte[] arr, int size)
         {
@@ -3551,6 +3551,7 @@ namespace ELTECSharp
         }
         static BigInteger TonelliShanks(RNGCryptoServiceProvider rng, BigInteger n, BigInteger p) //inverse modular square root
         {
+            //Console.WriteLine(BigInteger.ModPow(n, (p - 1) / 2, p) == 1); //Euler's criterion must equal one or no square root exists
             BigInteger S = 0, Q = p - 1;
             while (Q.IsEven) {
                 S += 1; Q /= 2;
@@ -3684,7 +3685,8 @@ namespace ELTECSharp
             do {
                 BigInteger fac = PollardRho(n);
                 if (fac.Equals(BigInteger.Zero)) break;
-                facs.Add(fac);
+                if (fac.IsPowerOfTwo) fac = 2; else if (!IsProbablePrime(fac, 64)) break;
+                facs.Add(fac); 
                 n = n / fac;
                 BigInteger remainder, quot = BigInteger.DivRem(n, fac, out remainder);
                 while (remainder.Equals(BigInteger.Zero)) {
@@ -4156,10 +4158,10 @@ namespace ELTECSharp
                     qprime = GetPivotRandom(rng, 128);
                     if (pprime * qprime <= n) continue;
                 } while (!IsProbablePrime(qprime, 64));
-                qprime = BigInteger.Parse("172760095752777414470818437006698692537");
+                qprime = BigInteger.Parse("266237645118740561410025069955757680311");
                 int i = 0;
                 for (; i < rs.Count; i++) {
-                    if (rs[i] != 2 && BigInteger.Remainder(qprime, rs[i]) == 0) break;
+                    if (rs[i] != 2 && BigInteger.Remainder(qprime - 1, rs[i]) == 0) break;
                 }
                 if (i != rs.Count) continue;
                 rsq = PollardRhoAll(qprime - 1); //check smoothness with Pollard's rho
@@ -4172,7 +4174,7 @@ namespace ELTECSharp
                 if (i == rsq.Count) break;
             } while (true);
             bs = new List<int>(); rcum = 1;
-            BigInteger nprime = pprime * qprime, npp = nprime / (_p - 1), npq = nprime / (_q - 1), ep = BigInteger.Zero, eq = BigInteger.Zero;
+            BigInteger nprime = pprime * qprime, npp = qprime - 1, npq = pprime - 1, ep = BigInteger.Zero, eq = BigInteger.Zero;
             //Pohlig-Hellman s^e=pad(m) mod n, s^ep=pad(m) mod p, s^eq=pad(m) mod q
             for (curr = 0; curr < rs.Count; curr++) {
                 BigInteger gprime = BigInteger.ModPow(s, (pprime - 1) / rs[curr], pprime);
@@ -4188,7 +4190,9 @@ namespace ELTECSharp
                 BigInteger curcum = rcum / rs[i];
                 ep += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
+            ep = BigInteger.Remainder(ep, rcum);
             bs.Clear(); rcum = 1;
+            List<int> rso = rs;
             rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
             for (curr = 0; curr < rs.Count; curr++) {
                 BigInteger gprime = BigInteger.ModPow(s, (qprime - 1) / rs[curr], qprime);
@@ -4204,9 +4208,42 @@ namespace ELTECSharp
                 BigInteger curcum = rcum / rs[i];
                 eq += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
-            //CRT
-            BigInteger eprime = ep * npp * modInverse(npp, npq) + eq * npq * modInverse(npq, npp);
-            Console.WriteLine("e and e' verify: " + BigInteger.ModPow(s, 3, n).Equals(hm) + " " + BigInteger.ModPow(s, eprime, nprime).Equals(hm));
+            eq = BigInteger.Remainder(eq, rcum);
+            rso.AddRange(rs);
+            Console.WriteLine("ep and eq verify: " + BigInteger.ModPow(s, ep, pprime).Equals(BigInteger.Remainder(hm, pprime)) + " " + BigInteger.ModPow(s, eq, qprime).Equals(BigInteger.Remainder(hm, qprime)));
+            //BigInteger gpr = BigInteger.ModPow(s, qprime - 1, nprime);
+            //BigInteger hpr = BigInteger.ModPow(hm, qprime - 1, nprime); // = BigInteger.ModPow(gpr, ep, nprime)
+            //CRT but (p-1) and (q-1) and not pairwise coprime, share factor of 2
+            BigInteger eprime = BigInteger.Remainder(ep * qprime * modInverse(qprime, pprime) + eq * pprime * modInverse(pprime, qprime), pprime * qprime);
+            npp = qprime - 1;
+            eprime = BigInteger.Remainder(ep * (npp / 2) * modInverse(npp / 2, npq) + eq * npq * modInverse(npq, npp / 2), npq * npp / 2);
+            /*for (int i = 0; i < rso.Count; i++) {
+                BigInteger rem, quot = BigInteger.DivRem(eprime, rso[i], out rem);
+                while (rem.Equals(BigInteger.Zero)) {
+                    Console.WriteLine(rso[i]);
+                    eprime = quot;
+                    quot = BigInteger.DivRem(eprime, rso[i], out rem);
+                }
+            }*/
+            Console.WriteLine("eprime for ep and eq: " + BigInteger.Remainder(eprime, pprime-1).Equals(ep) + " " + BigInteger.Remainder(eprime, qprime-1).Equals(eq));
+            //eprime must be coprime with npp * npq!!!
+            //eprime = BigInteger.Remainder(ep * npp * modInverse(npp, npq) + eq * npq * modInverse(pprime, npp), npq * npp);
+            dprime = modInverse(eprime / 2, npp * npq);
+            Console.WriteLine(BigInteger.Remainder(dprime * eprime / 2, npp * npq)); //this must be 1
+            //now there is a problem since this common factor of 2 (hence not having common factors in the problem description)
+            //requires that whenever using this new decryption key, a square root is taken since it is only half (so its interpeted as m^(e/2) instead of m^e)
+            Console.WriteLine("e and e' verify: " + BigInteger.ModPow(s, 3, n).Equals(hm) + " " + BigInteger.ModPow(s, eprime, nprime).Equals(BigInteger.Remainder(hm, nprime)));
+            //must start over with new primes, encryption and decryption key specific to every plaintext to decrypt
+            //4 possible CRT combinations - can verify correct one by reencrypting
+            Console.WriteLine("Encrypt and decrypt original and new: " + new ByteArrayComparer().Equals(BigInteger.ModPow(BigInteger.ModPow(new BigInteger(m.Take(15).ToArray()), 3, n), d, n).ToByteArray(), m.Take(15).ToArray()) + " " +
+                (BigInteger.Remainder(TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime) * qprime * modInverse(qprime, pprime) + TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime) * pprime * modInverse(pprime, qprime), pprime * qprime) == s) + " " +
+                (BigInteger.Remainder((pprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime)) * qprime * modInverse(qprime, pprime) + TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime) * pprime * modInverse(pprime, qprime), pprime * qprime) == s) + " " +
+                (BigInteger.Remainder(TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime) == s) + " " +
+                (BigInteger.Remainder((pprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime)) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime) == s) + " " +
+                BigInteger.Remainder(TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime) * qprime * modInverse(qprime, pprime) + TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime) * pprime * modInverse(pprime, qprime), pprime * qprime) + " " +
+                BigInteger.Remainder((pprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime)) * qprime * modInverse(qprime, pprime) + TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime) * pprime * modInverse(pprime, qprime), pprime * qprime) + " " +
+                BigInteger.Remainder(TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime) + " " +
+                BigInteger.Remainder((pprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime)) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime));
             Console.WriteLine("8.61");
 
             //SET 8 CHALLENGE 62
