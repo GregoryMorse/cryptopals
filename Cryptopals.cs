@@ -3713,12 +3713,13 @@ namespace ELTECSharp
             for (int i = Q.Count; i < B.Count; i++) {
                 List<Tuple<BigInteger, BigInteger>> v = B[i];
                 List<Tuple<BigInteger, BigInteger>> p = Q.Select((u) => proj(u, v)).Aggregate((b, t) => t.Zip(b, (s, a) => new Tuple<BigInteger, BigInteger>(s.Item1 * a.Item2 + s.Item2 * a.Item1, s.Item2 * a.Item2)).ToList()).ToList();
-                Q.Add(v.Zip(p, (t, s) => new Tuple<BigInteger, BigInteger>(t.Item1 * s.Item2 - t.Item2 * s.Item1, t.Item2 * s.Item2)).ToList());
+                Q.Add(v.Zip(p, (t, s) => reducFrac(new Tuple<BigInteger, BigInteger>(t.Item1 * s.Item2 - t.Item2 * s.Item1, t.Item2 * s.Item2))).ToList());
             }
             return Q;
         }
         static Tuple<BigInteger, BigInteger> reducFrac(Tuple<BigInteger, BigInteger> j)
         { //negative numerator and denominator could also be removed
+            if (j.Item1 == 0) return new Tuple<BigInteger, BigInteger>(0, 1);
             BigInteger gcd = BigInteger.GreatestCommonDivisor(j.Item1, j.Item2);
             return new Tuple<BigInteger, BigInteger>(j.Item1 / gcd, j.Item2 / gcd);
         }
@@ -3726,13 +3727,13 @@ namespace ELTECSharp
         {
             //a1^2/b1^2 + ... + an^2/bn^2
             //an^2*accb+acca*bn^2/bn^2*accb
-            return j.Select((u) => new Tuple<BigInteger, BigInteger>(u.Item1 * u.Item1, u.Item2 * u.Item2)).Aggregate((Tuple<BigInteger, BigInteger> acc, Tuple<BigInteger, BigInteger> val) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1 * acc.Item2, val.Item2 * acc.Item2));
+            return reducFrac(j.Select((u) => new Tuple<BigInteger, BigInteger>(u.Item1 * u.Item1, u.Item2 * u.Item2)).Aggregate((Tuple<BigInteger, BigInteger> acc, Tuple<BigInteger, BigInteger> val) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1 * acc.Item2, val.Item2 * acc.Item2)));
         }
         static Tuple<BigInteger, BigInteger> mu(List<Tuple<BigInteger, BigInteger>> i, List<Tuple<BigInteger, BigInteger>> j)
         {
             Tuple<BigInteger, BigInteger> uv = i.Zip(j, (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item1, u.Item2 * v.Item2)).Aggregate((Tuple<BigInteger, BigInteger> acc, Tuple<BigInteger, BigInteger> val) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1 * acc.Item2, val.Item2 * acc.Item2));
             Tuple<BigInteger, BigInteger> u2 = vecSqr(j);
-            return new Tuple<BigInteger, BigInteger>(uv.Item1 * u2.Item2, uv.Item2 * u2.Item1);
+            return reducFrac(new Tuple<BigInteger, BigInteger>(uv.Item1 * u2.Item2, uv.Item2 * u2.Item1));
         }
         static List<List<Tuple<BigInteger, BigInteger>>> LLL(List<List<Tuple<BigInteger, BigInteger>>> B, Tuple<BigInteger, BigInteger> delta)
         {
@@ -3741,20 +3742,23 @@ namespace ELTECSharp
             int k = 1;
             while (k < n) {
                 for (int j = k - 1; j >= 0; j--) {
+                //for (int j = 0; j <= k-1; j++) {
                     Tuple<BigInteger, BigInteger> mjk = mu(B[k], Q[j]); //mu(k,j) >= 0 ? > 1/2 : < -1/2, !(-1/2 >= mu(k,j) <= 1/2)
-                    if (mjk.Item1 * 2 - mjk.Item2 > 0 || mjk.Item1 * 2 + mjk.Item2 < 0)
+                    if ((mjk.Item1 * 2 - mjk.Item2) > 0 || (mjk.Item1 * 2 + mjk.Item2) < 0)
                     { //rounding by adding half of divisor before lbound dividing round(a/b)=lbound(a/b+1/2)=lbound((2a+b)/2b)
-                        List<Tuple<BigInteger, BigInteger>> test = B[k].Zip(B[j], (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * ((2 * mjk.Item1 + mjk.Item2) / (2 * mjk.Item2)), u.Item2 * v.Item2)).ToList();
-                        if (!B[k].SequenceEqual(test)) {
-                            B[k] = test;
-                            Q = gramschmidt(B, Q.Take(k-1).ToList());
-                        }
+                        //BigInteger mjkRnd = ((2 * mjk.Item1 + mjk.Item2) / (2 * mjk.Item2)); //round down on tie semantics but this wrongly forgets negatives
+                        BigInteger mjkRem, mjkRnd = BigInteger.DivRem(mjk.Item1, mjk.Item2, out mjkRem); //proper round down on tie semantics
+                        mjkRnd += (mjkRem * 2 > mjk.Item2 ? 1 : (mjkRem * 2 < -mjk.Item2 ? -1 : 0));
+                        List<Tuple<BigInteger, BigInteger>> test = B[k].Zip(B[j], (u, v) => reducFrac(new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * mjkRnd, u.Item2 * v.Item2))).ToList();
+                        B[k] = test;
+                        Q = gramschmidt(B, Q.Take(k-1).ToList());
                     }
                 }
                 Tuple<BigInteger, BigInteger> m = mu(B[k], Q[k - 1]);
                 Tuple<BigInteger, BigInteger> Qkm1 = vecSqr(Q[k - 1]);
                 Tuple<BigInteger, BigInteger> Qsqr = vecSqr(Q[k]);
                 Tuple<BigInteger, BigInteger> Cmp = new Tuple<BigInteger, BigInteger>((delta.Item1 * m.Item2 * m.Item2 - delta.Item2 * m.Item1 * m.Item1) * Qkm1.Item1, delta.Item2 * m.Item2 * m.Item2 * Qkm1.Item2);
+                //a/b>=c/d === ad>=bc
                 if (Qsqr.Item1 * Cmp.Item2 - Qsqr.Item2 * Cmp.Item1 >= 0) {
                     k++;
                 } else {
