@@ -3703,24 +3703,37 @@ namespace ELTECSharp
         static List<Tuple<BigInteger, BigInteger>> proj(List<Tuple<BigInteger, BigInteger>> u, List<Tuple<BigInteger, BigInteger>> v)
         {
             if (u.All((Tuple<BigInteger, BigInteger> el) => el.Item1 == 0)) return u;
-            Tuple<BigInteger, BigInteger> m = mu(u, v);
+            Tuple<BigInteger, BigInteger> m = mu(v, u);
             return u.Select((Tuple<BigInteger, BigInteger> el) => new Tuple<BigInteger, BigInteger>(m.Item1 * el.Item1, m.Item2 * el.Item2)).ToList();
         }
         static List<List<Tuple<BigInteger, BigInteger>>> gramschmidt(List<List<Tuple<BigInteger, BigInteger>>> B)
         {
             List<List<Tuple<BigInteger, BigInteger>>> Q = new List<List<Tuple<BigInteger, BigInteger>>>();
-            foreach (List<Tuple<BigInteger, BigInteger>> v in B) {
-                for (int i = 0; i < v.Count; i++) {
-                    List<Tuple<BigInteger, BigInteger>> u;
-                    //proj(u, v).Sum();
+            for (int i = 0; i < B.Count; i++) {
+                List<Tuple<BigInteger, BigInteger>> v = B[i];
+                if (Q.Count == 0) Q.Add(v);
+                else {
+                    List<Tuple<BigInteger, BigInteger>> p = Q.Select((u) => proj(u, v)).Aggregate((b, t) => t.Zip(b, (s, a) => new Tuple<BigInteger, BigInteger>(s.Item1 * a.Item2 + s.Item2 * a.Item1, s.Item2 * a.Item2)).ToList()).ToList();
+                    Q.Add(v.Zip(p, (t, s) => new Tuple<BigInteger, BigInteger>(t.Item1 * s.Item2 - t.Item2 * s.Item1, t.Item2 * s.Item2)).ToList());
                 }
             }
             return Q;
         }
+        static Tuple<BigInteger, BigInteger> reducFrac(Tuple<BigInteger, BigInteger> j)
+        { //negative numerator and denominator could also be removed
+            BigInteger gcd = BigInteger.GreatestCommonDivisor(j.Item1, j.Item2);
+            return new Tuple<BigInteger, BigInteger>(j.Item1 / gcd, j.Item2 / gcd);
+        }
+        static Tuple<BigInteger, BigInteger> vecSqr(List<Tuple<BigInteger, BigInteger>> j)
+        {
+            //a1^2/b1^2 + ... + an^2/bn^2
+            //an^2*accb+acca*bn^2/bn^2*accb
+            return j.Select((u) => new Tuple<BigInteger, BigInteger>(u.Item1 * u.Item1, u.Item2 * u.Item2)).Aggregate((Tuple<BigInteger, BigInteger> acc, Tuple<BigInteger, BigInteger> val) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1 * acc.Item2, val.Item2 * acc.Item2));
+        }
         static Tuple<BigInteger, BigInteger> mu(List<Tuple<BigInteger, BigInteger>> i, List<Tuple<BigInteger, BigInteger>> j)
         {
-            Tuple<BigInteger, BigInteger> uv = i.Zip(j, (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item1, u.Item2 * v.Item2)).Aggregate((Tuple<BigInteger, BigInteger> val, Tuple<BigInteger, BigInteger> acc) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1, val.Item2));
-            Tuple<BigInteger, BigInteger> u2 = j.Aggregate((Tuple<BigInteger, BigInteger> val, Tuple<BigInteger, BigInteger> acc) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 * val.Item2 + val.Item1 * val.Item1, val.Item2 * val.Item2));
+            Tuple<BigInteger, BigInteger> uv = i.Zip(j, (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item1, u.Item2 * v.Item2)).Aggregate((Tuple<BigInteger, BigInteger> acc, Tuple<BigInteger, BigInteger> val) => new Tuple<BigInteger, BigInteger>(acc.Item1 * val.Item2 + val.Item1 * acc.Item2, val.Item2 * acc.Item2));
+            Tuple<BigInteger, BigInteger> u2 = vecSqr(j);
             return new Tuple<BigInteger, BigInteger>(uv.Item1 * u2.Item2, uv.Item2 * u2.Item1);
         }
         static List<List<Tuple<BigInteger, BigInteger>>> LLL(List<List<Tuple<BigInteger, BigInteger>>> B, Tuple<BigInteger, BigInteger> delta)
@@ -3729,20 +3742,26 @@ namespace ELTECSharp
             int n = B.Count;
             int k = 1;
             while (k < n) {
-                for (int j = k; j > 0; j--) {
-                    if (mu(Q[j], B[k])) {
-                        B[k] = B[k].Select();
+                for (int j = k - 1; j >= 0; j--) {
+                    Tuple<BigInteger, BigInteger> mjk = mu(B[k], Q[j]); //mu(k,j) >= 0 ? > 1/2 : < -1/2
+                    if (mjk.Item1 * 2 - mjk.Item2 > 0 || mjk.Item1 * 2 + mjk.Item2 < 0)
+                    { //rounding by adding half of divisor before dividing
+                        B[k] = B[k].Zip(B[j], (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * ((mjk.Item1 + mjk.Item2 / 2) / mjk.Item2), u.Item2 * v.Item2)).ToList();
                         Q = gramschmidt(B);
                     }
-                    if (Q[k] * Q[k] >= (delta - mu(Q[k-1], B[k]) * mu(Q[k - 1], B[k])) * (Q[k-1] * Q[k-1])) {
-                        k++;
-                    } else {
-                        List<Tuple<BigInteger, BigInteger>> swap = B[k];
-                        B[k] = B[k - 1];
-                        B[k - 1] = swap;
-                        Q = gramschmidt(B);
-                        k = Math.Max(k - 1, 1);
-                    }
+                }
+                Tuple<BigInteger, BigInteger> m = mu(B[k], Q[k - 1]);
+                Tuple<BigInteger, BigInteger> Qkm1 = vecSqr(Q[k - 1]);
+                Tuple<BigInteger, BigInteger> Qsqr = vecSqr(Q[k]);
+                Tuple<BigInteger, BigInteger> Cmp = new Tuple<BigInteger, BigInteger>((delta.Item1 * m.Item2 * m.Item2 - delta.Item2 * m.Item1 * m.Item1) * Qkm1.Item1, delta.Item2 * m.Item2 * m.Item2 * Qkm1.Item2);
+                if (Qsqr.Item1 * Cmp.Item2 - Qsqr.Item2 * Cmp.Item1 >= 0) {
+                    k++;
+                } else {
+                    List<Tuple<BigInteger, BigInteger>> swap = B[k];
+                    B[k] = B[k - 1];
+                    B[k - 1] = swap;
+                    Q = gramschmidt(B);
+                    k = Math.Max(k - 1, 1);
                 }
             }
             return B;
@@ -4145,8 +4164,9 @@ namespace ELTECSharp
             }
             Console.WriteLine("8.60 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
-            //SET 8 CHALLENGE 61
-            p61:
+        //SET 8 CHALLENGE 61
+        p61:
+            goto p62;
             BigInteger d;
             do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
             Tuple<BigInteger, BigInteger> Q = scaleEC(G, d, EaOrig, GF);
@@ -4293,7 +4313,24 @@ namespace ELTECSharp
                 BigInteger.Remainder((pprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime)) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime));
             Console.WriteLine("8.61");
 
-            //SET 8 CHALLENGE 62
+        //SET 8 CHALLENGE 62
+        p62:
+            List<List<Tuple<BigInteger, BigInteger>>> Result = LLL(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(3, 1), new Tuple<BigInteger, BigInteger>(5, 1), new Tuple<BigInteger, BigInteger>(6, 1) }},
+                new Tuple<BigInteger, BigInteger>(99, 100));
+            Console.WriteLine("Wikipedia LLL result: " + Result.Zip(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(0, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(1, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(2, 1) }}, (r1, r2) => r1.SequenceEqual(r2)).All((b) => b));
+            Result = LLL(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-2, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(2, 1), new Tuple<BigInteger, BigInteger>(0, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 2), new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(0, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(-2, 1), new Tuple<BigInteger, BigInteger>(1, 2) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(2, 1) } },
+                new Tuple<BigInteger, BigInteger>(99, 100));
+            Console.WriteLine("LLL verification: " + Result.Zip(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 2), new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(0, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(-2, 1), new Tuple<BigInteger, BigInteger>(1, 2) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 2), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
+                new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-3, 2), new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(2, 1), new Tuple<BigInteger, BigInteger>(0, 1) }}, (r1, r2) => r1.SequenceEqual(r2)).All((b) => b));
             Console.WriteLine("8.62");
 
             //SET 8 CHALLENGE 63
