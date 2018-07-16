@@ -3706,16 +3706,14 @@ namespace ELTECSharp
             Tuple<BigInteger, BigInteger> m = mu(v, u);
             return u.Select((Tuple<BigInteger, BigInteger> el) => new Tuple<BigInteger, BigInteger>(m.Item1 * el.Item1, m.Item2 * el.Item2)).ToList();
         }
-        static List<List<Tuple<BigInteger, BigInteger>>> gramschmidt(List<List<Tuple<BigInteger, BigInteger>>> B)
+        static List<List<Tuple<BigInteger, BigInteger>>> gramschmidt(List<List<Tuple<BigInteger, BigInteger>>> B, List<List<Tuple<BigInteger, BigInteger>>> Q)
         {
-            List<List<Tuple<BigInteger, BigInteger>>> Q = new List<List<Tuple<BigInteger, BigInteger>>>();
-            for (int i = 0; i < B.Count; i++) {
+            if (Q == null) Q = new List<List<Tuple<BigInteger, BigInteger>>>();
+            if (Q.Count == 0 && B.Count != 0) Q.Add(B[0]);
+            for (int i = Q.Count; i < B.Count; i++) {
                 List<Tuple<BigInteger, BigInteger>> v = B[i];
-                if (Q.Count == 0) Q.Add(v);
-                else {
-                    List<Tuple<BigInteger, BigInteger>> p = Q.Select((u) => proj(u, v)).Aggregate((b, t) => t.Zip(b, (s, a) => new Tuple<BigInteger, BigInteger>(s.Item1 * a.Item2 + s.Item2 * a.Item1, s.Item2 * a.Item2)).ToList()).ToList();
-                    Q.Add(v.Zip(p, (t, s) => new Tuple<BigInteger, BigInteger>(t.Item1 * s.Item2 - t.Item2 * s.Item1, t.Item2 * s.Item2)).ToList());
-                }
+                List<Tuple<BigInteger, BigInteger>> p = Q.Select((u) => proj(u, v)).Aggregate((b, t) => t.Zip(b, (s, a) => new Tuple<BigInteger, BigInteger>(s.Item1 * a.Item2 + s.Item2 * a.Item1, s.Item2 * a.Item2)).ToList()).ToList();
+                Q.Add(v.Zip(p, (t, s) => new Tuple<BigInteger, BigInteger>(t.Item1 * s.Item2 - t.Item2 * s.Item1, t.Item2 * s.Item2)).ToList());
             }
             return Q;
         }
@@ -3738,16 +3736,19 @@ namespace ELTECSharp
         }
         static List<List<Tuple<BigInteger, BigInteger>>> LLL(List<List<Tuple<BigInteger, BigInteger>>> B, Tuple<BigInteger, BigInteger> delta)
         {
-            List<List<Tuple<BigInteger, BigInteger>>> Q = gramschmidt(B);
+            List<List<Tuple<BigInteger, BigInteger>>> Q = gramschmidt(B, null);
             int n = B.Count;
             int k = 1;
             while (k < n) {
                 for (int j = k - 1; j >= 0; j--) {
-                    Tuple<BigInteger, BigInteger> mjk = mu(B[k], Q[j]); //mu(k,j) >= 0 ? > 1/2 : < -1/2
+                    Tuple<BigInteger, BigInteger> mjk = mu(B[k], Q[j]); //mu(k,j) >= 0 ? > 1/2 : < -1/2, !(-1/2 >= mu(k,j) <= 1/2)
                     if (mjk.Item1 * 2 - mjk.Item2 > 0 || mjk.Item1 * 2 + mjk.Item2 < 0)
-                    { //rounding by adding half of divisor before dividing
-                        B[k] = B[k].Zip(B[j], (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * ((mjk.Item1 + mjk.Item2 / 2) / mjk.Item2), u.Item2 * v.Item2)).ToList();
-                        Q = gramschmidt(B);
+                    { //rounding by adding half of divisor before lbound dividing round(a/b)=lbound(a/b+1/2)=lbound((2a+b)/2b)
+                        List<Tuple<BigInteger, BigInteger>> test = B[k].Zip(B[j], (u, v) => new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * ((2 * mjk.Item1 + mjk.Item2) / (2 * mjk.Item2)), u.Item2 * v.Item2)).ToList();
+                        if (!B[k].SequenceEqual(test)) {
+                            B[k] = test;
+                            Q = gramschmidt(B, Q.Take(k-1).ToList());
+                        }
                     }
                 }
                 Tuple<BigInteger, BigInteger> m = mu(B[k], Q[k - 1]);
@@ -3757,11 +3758,13 @@ namespace ELTECSharp
                 if (Qsqr.Item1 * Cmp.Item2 - Qsqr.Item2 * Cmp.Item1 >= 0) {
                     k++;
                 } else {
-                    List<Tuple<BigInteger, BigInteger>> swap = B[k];
-                    B[k] = B[k - 1];
-                    B[k - 1] = swap;
-                    Q = gramschmidt(B);
-                    k = Math.Max(k - 1, 1);
+                    if (!B[k].SequenceEqual(B[k - 1])) {
+                        List<Tuple<BigInteger, BigInteger>> swap = B[k];
+                        B[k] = B[k - 1];
+                        B[k - 1] = swap;
+                        k = Math.Max(k - 1, 1);
+                        Q = gramschmidt(B, Q.Take(k - 1).ToList());
+                    } else k = Math.Max(k - 1, 1);
                 }
             }
             return B;
