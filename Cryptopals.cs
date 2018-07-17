@@ -4361,7 +4361,7 @@ namespace ELTECSharp
             Q = scaleEC(G, d, EaOrig, GF);
             hm = BytesToBigInt(hf.ComputeHash(m));
             List<List<Tuple<BigInteger, BigInteger>>> Basis = new List<List<Tuple<BigInteger, BigInteger>>>();
-            const int trials = 14;
+            const int trials = 20;
             for (int i = 0; i < trials; i++) {
                 Basis.Add(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), i).Concat(new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(BPOrd, 1) }).Concat(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), trials + 2 - 1 - i)).ToList());
             }
@@ -4377,7 +4377,10 @@ namespace ELTECSharp
             }
             //ct = 1/2^l, cu = q/2^l
             Tuple<BigInteger, BigInteger> cu = reducFrac(new Tuple<BigInteger, BigInteger>(BPOrd, 1 << 8));
-            bt.Add(new Tuple<BigInteger, BigInteger>(1, 1 << 8)); bt.Add(new Tuple<BigInteger, BigInteger>(0, 1));
+            bt.Add(new Tuple<BigInteger, BigInteger>(1, 1 << 8));
+            //Tuple<BigInteger, BigInteger> cu = reducFrac(new Tuple<BigInteger, BigInteger>(BigInteger.Remainder(BPOrd * modInverse(1 << 8, BPOrd), BPOrd), 1));
+            //bt.Add(new Tuple<BigInteger, BigInteger>(modInverse(1 << 8, BPOrd), 1));
+            bt.Add(new Tuple<BigInteger, BigInteger>(0, 1));
             bu.Add(new Tuple<BigInteger, BigInteger>(0, 1)); bu.Add(cu);
             Basis.Add(bt); Basis.Add(bu);
             LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100)); //about an hour with 22 vector basis, 3 minutes for 14 vector basis, 8 minutes for 16 vector basis
