@@ -4368,18 +4368,20 @@ namespace ELTECSharp
                 //t = r / ( s * (1 << 8)), u = H(m) / (-s * (1 << 8))
                 bt.Add(new Tuple<BigInteger, BigInteger>(BigInteger.Remainder(res.Item1 * modInverse(res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
                 bu.Add(new Tuple<BigInteger, BigInteger>(posRemainder(hm * modInverse(-res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
+                //bt.Add(new Tuple<BigInteger, BigInteger>(res.Item1, res.Item2 * (1 << 8)));
+                //bu.Add(new Tuple<BigInteger, BigInteger>(hm, -res.Item2 * (1 << 8)));
             }
             //ct = 1/2^l, cu = q/2^l
             Tuple<BigInteger, BigInteger> cu = reducFrac(new Tuple<BigInteger, BigInteger>(BPOrd, 1 << 8));
             bt.Add(new Tuple<BigInteger, BigInteger>(1, 1 << 8)); bt.Add(new Tuple<BigInteger, BigInteger>(0, 1));
             bu.Add(new Tuple<BigInteger, BigInteger>(0, 1)); bu.Add(cu);
             Basis.Add(bt); Basis.Add(bu);
-            LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100));
+            LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100)); //about an hour with 22 vector basis
             dprime = BigInteger.Zero;
             for (int i = 0; i < 20 + 2; i++) {
                 if (Basis[i][21] == cu) {
                     //reducFrac(-Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2).Item1 == 1
-                    dprime = reducFrac(new Tuple<BigInteger, BigInteger>(- Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2)).Item1;
+                    dprime = reducFrac(new Tuple<BigInteger, BigInteger>(-Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2)).Item1;
                     break;
                 }
             }
