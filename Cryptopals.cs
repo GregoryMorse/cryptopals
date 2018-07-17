@@ -3759,11 +3759,13 @@ namespace ELTECSharp
                 for (int j = k - 1; j >= 0; j--) {
                 //for (int j = 0; j <= k-1; j++) {
                     Tuple<BigInteger, BigInteger> mjk = mu(B[k], Q[j]); //mu(k,j) >= 0 ? > 1/2 : < -1/2, !(-1/2 >= mu(k,j) <= 1/2)
-                    if ((mjk.Item1 * 2 - mjk.Item2) > 0 || (mjk.Item1 * 2 + mjk.Item2) < 0)
+                    BigInteger mjk2 = mjk.Item1 * 2;
+                    if ((mjk2 - mjk.Item2) > 0 || (mjk2 + mjk.Item2) < 0)
                     { //rounding by adding half of divisor before lbound dividing round(a/b)=lbound(a/b+1/2)=lbound((2a+b)/2b)
                         //BigInteger mjkRnd = ((2 * mjk.Item1 + mjk.Item2) / (2 * mjk.Item2)); //round down on tie semantics but this wrongly forgets negatives
                         BigInteger mjkRem, mjkRnd = BigInteger.DivRem(mjk.Item1, mjk.Item2, out mjkRem); //proper round down on tie semantics
-                        mjkRnd += (mjkRem * 2 > mjk.Item2 ? 1 : (mjkRem * 2 < -mjk.Item2 ? -1 : 0));
+                        BigInteger mjkRem2 = mjkRem * 2;
+                        mjkRnd += (mjkRem2 > mjk.Item2 ? 1 : (mjkRem2 < -mjk.Item2 ? -1 : 0));
                         List<Tuple<BigInteger, BigInteger>> test = B[k].Zip(B[j], (u, v) => reducFrac(new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * mjkRnd, u.Item2 * v.Item2))).ToList();
                         B[k] = test;
                         Q = gramschmidt(B, Q.Take(k-1).ToList());
@@ -3772,7 +3774,8 @@ namespace ELTECSharp
                 Tuple<BigInteger, BigInteger> m = mu(B[k], Q[k - 1]);
                 Tuple<BigInteger, BigInteger> Qkm1 = vecSqr(Q[k - 1]);
                 Tuple<BigInteger, BigInteger> Qsqr = vecSqr(Q[k]);
-                Tuple<BigInteger, BigInteger> Cmp = new Tuple<BigInteger, BigInteger>((delta.Item1 * m.Item2 * m.Item2 - delta.Item2 * m.Item1 * m.Item1) * Qkm1.Item1, delta.Item2 * m.Item2 * m.Item2 * Qkm1.Item2);
+                BigInteger mi2 = m.Item2 * m.Item2;
+                Tuple<BigInteger, BigInteger> Cmp = new Tuple<BigInteger, BigInteger>((delta.Item1 * mi2 - delta.Item2 * m.Item1 * m.Item1) * Qkm1.Item1, delta.Item2 * mi2 * Qkm1.Item2);
                 //a/b>=c/d === ad>=bc
                 if (Qsqr.Item1 * Cmp.Item2 - Qsqr.Item2 * Cmp.Item1 >= 0) {
                     k++;
@@ -4358,12 +4361,13 @@ namespace ELTECSharp
             Q = scaleEC(G, d, EaOrig, GF);
             hm = BytesToBigInt(hf.ComputeHash(m));
             List<List<Tuple<BigInteger, BigInteger>>> Basis = new List<List<Tuple<BigInteger, BigInteger>>>();
-            for (int i = 0; i < 20; i++) {
-                Basis.Add(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), i).Concat(new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(BPOrd, 1) }).Concat(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), 20 + 2 - 1 - i)).ToList());
+            const int trials = 14;
+            for (int i = 0; i < trials; i++) {
+                Basis.Add(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), i).Concat(new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(BPOrd, 1) }).Concat(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), trials + 2 - 1 - i)).ToList());
             }
             List<Tuple<BigInteger, BigInteger>> bt = new List<Tuple<BigInteger, BigInteger>>();
             List<Tuple<BigInteger, BigInteger>> bu = new List<Tuple<BigInteger, BigInteger>>();
-            for (int i = 0; i < 20; i++) {
+            for (int i = 0; i < trials; i++) {
                 res = signECDSAbiased(rng, hm, d, BPOrd, G, EaOrig, GF);
                 //t = r / ( s * (1 << 8)), u = H(m) / (-s * (1 << 8))
                 bt.Add(new Tuple<BigInteger, BigInteger>(BigInteger.Remainder(res.Item1 * modInverse(res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
@@ -4376,12 +4380,12 @@ namespace ELTECSharp
             bt.Add(new Tuple<BigInteger, BigInteger>(1, 1 << 8)); bt.Add(new Tuple<BigInteger, BigInteger>(0, 1));
             bu.Add(new Tuple<BigInteger, BigInteger>(0, 1)); bu.Add(cu);
             Basis.Add(bt); Basis.Add(bu);
-            LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100)); //about an hour with 22 vector basis
+            LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100)); //about an hour with 22 vector basis, 3 minutes for 14 vector basis, 8 minutes for 16 vector basis
             dprime = BigInteger.Zero;
-            for (int i = 0; i < 20 + 2; i++) {
-                if (Basis[i][21] == cu) {
-                    //reducFrac(-Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2).Item1 == 1
-                    dprime = reducFrac(new Tuple<BigInteger, BigInteger>(-Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2)).Item1;
+            for (int i = 0; i < trials + 2; i++) {
+                if (Basis[i][trials + 1] == cu) {
+                    //reducFrac(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2).Item1 == 1
+                    dprime = reducFrac(new Tuple<BigInteger, BigInteger>(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2)).Item1;
                     break;
                 }
             }
