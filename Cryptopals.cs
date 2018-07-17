@@ -3658,6 +3658,21 @@ namespace ELTECSharp
             BigInteger inv = modInverse(rs.Item2, n), u1 = BigInteger.Remainder(m * inv, n), u2 = BigInteger.Remainder(rs.Item1 * inv, n);
             return rs.Item1.Equals(addEC(scaleEC(G, u1, Ea, GF), scaleEC(Q, u2, Ea, GF), Ea, GF).Item1);
         }
+        static Tuple<BigInteger, BigInteger> signECDSAbiased(RNGCryptoServiceProvider rng, BigInteger m, BigInteger d, BigInteger n, Tuple<BigInteger, BigInteger> G, int Ea, BigInteger GF)
+        {
+            BigInteger k, r, s;
+            do
+            {
+                do
+                {
+                    do { k = Crypto.GetNextRandomBig(rng, n); } while (k <= 1);
+                    k -= (k & 255);
+                    r = scaleEC(G, k, Ea, GF).Item1;
+                } while (r.Equals(BigInteger.Zero));
+                s = BigInteger.Remainder((m + d * r) * modInverse(k, n), n);
+            } while (s.Equals(BigInteger.Zero));
+            return new Tuple<BigInteger, BigInteger>(r, s);
+        }
         static BigInteger rhog(BigInteger x, BigInteger n)
         {
             return BigInteger.Remainder(x * x + 1, n);
@@ -4173,11 +4188,10 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 61
         p61:
-            goto p62;
             BigInteger d;
+            SHA1 hf = SHA1.Create();
             do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
             Tuple<BigInteger, BigInteger> Q = scaleEC(G, d, EaOrig, GF);
-            SHA1 hf = SHA1.Create();
             BigInteger hm = BytesToBigInt(hf.ComputeHash(m));
             Tuple<BigInteger, BigInteger> res = signECDSA(rng, hm, d, BPOrd, G, EaOrig, GF);
             //now generate a fake signer public key Q'
@@ -4188,6 +4202,7 @@ namespace ELTECSharp
             GprimeEC = scaleEC(addEC(scaleEC(G, u1, EaOrig, GF), scaleEC(Q, u2, EaOrig, GF), EaOrig, GF), modInverse(tmp, BPOrd), EaOrig, GF);
             Tuple<BigInteger, BigInteger> Qprime = scaleEC(GprimeEC, dprime, EaOrig, GF);
             Console.WriteLine("Q and Q' verify: " + verifyECDSA(hm, res, Q, BPOrd, G, EaOrig, GF) + " " + verifyECDSA(hm, res, Qprime, BPOrd, GprimeEC, EaOrig, GF));
+            goto p62;
             //RSA
             //sign: s=pad(m)^d mod N
             BigInteger _p;
@@ -4338,7 +4353,37 @@ namespace ELTECSharp
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(-2, 1), new Tuple<BigInteger, BigInteger>(1, 2) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 2), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-3, 2), new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(2, 1), new Tuple<BigInteger, BigInteger>(0, 1) }}, (r1, r2) => r1.SequenceEqual(r2)).All((b) => b));
-            Console.WriteLine("8.62");
+
+            do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
+            Q = scaleEC(G, d, EaOrig, GF);
+            hm = BytesToBigInt(hf.ComputeHash(m));
+            List<List<Tuple<BigInteger, BigInteger>>> Basis = new List<List<Tuple<BigInteger, BigInteger>>>();
+            for (int i = 0; i < 20; i++) {
+                Basis.Add(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), i).Concat(new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(BPOrd, 1) }).Concat(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), 20 + 2 - 1 - i)).ToList());
+            }
+            List<Tuple<BigInteger, BigInteger>> bt = new List<Tuple<BigInteger, BigInteger>>();
+            List<Tuple<BigInteger, BigInteger>> bu = new List<Tuple<BigInteger, BigInteger>>();
+            for (int i = 0; i < 20; i++) {
+                res = signECDSAbiased(rng, hm, d, BPOrd, G, EaOrig, GF);
+                //t = r / ( s * (1 << 8)), u = H(m) / (-s * (1 << 8))
+                bt.Add(new Tuple<BigInteger, BigInteger>(BigInteger.Remainder(res.Item1 * modInverse(res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
+                bu.Add(new Tuple<BigInteger, BigInteger>(posRemainder(hm * modInverse(-res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
+            }
+            //ct = 1/2^l, cu = q/2^l
+            Tuple<BigInteger, BigInteger> cu = reducFrac(new Tuple<BigInteger, BigInteger>(BPOrd, 1 << 8));
+            bt.Add(new Tuple<BigInteger, BigInteger>(1, 1 << 8)); bt.Add(new Tuple<BigInteger, BigInteger>(0, 1));
+            bu.Add(new Tuple<BigInteger, BigInteger>(0, 1)); bu.Add(cu);
+            Basis.Add(bt); Basis.Add(bu);
+            LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100));
+            dprime = BigInteger.Zero;
+            for (int i = 0; i < 20 + 2; i++) {
+                if (Basis[i][21] == cu) {
+                    //reducFrac(-Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2).Item1 == 1
+                    dprime = reducFrac(new Tuple<BigInteger, BigInteger>(- Basis[i][20].Item1 * (1 << 8), Basis[i][20].Item2)).Item1;
+                    break;
+                }
+            }
+            Console.WriteLine("8.62 d recovered: " + (d == dprime));
 
             //SET 8 CHALLENGE 63
             Console.WriteLine("8.63");
