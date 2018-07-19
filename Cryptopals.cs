@@ -3491,10 +3491,11 @@ namespace ELTECSharp
         //Montgomery gives in his paper "Speeding the Pollard and Elliptic Curve Methods of Factorization" from 1987 the formula on page 19:
         //x3=((y1-y2)/(x1-x2))^2-A-x1-x2, x coordinate point addition
         //Affine addition/doubling formulae: http://hyperelliptic.org/EFD/g1p/auto-montgom.html
-        static BigInteger PollardKangarooECmontg(BigInteger a, BigInteger b, int k, Tuple<BigInteger, BigInteger> G, int Ea, int Eb, BigInteger p, Tuple<BigInteger, BigInteger> y, int conv)
+        static BigInteger PollardKangarooECmontg(BigInteger a, BigInteger b, int k, Tuple<BigInteger, BigInteger> G, int EaOrig, int Ea, int Eb, BigInteger p, Tuple<BigInteger, BigInteger> y, int conv)
         {//modular exponentiation/multiplication is scalar multiplication/group addition on the elliptical curve
             BigInteger xT = BigInteger.Zero;
-            Tuple<BigInteger, BigInteger> yT = ladder2(G, b, Ea, Eb, p);
+            Tuple<BigInteger, BigInteger> yT = ladder2(G, b, Ea, EaOrig, Eb, p, conv);
+            yT = new Tuple<BigInteger, BigInteger>(yT.Item1 + conv, yT.Item2);
             //N is then derived from f -take the mean of all possible outputs of f and multiply it by a small constant, e.g. 4.
             int N = ((1 << (k + 1)) - 1) * 4 / k;
             //make the constant bigger to better your chances of finding a collision at the(obvious) cost of extra computation.
@@ -3502,7 +3503,8 @@ namespace ELTECSharp
             {
                 BigInteger KF = BigInteger.Remainder(KangF(yT.Item1, k), p);
                 xT = xT + KF;
-                yT = addEC(yT, ladder2(G, KF, Ea, Eb, p), Ea, p);
+                Tuple<BigInteger, BigInteger> scl = ladder2(G, KF, Ea, EaOrig, Eb, p, conv);
+                yT = addEC(yT, new Tuple<BigInteger, BigInteger>(scl.Item1 + conv, scl.Item2), EaOrig, p);
             }
             //now yT = g^(b + xT)
             //Console.WriteLine("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
@@ -3512,7 +3514,8 @@ namespace ELTECSharp
             {
                 BigInteger KF = BigInteger.Remainder(KangF(yW.Item1, k), p);
                 xW = xW + KF;
-                yW = addEC(yW, scaleEC(G, KF, Ea, p), Ea, p);
+                Tuple<BigInteger, BigInteger> scl = ladder2(G, KF, Ea, EaOrig, Eb, p, conv);
+                yW = addEC(yW, new Tuple<BigInteger, BigInteger>(scl.Item1 + conv, scl.Item2), EaOrig, p);
                 if (yW == yT)
                 {
                     return b + xT - xW;
@@ -3604,7 +3607,7 @@ namespace ELTECSharp
             return BigInteger.Remainder(u2 * BigInteger.ModPow(w2, p - 2, p), p);
         }
         //Recover: Okeya–Sakurai y-coordinate recovery
-        static Tuple<BigInteger, BigInteger> ladder2(Tuple<BigInteger, BigInteger> u, BigInteger k, int Ea, int Eb, BigInteger p)
+        static Tuple<BigInteger, BigInteger> ladder2(Tuple<BigInteger, BigInteger> u, BigInteger k, int Ea, int EaOrig, int Eb, BigInteger p, int conv)
         {
             BigInteger u2 = 1, w2 = 0;
             BigInteger u3 = u.Item1, w3 = 1;
@@ -3625,21 +3628,26 @@ namespace ELTECSharp
                 tup = cswap(u2, u3, b); u2 = tup.Item1; u3 = tup.Item2;
                 tup = cswap(w2, w3, b); w2 = tup.Item1; w3 = tup.Item2;
             }
-            BigInteger x0 = BigInteger.Remainder(u2 * BigInteger.ModPow(w2, p - 2, p), p);
-            BigInteger x1 = BigInteger.Remainder(u3 * BigInteger.ModPow(w3, p - 2, p), p);
-            BigInteger v1 = x0 == 1 ? 0 : u.Item1, v2 = x0 + v1, v3 = x0 - v1;
-            v3 = v3 * v3; v3 = v3 * x1;
-            v1 = x0 == 1 ? 0 : 2 * Ea;
-            v2 = v2 + v1;
-            BigInteger v4 = u.Item1 * x0; v4 += (x0 == 1 ? 0 : 1);
-            v2 = v2 * v4;
-            v1 = x0 == 1 ? 0 : v1;
-            v2 = v2 - v1;
-            v2 = x1 == 1 ? 0 : v2;
-            BigInteger y1 = v2 - v3;
-            v1 = 2 * Eb * u.Item2;
-            v1 = x0 == 1 ? 0 : v1; v1 = x1 == 1 ? 0 : v1;
-            return (x0 == 1 ? 0 : v1) == 0 ? new Tuple<BigInteger, BigInteger>(1, 0) : new Tuple<BigInteger, BigInteger>(v1 * x0, y1);
+            BigInteger x1 = BigInteger.Remainder(u2 * BigInteger.ModPow(w2, p - 2, p), p); //or for other algo x0
+            //x2=ladder(u.Item1, k+1, Ea, p) //or (r+1)G instead of rG
+            BigInteger x2 = BigInteger.Remainder(u3 * BigInteger.ModPow(w3, p - 2, p), p); //or for other algo x1
+            //y1=(2b+(a+x0x1)(x0+x1)-x2(x0-x1)^2)/2y0
+            BigInteger diff = posRemainder(u.Item1 - x1, p);
+            return new Tuple<BigInteger, BigInteger>(x1, posRemainder(posRemainder(2*Eb+posRemainder(EaOrig+(u.Item1+conv)*(x1+conv), p)*(u.Item1 + conv + x1 + conv)-(x2 + conv)*diff*diff, p)* modInverse(2 * u.Item2, p), p));
+            //BigInteger x1 = BigInteger.Remainder(u3 * BigInteger.ModPow(w3, p - 2, p), p);
+            //BigInteger v1 = x0 == 1 ? 0 : u.Item1, v2 = x0 + v1, v3 = x0 - v1;
+            //v3 = v3 * v3; v3 = v3 * x1;
+            //v1 = x0 == 1 ? 0 : 2 * Ea;
+            //v2 = v2 + v1;
+            //BigInteger v4 = u.Item1 * x0; v4 += (x0 == 1 ? 0 : 1);
+            //v2 = v2 * v4;
+            //v1 = x0 == 1 ? 0 : v1;
+            //v2 = v2 - v1;
+            //v2 = x1 == 1 ? 0 : v2;
+            //BigInteger y1 = v2 - v3;
+            //v1 = 2 * Eb * u.Item2;
+            //v1 = x0 == 1 ? 0 : v1; v1 = x1 == 1 ? 0 : v1;
+            //return (x0 == 1 ? 0 : v1) == 0 ? new Tuple<BigInteger, BigInteger>(1, 0) : new Tuple<BigInteger, BigInteger>(posRemainder(v1 * x0, p), posRemainder(y1, p));
         }
         static Tuple<BigInteger, BigInteger> signECDSA(RNGCryptoServiceProvider rng, BigInteger m, BigInteger d, BigInteger n, Tuple<BigInteger, BigInteger> G, int Ea, BigInteger GF)
         {
@@ -4058,7 +4066,7 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 60
         p60:
-            goto p61;
+            //goto p61;
             Ea = 534; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
             BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
@@ -4090,8 +4098,9 @@ namespace ELTECSharp
             //positive and negative root do not yield same result so how to determine
             Tuple<BigInteger, BigInteger> Y = new Tuple<BigInteger, BigInteger>(hxu + 178, TonelliShanks(rng, posRemainder(hxu * hxu * hxu + Ea * hxu * hxu + hxu, GF), GF));
             Console.WriteLine("Secret key generated: " + x);
-            Console.WriteLine("Public key: " + Y + " " + scaleEC(G, x, EaOrig, GF) + " " + TonelliShanks(rng, posRemainder((hxu + 178) * (hxu + 178) * (hxu + 178) + EaOrig * (hxu + 178) + Eb, GF), GF));
+            Console.WriteLine("Public key: " + Y + " " + scaleEC(G, x, EaOrig, GF) + " " + TonelliShanks(rng, posRemainder((hxu + 178) * (hxu + 178) * (hxu + 178) + EaOrig * (hxu + 178) + Eb, GF), GF) + " " + ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), x, Ea, EaOrig, Eb, GF, 178));
             Y = scaleEC(G, x, EaOrig, GF);
+            Y = ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), x, Ea, EaOrig, Eb, GF, 178);
             //cannot know the correct sign, but (r+1)G is calculated in other accumulator in ladder() function and hence
             //if x1 is to rG as x2 is to (r+1)G, then y1=(2b+(a+x0x1)(x0+x1)-x2(x0-x1)^2)/2y0
             //would need a double coordinate ladder, but it should be safe to assume that this need be provided or it doubles trials at the end
@@ -4177,15 +4186,18 @@ namespace ELTECSharp
             //x = n mod r, x = n + m * r therefore transform
             //y = xG=nG+mrG
             //y' = mG', y'=y-nG, G'=rG
-            Tuple<BigInteger, BigInteger> GprimeEC = scaleEC(G, rcum, EaOrig, GF);
+            //Tuple<BigInteger, BigInteger> GprimeEC = scaleEC(G, rcum, EaOrig, GF);
+            Tuple<BigInteger, BigInteger> GprimeEC = ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), rcum, Ea, EaOrig, Eb, GF, 178);
             Tuple<BigInteger, BigInteger> YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
             Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
-            Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+            //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+            Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, 1, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
             if (Mprime.Equals(BigInteger.Zero)) {
                 RecX = rcum - RecX;
                 YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
                 Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
-                Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+                //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+                Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, 1, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
             }
             Console.WriteLine("8.60 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
