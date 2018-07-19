@@ -4191,13 +4191,13 @@ namespace ELTECSharp
             Tuple<BigInteger, BigInteger> YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
             Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
             //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
-            Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, 1, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+            Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
             if (Mprime.Equals(BigInteger.Zero)) {
                 RecX = rcum - RecX;
                 YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
                 Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
                 //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
-                Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, 1, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+                Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
             }
             Console.WriteLine("8.60 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
