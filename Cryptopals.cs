@@ -4066,7 +4066,7 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 60
         p60:
-            //goto p61;
+            goto p61;
             Ea = 534; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
             BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
@@ -4373,7 +4373,7 @@ namespace ELTECSharp
             Q = scaleEC(G, d, EaOrig, GF);
             hm = BytesToBigInt(hf.ComputeHash(m));
             List<List<Tuple<BigInteger, BigInteger>>> Basis = new List<List<Tuple<BigInteger, BigInteger>>>();
-            const int trials = 20;
+            const int trials = 20; //20 is possible per problem guidance
             for (int i = 0; i < trials; i++) {
                 Basis.Add(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), i).Concat(new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(BPOrd, 1) }).Concat(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), trials + 2 - 1 - i)).ToList());
             }
@@ -4383,7 +4383,7 @@ namespace ELTECSharp
                 res = signECDSAbiased(rng, hm, d, BPOrd, G, EaOrig, GF);
                 //t = r / ( s * (1 << 8)), u = H(m) / (-s * (1 << 8))
                 bt.Add(new Tuple<BigInteger, BigInteger>(BigInteger.Remainder(res.Item1 * modInverse(res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
-                bu.Add(new Tuple<BigInteger, BigInteger>(posRemainder(hm * modInverse(-res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
+                bu.Add(new Tuple<BigInteger, BigInteger>(posRemainder(hm * modInverse(posRemainder(-res.Item2 * (1 << 8), BPOrd), BPOrd), BPOrd), 1));
                 //bt.Add(new Tuple<BigInteger, BigInteger>(res.Item1, res.Item2 * (1 << 8)));
                 //bu.Add(new Tuple<BigInteger, BigInteger>(hm, -res.Item2 * (1 << 8)));
             }
@@ -4398,9 +4398,9 @@ namespace ELTECSharp
             LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100)); //about an hour with 22 vector basis, 3 minutes for 14 vector basis, 8 minutes for 16 vector basis
             dprime = BigInteger.Zero;
             for (int i = 0; i < trials + 2; i++) {
-                if (Basis[i][trials + 1] == cu) {
+                if (Basis[i][trials + 1].Equals(cu)) {
                     //reducFrac(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2).Item1 == 1
-                    dprime = reducFrac(new Tuple<BigInteger, BigInteger>(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2)).Item1;
+                    dprime = posRemainder(reducFrac(new Tuple<BigInteger, BigInteger>(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2)).Item1, BPOrd);
                     break;
                 }
             }
