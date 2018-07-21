@@ -3800,6 +3800,49 @@ namespace ELTECSharp
             }
             return B;
         }
+        BigInteger addGF2(BigInteger A, BigInteger B)
+        {
+            return A ^ B;
+        }
+        BigInteger mulGF2(BigInteger A, BigInteger B)
+        {
+            BigInteger p = 0;
+            while (A > 0) {
+                if ((A & 1) != BigInteger.Zero) p = BigInteger.ModPow(p, B, 2);
+                A = A >> 1; B = B << 1;
+            }
+            return p;
+        }
+        Tuple<BigInteger, BigInteger> divmodGF2(BigInteger A, BigInteger B)
+        {
+            BigInteger q = BigInteger.Zero, r = A; int d;
+            while ((d = GetBitSize(r) - GetBitSize(B)) >= 0) {
+                q = BigInteger.ModPow(q, 1 << d, 2);
+                r = BigInteger.ModPow(r, B << d, 2);
+            }
+            return new Tuple<BigInteger, BigInteger>(q, r);
+        }
+        BigInteger modmulGF2k(BigInteger A, BigInteger B, BigInteger M)
+        {
+            //BigInteger p = mulGF2(A, B);
+            //return divmodGF2(p, M).Item2;
+            BigInteger p = 0;
+            while (A > 0) {
+                if ((A & 1) != BigInteger.Zero) p = BigInteger.ModPow(p, B, 2);
+                A = A >> 1; B = B << 1;
+                if (GetBitSize(B) == GetBitSize(M)) {
+                    B = BigInteger.ModPow(B, M, 2);
+                }
+            }
+            return p;
+        }
+        BigInteger modinvGF2k(BigInteger A, BigInteger k)
+        {
+
+        }
+        BigInteger modexpGF2k(BigInteger A, BigInteger B, bigInteger M) {
+
+        }
         static void Set8()
         {
             //SET 8 CHALLENGE 57
