@@ -3808,7 +3808,7 @@ namespace ELTECSharp
         {
             BigInteger p = 0;
             while (A > 0) {
-                if ((A & 1) != BigInteger.Zero) p = BigInteger.ModPow(p, B, 2);
+                if ((A & 1) != BigInteger.Zero) p = BigInteger.ModPow(p, B, BigInteger.One << 128);
                 A = A >> 1; B = B << 1;
             }
             return p;
@@ -3817,31 +3817,57 @@ namespace ELTECSharp
         {
             BigInteger q = BigInteger.Zero, r = A; int d;
             while ((d = GetBitSize(r) - GetBitSize(B)) >= 0) {
-                q = BigInteger.ModPow(q, 1 << d, 2);
-                r = BigInteger.ModPow(r, B << d, 2);
+                q = BigInteger.ModPow(q, 1 << d, BigInteger.One << 128);
+                r = BigInteger.ModPow(r, B << d, BigInteger.One << 128);
             }
             return new Tuple<BigInteger, BigInteger>(q, r);
         }
+        //M=x^4 + x + 1, 1100(1)=C
+        //M=x^128 + x^7 + x^2 + x + 1
+        //leftmost bit is the coefficient of x^0 so reverse bits E100 0000 0000 0000 0000 0000 0000 0000
         BigInteger modmulGF2k(BigInteger A, BigInteger B, BigInteger M)
         {
             //BigInteger p = mulGF2(A, B);
             //return divmodGF2(p, M).Item2;
             BigInteger p = 0;
             while (A > 0) {
-                if ((A & 1) != BigInteger.Zero) p = BigInteger.ModPow(p, B, 2);
+                if ((A & 1) != BigInteger.Zero) p = BigInteger.ModPow(p, B, BigInteger.One << 128);
                 A = A >> 1; B = B << 1;
                 if (GetBitSize(B) == GetBitSize(M)) {
-                    B = BigInteger.ModPow(B, M, 2);
+                    B = BigInteger.ModPow(B, M, BigInteger.One << 128);
                 }
             }
             return p;
         }
-        BigInteger modinvGF2k(BigInteger A, BigInteger k)
+        BigInteger modinvGF2k(BigInteger a, BigInteger n)
         {
+            BigInteger i = n, v = 0, d = 1;
+            while (a > 0)
+            {
+                BigInteger t = divmodGF2(i, a).Item1, x = a;
+                a = divmodGF2(i, x).Item2;
+                i = x;
+                x = d;
+                d = addGF2(v, modmulGF2k(t, x, BigInteger.One << 128));
+                v = x;
+            }
+            v = divmodGF2(v, n).Item2;
+            if (v < 0) v = addGF2(v, n) % n;
+            return v;
 
         }
-        BigInteger modexpGF2k(BigInteger A, BigInteger B, bigInteger M) {
-
+        BigInteger modexpGF2k(BigInteger A, BigInteger B, BigInteger M)
+        {
+            BigInteger d = 1;
+            for (int i = 127; i >= 0; i--)
+            {
+                d = modmulGF2k(d, d, BigInteger.One << 128);
+                if (((BigInteger.One << i) & A) != 0)
+                {
+                    d = modmulGF2k(d, g, BigInteger.One << 128);
+                }
+            }
+            return d;
         }
         static void Set8()
         {
@@ -4396,6 +4422,7 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 62
         p62:
+            goto p63;
             List<List<Tuple<BigInteger, BigInteger>>> Result = LLL(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(3, 1), new Tuple<BigInteger, BigInteger>(5, 1), new Tuple<BigInteger, BigInteger>(6, 1) }},
@@ -4451,6 +4478,7 @@ namespace ELTECSharp
             Console.WriteLine("8.62 d recovered: " + (d == dprime));
 
             //SET 8 CHALLENGE 63
+            p63:
             Console.WriteLine("8.63");
 
             //SET 8 CHALLENGE 64
