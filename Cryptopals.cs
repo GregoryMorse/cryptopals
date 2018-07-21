@@ -3497,9 +3497,10 @@ namespace ELTECSharp
             Tuple<BigInteger, BigInteger> yT = ladder2(G, b, Ea, EaOrig, Eb, p, conv);
             yT = new Tuple<BigInteger, BigInteger>(yT.Item1 + conv, yT.Item2);
             //N is then derived from f -take the mean of all possible outputs of f and multiply it by a small constant, e.g. 4.
-            int N = ((1 << (k + 1)) - 1) * 4 / k;
+            ulong N = (((ulong)1 << (k + 1)) - 1) * 4 / (ulong)k;
+            //if (N > ((ulong)1 << 24)) N /= 8;
             //make the constant bigger to better your chances of finding a collision at the(obvious) cost of extra computation.
-            for (int i = 1; i <= N; i++)
+            for (ulong i = 1; i <= N; i++)
             {
                 BigInteger KF = BigInteger.Remainder(KangF(yT.Item1, k), p);
                 xT = xT + KF;
@@ -4066,7 +4067,7 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 60
         p60:
-            goto p61;
+            //goto p61;
             Ea = 534; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
             BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
@@ -4190,14 +4191,14 @@ namespace ELTECSharp
             Tuple<BigInteger, BigInteger> GprimeEC = ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), rcum, Ea, EaOrig, Eb, GF, 178);
             Tuple<BigInteger, BigInteger> YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
             Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
-            //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
-            Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+            //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 26, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
+            Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 26, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
             if (Mprime.Equals(BigInteger.Zero)) {
                 RecX = rcum - RecX;
                 YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
                 Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
-                //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
-                Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
+                //Mprime = PollardKangarooEC(0, TwistOrd / rcum, 26, GprimeEC, EaOrig, GF, YprimeEC); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
+                Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 26, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
             }
             Console.WriteLine("8.60 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
