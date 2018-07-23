@@ -3800,11 +3800,11 @@ namespace ELTECSharp
             }
             return B;
         }
-        BigInteger addGF2(BigInteger A, BigInteger B)
+        static BigInteger addGF2(BigInteger A, BigInteger B)
         {
             return A ^ B;
         }
-        BigInteger mulGF2(BigInteger A, BigInteger B)
+        static BigInteger mulGF2(BigInteger A, BigInteger B)
         {
             BigInteger p = 0;
             while (A > 0) {
@@ -3813,7 +3813,7 @@ namespace ELTECSharp
             }
             return p;
         }
-        Tuple<BigInteger, BigInteger> divmodGF2(BigInteger A, BigInteger B)
+        static Tuple<BigInteger, BigInteger> divmodGF2(BigInteger A, BigInteger B)
         {
             BigInteger q = BigInteger.Zero, r = A; int d;
             while ((d = GetBitSize(r) - GetBitSize(B)) >= 0) {
@@ -3825,7 +3825,7 @@ namespace ELTECSharp
         //M=x^4 + x + 1, 1100(1)=C
         //M=x^128 + x^7 + x^2 + x + 1
         //leftmost bit is the coefficient of x^0 so reverse bits E100 0000 0000 0000 0000 0000 0000 0000
-        BigInteger modmulGF2k(BigInteger A, BigInteger B, BigInteger M)
+        static BigInteger modmulGF2k(BigInteger A, BigInteger B, BigInteger M)
         {
             //BigInteger p = mulGF2(A, B);
             //return divmodGF2(p, M).Item2;
@@ -3839,7 +3839,7 @@ namespace ELTECSharp
             }
             return p;
         }
-        BigInteger modinvGF2k(BigInteger a, BigInteger n)
+        static BigInteger modinvGF2k(BigInteger a, BigInteger n)
         {
             BigInteger i = n, v = 0, d = 1;
             while (a > 0)
@@ -3856,7 +3856,7 @@ namespace ELTECSharp
             return v;
 
         }
-        BigInteger modexpGF2k(BigInteger A, BigInteger B, BigInteger M)
+        static BigInteger modexpGF2k(BigInteger A, BigInteger B, BigInteger M)
         {
             BigInteger d = 1;
             for (int i = 127; i >= 0; i--)
@@ -3869,6 +3869,55 @@ namespace ELTECSharp
             }
             return d;
         }
+        static BigInteger calc_gcm_tag(byte[] nonce, byte[] key, byte[] cyphText, byte[] authData)
+        {
+            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray())); //authentication key
+            BigInteger g = BigInteger.Zero, M = BigInteger.Parse("E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
+            for (ulong ctr = 0; (int)ctr < authData.Length; ctr += 16) {
+                g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray())), h, M);
+            }
+            for (ulong ctr = 0; (int)ctr < cyphText.Length; ctr += 16) {
+                g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).ToArray())), h, M);
+            }
+            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length).Concat(BitConverter.GetBytes((ulong)authData.Length)).ToArray())), h, M);
+            BigInteger s = new BigInteger(encrypt_ecb(key, nonce));
+            BigInteger t = g + s;
+            return t;
+        }
+        static byte[] crypt_gcm(byte [] nonce, byte[] key, byte[] input)
+        {
+            byte[] o = new byte[input.Length];
+            for (ulong ctr = 0; (int)ctr < input.Length; ctr += 16) {
+                //BitConverter uses little endian order
+                FixedXOR(input.Skip((int)ctr).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray(), encrypt_ecb(key, nonce).ToArray().Take(Math.Min(input.Length - (int)ctr, 16)).ToArray()).CopyTo(o, (int)ctr);
+            }
+            return o;
+        }
+        static BigInteger[] sqrFree(BigInteger[] g) //Yun's algorithm, g is monic polynomial
+        {
+            BigInteger f = BigInteger.One, fprime = BigInteger.One, M = BigInteger.Parse("E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
+            for (int i = 0; i < g.Length; i++) {
+                f = modmulGF2k(f, modexpGF2k(g[i], i + 1, M), M);
+                if (i == g.Length - 1)
+                    fprime = modmulGF2k(fprime, modexpGF2k(g[i] * (i + 1), i, M), M); //formal derivative f'
+            }
+            BigInteger a0 = BigInteger.GreatestCommonDivisor(f, fprime), b = f / a0, c = fprime / a0, d = c - b;
+            List <BigInteger> a = new List<BigInteger>();
+            do {
+                BigInteger ai = BigInteger.GreatestCommonDivisor(b, d);
+                a.Add(ai); b = b / ai; c = d / ai; d = c - b;
+            } while (b != BigInteger.One);
+            return a.ToArray();
+        }
+        //static Tuple<BigInteger, BigInteger>[] ddf(BigInteger f)
+        //{
+
+        //}
+        //static BigInteger[] edf(BigInteger f)
+        //{
+
+        //}
+
         static void Set8()
         {
             //SET 8 CHALLENGE 57
@@ -4477,8 +4526,22 @@ namespace ELTECSharp
             }
             Console.WriteLine("8.62 d recovered: " + (d == dprime));
 
-            //SET 8 CHALLENGE 63
-            p63:
+        //SET 8 CHALLENGE 63
+        p63:
+            byte[] key = new byte[16];
+            rng.GetBytes(key);
+            byte[] nonce = new byte[12]; // || 0^31 || 1
+            rng.GetBytes(nonce);
+            byte[] cyphData = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m);
+            byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
+            BigInteger tag = calc_gcm_tag(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, cyphData, authData);
+            //authData.Concat(cyphData).Concat(tag.ToByteArray()).ToArray();
+            byte[] cyphData2 = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m.Reverse().ToArray());
+            BigInteger tag2 = calc_gcm_tag(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, cyphData2, authData);
+            BigInteger[] coeff = new BigInteger[] { tag + tag2 };
+            //make monic polynomial
+            // / coeff[0];
+
             Console.WriteLine("8.63");
 
             //SET 8 CHALLENGE 64
