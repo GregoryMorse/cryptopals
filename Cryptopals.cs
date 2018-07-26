@@ -4280,7 +4280,7 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 60
         p60:
-            //goto p61;
+            goto p61;
             Ea = 534; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
             BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
@@ -4622,12 +4622,30 @@ namespace ELTECSharp
 
         //SET 8 CHALLENGE 63
         p63:
+            //BouncyCastle
+            //BCryptEncrypt https://docs.microsoft.com/en-us/windows/desktop/api/bcrypt/nf-bcrypt-bcryptencrypt
+            //https://archive.codeplex.com/?p=clrsecurity
+            //https://codeplexarchive.blob.core.windows.net/archive/projects/clrsecurity/clrsecurity.zip
+
             byte[] key = new byte[16];
             rng.GetBytes(key);
             byte[] nonce = new byte[12]; // || 0^31 || 1
             rng.GetBytes(nonce);
-            byte[] cyphData = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m);
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
+            Security.Cryptography.AuthenticatedAesCng aes = new Security.Cryptography.AuthenticatedAesCng();
+            aes.CngMode = Security.Cryptography.CngChainingMode.Gcm;
+            aes.Key = key;
+            aes.IV = nonce;
+            aes.AuthenticatedData = authData;
+            Security.Cryptography.IAuthenticatedCryptoTransform aesgcm = aes.CreateAuthenticatedEncryptor();
+            byte[] cyphDataVerify = new byte[(m.Length - 1) / 16 * 16];
+            for (int i = 0; i < m.Length; i += 16) {
+                if (i + 16 >= m.Length) cyphDataVerify = cyphDataVerify.Concat(aesgcm.TransformFinalBlock(m, i, m.Length - i)).ToArray();
+                else aesgcm.TransformBlock(m, i, 16, cyphDataVerify, i);
+            }
+            byte[] VerifyTag = aesgcm.GetTag();
+
+            byte[] cyphData = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m);
             BigInteger tag = calc_gcm_tag(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, cyphData, authData);
             //authData.Concat(cyphData).Concat(tag.ToByteArray()).ToArray();
             byte[] cyphData2 = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m.Reverse().ToArray());
@@ -4645,8 +4663,23 @@ namespace ELTECSharp
             Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
             BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2)); //what about remainder?
             BigInteger[] sqrF = sqrFree(monic);
-            //BigInteger[] ddfRes = ddf(sqrF);
-            //BigInteger[] edfRes = edf(ddfRes)
+            Tuple<BigInteger[], int>[] ddfRes = ddf(sqrF);
+            List<BigInteger> keyPosbl = new List<BigInteger>();
+            for (int i = 0; i < ddfRes.Length; i++) {
+                BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
+                for (int l = 0; l < edfRes.Length; l++) {
+                    if (edfRes[l].TakeWhile((BigInteger c) => c == BigInteger.Zero).Count() == 1) {
+                        keyPosbl.Add(edfRes[l].Last());
+                    }
+                }
+            }
+
+            if (keyPosbl.Count != 1) {
+                //make forgery, query oracle for validity
+            }
+            while (keyPosbl.Count != 1) {
+                //try new messages
+            }
             Console.WriteLine("8.63");
 
             //SET 8 CHALLENGE 64
