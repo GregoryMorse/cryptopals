@@ -3868,8 +3868,8 @@ namespace ELTECSharp
         }
         static BigInteger calc_gcm_tag(byte[] nonce, byte[] key, byte[] cyphText, byte[] authData)
         {
-            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray())); //authentication key
-            BigInteger g = BigInteger.Zero, M = BigInteger.Parse("E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
+            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Concat(new byte[] { 0 }).ToArray()); //authentication key
+            BigInteger g = BigInteger.Zero, M = BigInteger.Parse("00E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
             for (ulong ctr = 0; (int)ctr < authData.Length; ctr += 16) { //zero pad to block align
                 g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray())), h, M);
             }
@@ -3877,16 +3877,16 @@ namespace ELTECSharp
                 g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).ToArray())), h, M);
             }
             g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length * 8).Concat(BitConverter.GetBytes((ulong)authData.Length * 8)).ToArray())), h, M);
-            BigInteger s = new BigInteger(encrypt_ecb(key, nonce));
-            BigInteger t = g + s;
+            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()));
+            BigInteger t = addGF2(g, s);
             return t;
         }
         static byte[] crypt_gcm(byte [] nonce, byte[] key, byte[] input)
         {
             byte[] o = new byte[input.Length];
-            for (ulong ctr = 0; (int)ctr < input.Length; ctr += 16) { //zero pad to block align
+            for (uint ctr = 0; ctr < input.Length; ctr += 16) { //zero pad to block align
                 //BitConverter uses little endian order
-                FixedXOR(input.Skip((int)ctr).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray(), encrypt_ecb(key, nonce).ToArray().Take(Math.Min(input.Length - (int)ctr, 16)).ToArray()).CopyTo(o, (int)ctr);
+                FixedXOR(input.Skip((int)ctr).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray(), encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes(ctr / 16 + 2).Reverse()).ToArray()).ToArray().Take(Math.Min(input.Length - (int)ctr, 16)).ToArray()).CopyTo(o, (int)ctr);
             }
             return o;
         }
@@ -4643,13 +4643,13 @@ namespace ELTECSharp
                 if (i + 16 >= m.Length) cyphDataVerify = cyphDataVerify.Concat(aesgcm.TransformFinalBlock(m, i, m.Length - i)).ToArray();
                 else aesgcm.TransformBlock(m, i, 16, cyphDataVerify, i);
             }
-            byte[] VerifyTag = aesgcm.GetTag();
+            BigInteger VerifyTag = new BigInteger(aesgcm.GetTag().Concat(new byte[] { 0 }).ToArray());
 
-            byte[] cyphData = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m);
-            BigInteger tag = calc_gcm_tag(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, cyphData, authData);
+            byte[] cyphData = crypt_gcm(nonce, key, m);
+            BigInteger tag = calc_gcm_tag(nonce, key, cyphData, authData);
             //authData.Concat(cyphData).Concat(tag.ToByteArray()).ToArray();
-            byte[] cyphData2 = crypt_gcm(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, m.Reverse().ToArray());
-            BigInteger tag2 = calc_gcm_tag(nonce.Concat(BitConverter.GetBytes((int)1)).ToArray(), key, cyphData2, authData);
+            byte[] cyphData2 = crypt_gcm(nonce, key, m.Reverse().ToArray());
+            BigInteger tag2 = calc_gcm_tag(nonce, key, cyphData2, authData);
             BigInteger[] coeff = new BigInteger[(authData.Length + 15) / 16 + cyphData.Length / 16 + 2];
             for (int ctr = 0; ctr < authData.Length; ctr += 16) { //zero pad to block align
                 coeff[ctr] = addGF2(new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray()), new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray()));
