@@ -3869,18 +3869,18 @@ namespace ELTECSharp
         }
         static BigInteger calc_gcm_tag(byte[] nonce, byte[] key, byte[] cyphText, byte[] authData)
         {
-            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Concat(new byte[] { 0 }).ToArray()); //authentication key
+            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Reverse().Concat(new byte[] { 0 }).ToArray()); //authentication key
             BigInteger g = BigInteger.Zero, M = BigInteger.Parse("00E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
             authData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
             cyphText = cyphText.Concat(Enumerable.Repeat((byte)0, (16 - (cyphText.Length % 16)) % 16)).ToArray();
             for (ulong ctr = 0; (int)ctr < authData.Length; ctr += 16) { //zero pad to block align
-                g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray())), h, M);
+                g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(16).Reverse().Concat(new byte[] { 0 }).ToArray())), h, M);
             }
             for (ulong ctr = 0; (int)ctr < cyphText.Length; ctr += 16) { //zero pad to block align
-                g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray())), h, M);
+                g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).Reverse().Concat(new byte[] { 0 }).ToArray())), h, M);
             }
-            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length * 8).Concat(BitConverter.GetBytes((ulong)authData.Length * 8)).Concat(new byte[] { 0 }).ToArray())), h, M);
-            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()).Concat(new byte[] { 0 }).ToArray());
+            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse()).Reverse().Concat(new byte[] { 0 }).ToArray())), h, M);
+            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()).Reverse().Concat(new byte[] { 0 }).ToArray());
             BigInteger t = addGF2(g, s);
             return t;
         }
