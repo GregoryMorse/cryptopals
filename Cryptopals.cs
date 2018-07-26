@@ -3829,6 +3829,7 @@ namespace ELTECSharp
             //BigInteger p = mulGF2(A, B);
             //return divmodGF2(p, M).Item2;
             BigInteger p = 0;
+            if (GetBitSize(B) == GetBitSize(M)) B = B ^ M;
             while (A > 0) {
                 if ((A & 1) != BigInteger.Zero) p = p ^ B;
                 A = A >> 1; B = B << 1;
@@ -3870,14 +3871,16 @@ namespace ELTECSharp
         {
             BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Concat(new byte[] { 0 }).ToArray()); //authentication key
             BigInteger g = BigInteger.Zero, M = BigInteger.Parse("00E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
+            authData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
+            cyphText = cyphText.Concat(Enumerable.Repeat((byte)0, (16 - (cyphText.Length % 16)) % 16)).ToArray();
             for (ulong ctr = 0; (int)ctr < authData.Length; ctr += 16) { //zero pad to block align
-                g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray())), h, M);
+                g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray())), h, M);
             }
             for (ulong ctr = 0; (int)ctr < cyphText.Length; ctr += 16) { //zero pad to block align
-                g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).ToArray())), h, M);
+                g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray())), h, M);
             }
-            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length * 8).Concat(BitConverter.GetBytes((ulong)authData.Length * 8)).ToArray())), h, M);
-            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()));
+            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length * 8).Concat(BitConverter.GetBytes((ulong)authData.Length * 8)).Concat(new byte[] { 0 }).ToArray())), h, M);
+            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()).Concat(new byte[] { 0 }).ToArray());
             BigInteger t = addGF2(g, s);
             return t;
         }
@@ -4643,19 +4646,20 @@ namespace ELTECSharp
                 if (i + 16 >= m.Length) cyphDataVerify = cyphDataVerify.Concat(aesgcm.TransformFinalBlock(m, i, m.Length - i)).ToArray();
                 else aesgcm.TransformBlock(m, i, 16, cyphDataVerify, i);
             }
-            BigInteger VerifyTag = new BigInteger(aesgcm.GetTag().Concat(new byte[] { 0 }).ToArray());
+            byte[] VerifyTag = aesgcm.GetTag();
 
             byte[] cyphData = crypt_gcm(nonce, key, m);
             BigInteger tag = calc_gcm_tag(nonce, key, cyphData, authData);
+            byte[] tgComp = tag.ToByteArray();
             //authData.Concat(cyphData).Concat(tag.ToByteArray()).ToArray();
             byte[] cyphData2 = crypt_gcm(nonce, key, m.Reverse().ToArray());
             BigInteger tag2 = calc_gcm_tag(nonce, key, cyphData2, authData);
             BigInteger[] coeff = new BigInteger[(authData.Length + 15) / 16 + cyphData.Length / 16 + 2];
             for (int ctr = 0; ctr < authData.Length; ctr += 16) { //zero pad to block align
-                coeff[ctr] = addGF2(new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray()), new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).ToArray()));
+                coeff[ctr] = addGF2(new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).Concat(new byte[] { 0 }).ToArray()), new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).Concat(new byte[] { 0 }).ToArray()));
             }
             for (int ctr = 0; ctr < cyphData.Length; ctr += 16) { //zero pad to block align
-                coeff[(authData.Length + 15) / 16 + ctr] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).ToArray()), new BigInteger(cyphData2.Skip((int)ctr).Take(16).ToArray()));
+                coeff[(authData.Length + 15) / 16 + ctr] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray()), new BigInteger(cyphData2.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray()));
             }
             coeff[coeff.Length - 2] = authData.Length * 8 + cyphData.Length * 8 + authData.Length * 8 + cyphData2.Length * 8;
             coeff[coeff.Length - 1] = tag + tag2;
