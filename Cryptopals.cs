@@ -3829,7 +3829,6 @@ namespace ELTECSharp
             //BigInteger p = mulGF2(A, B);
             //return divmodGF2(p, M).Item2;
             BigInteger p = 0;
-            if (GetBitSize(B) == GetBitSize(M)) B = B ^ M;
             while (A > 0) {
                 if ((A & 1) != BigInteger.Zero) p = p ^ B;
                 A = A >> 1; B = B << 1;
@@ -3867,20 +3866,24 @@ namespace ELTECSharp
             }
             return d;
         }
+        public static byte ReverseBitsWith4Operations(byte b)
+        {
+            return (byte)(((b * 0x80200802ul) & 0x0884422110ul) * 0x0101010101ul >> 32);
+        }
         static BigInteger calc_gcm_tag(byte[] nonce, byte[] key, byte[] cyphText, byte[] authData)
         {
-            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Reverse().Concat(new byte[] { 0 }).ToArray()); //authentication key
-            BigInteger g = BigInteger.Zero, M = BigInteger.Parse("00E1000000000000000000000000000000", System.Globalization.NumberStyles.HexNumber);
-            authData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
-            cyphText = cyphText.Concat(Enumerable.Repeat((byte)0, (16 - (cyphText.Length % 16)) % 16)).ToArray();
-            for (ulong ctr = 0; (int)ctr < authData.Length; ctr += 16) { //zero pad to block align
-                g = modmulGF2k(addGF2(g, new BigInteger(authData.Skip((int)ctr).Take(16).Reverse().Concat(new byte[] { 0 }).ToArray())), h, M);
+            BigInteger h = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
+            BigInteger g = BigInteger.Zero, M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
+            byte[] padAuthData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
+            byte[] padCyphText = cyphText.Concat(Enumerable.Repeat((byte)0, (16 - (cyphText.Length % 16)) % 16)).ToArray();
+            for (ulong ctr = 0; (int)ctr < padAuthData.Length; ctr += 16) { //zero pad to block align
+                g = modmulGF2k(addGF2(g, new BigInteger(padAuthData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray())), h, M);
             }
-            for (ulong ctr = 0; (int)ctr < cyphText.Length; ctr += 16) { //zero pad to block align
-                g = modmulGF2k(addGF2(g, new BigInteger(cyphText.Skip((int)ctr).Take(16).Reverse().Concat(new byte[] { 0 }).ToArray())), h, M);
+            for (ulong ctr = 0; (int)ctr < padCyphText.Length; ctr += 16) { //zero pad to block align
+                g = modmulGF2k(addGF2(g, new BigInteger(padCyphText.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray())), h, M);
             }
-            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)cyphText.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse()).Reverse().Concat(new byte[] { 0 }).ToArray())), h, M);
-            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()).Reverse().Concat(new byte[] { 0 }).ToArray());
+            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)cyphText.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray())), h, M);
+            BigInteger s = new BigInteger(encrypt_ecb(key, nonce.Concat(BitConverter.GetBytes((int)1).Reverse()).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
             BigInteger t = addGF2(g, s);
             return t;
         }
@@ -4634,7 +4637,14 @@ namespace ELTECSharp
             rng.GetBytes(key);
             byte[] nonce = new byte[12]; // || 0^31 || 1
             rng.GetBytes(nonce);
+            //nonce = new byte[] { 0x51, 0x75, 0x3c, 0x65, 0x80, 0xc2, 0x72, 0x6f, 0x20, 0x71, 0x84, 0x14 };
+            //key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+            //https://tools.ietf.org/html/rfc7714#section-16.1.1
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
+            //authData = new byte[] { 0x80, 0x40, 0xf1, 0x7b, 0x80, 0x41, 0xf8, 0xd3, 0x55, 0x01, 0xa0, 0xb2 };
+            //m = new byte[] { 0x47, 0x61, 0x6c, 0x6c, 0x69, 0x61, 0x20, 0x65, 0x73, 0x74, 0x20, 0x6f, 0x6d, 0x6e, 0x69, 0x73,
+            //    0x20, 0x64, 0x69, 0x76, 0x69, 0x73, 0x61, 0x20, 0x69, 0x6e, 0x20, 0x70, 0x61, 0x72, 0x74, 0x65,
+            //    0x73, 0x20, 0x74, 0x72, 0x65, 0x73 };
             Security.Cryptography.AuthenticatedAesCng aes = new Security.Cryptography.AuthenticatedAesCng();
             aes.CngMode = Security.Cryptography.CngChainingMode.Gcm;
             aes.Key = key;
@@ -4650,7 +4660,7 @@ namespace ELTECSharp
 
             byte[] cyphData = crypt_gcm(nonce, key, m);
             BigInteger tag = calc_gcm_tag(nonce, key, cyphData, authData);
-            byte[] tgComp = tag.ToByteArray();
+            byte[] tgComp = tag.ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).ToArray();
             //authData.Concat(cyphData).Concat(tag.ToByteArray()).ToArray();
             byte[] cyphData2 = crypt_gcm(nonce, key, m.Reverse().ToArray());
             BigInteger tag2 = calc_gcm_tag(nonce, key, cyphData2, authData);
