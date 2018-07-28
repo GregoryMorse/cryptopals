@@ -4637,8 +4637,8 @@ namespace ELTECSharp
             rng.GetBytes(key);
             byte[] nonce = new byte[12]; // || 0^31 || 1
             rng.GetBytes(nonce);
-            //nonce = new byte[] { 0x51, 0x75, 0x3c, 0x65, 0x80, 0xc2, 0x72, 0x6f, 0x20, 0x71, 0x84, 0x14 };
-            //key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+            nonce = new byte[] { 0x51, 0x75, 0x3c, 0x65, 0x80, 0xc2, 0x72, 0x6f, 0x20, 0x71, 0x84, 0x14 };
+            key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
             //https://tools.ietf.org/html/rfc7714#section-16.1.1
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
             //authData = new byte[] { 0x80, 0x40, 0xf1, 0x7b, 0x80, 0x41, 0xf8, 0xd3, 0x55, 0x01, 0xa0, 0xb2 };
@@ -4663,16 +4663,24 @@ namespace ELTECSharp
             byte[] tgComp = tag.ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).ToArray();
             //authData.Concat(cyphData).Concat(tag.ToByteArray()).ToArray();
             byte[] cyphData2 = crypt_gcm(nonce, key, m.Reverse().ToArray());
-            BigInteger tag2 = calc_gcm_tag(nonce, key, cyphData2, authData);
-            BigInteger[] coeff = new BigInteger[(authData.Length + 15) / 16 + cyphData.Length / 16 + 2];
-            for (int ctr = 0; ctr < authData.Length; ctr += 16) { //zero pad to block align
-                coeff[ctr] = addGF2(new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).Concat(new byte[] { 0 }).ToArray()), new BigInteger(authData.Skip((int)ctr).Take(Math.Min(authData.Length - (int)ctr, 16)).Concat(new byte[] { 0 }).ToArray()));
+            BigInteger tag2 = calc_gcm_tag(nonce, key, cyphData2, authData.Reverse().ToArray());
+            byte[] padAuthData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
+            byte[] padAuthDataRev = authData.Reverse().Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
+            BigInteger[] coeff = new BigInteger[padAuthData.Length / 16 + cyphData.Length / 16 + 2];
+            for (int ctr = 0; ctr < padAuthData.Length; ctr += 16) { //zero pad to block align
+                coeff[ctr / 16] = addGF2(new BigInteger(padAuthData.Skip((int)ctr).Take(Math.Min(padAuthData.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()), new BigInteger(padAuthDataRev.Skip((int)ctr).Take(Math.Min(padAuthDataRev.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             }
             for (int ctr = 0; ctr < cyphData.Length; ctr += 16) { //zero pad to block align
-                coeff[(authData.Length + 15) / 16 + ctr] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray()), new BigInteger(cyphData2.Skip((int)ctr).Take(16).Concat(new byte[] { 0 }).ToArray()));
+                coeff[padAuthData.Length / 16 + ctr / 16] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()), new BigInteger(cyphData2.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             }
-            coeff[coeff.Length - 2] = authData.Length * 8 + cyphData.Length * 8 + authData.Length * 8 + cyphData2.Length * 8;
-            coeff[coeff.Length - 1] = tag + tag2;
+            coeff[coeff.Length - 2] = addGF2(new BigInteger(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
+                new BigInteger(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData2.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
+            coeff[coeff.Length - 1] = addGF2(tag, tag2);
+            String str = String.Empty;
+            for (int i = 0; i < coeff.Length; i++) {
+                str += coeff[i].ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+            }
+            Console.WriteLine(str); //for Sage Math
             //make monic polynomial
             Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
             BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2)); //what about remainder?
