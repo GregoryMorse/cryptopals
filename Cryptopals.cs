@@ -4671,7 +4671,7 @@ namespace ELTECSharp
             BigInteger tag2 = calc_gcm_tag(nonce, key, cyphData2, authData.Reverse().ToArray());
             byte[] padAuthData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
             byte[] padAuthDataRev = authData.Reverse().Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
-            BigInteger[] coeff = new BigInteger[padAuthData.Length / 16 + cyphData.Length / 16 + 2];
+            BigInteger[] coeff = new BigInteger[padAuthData.Length / 16 + (cyphData.Length + 15) / 16 + 2];
             for (int ctr = 0; ctr < padAuthData.Length; ctr += 16) { //zero pad to block align
                 coeff[ctr / 16] = addGF2(new BigInteger(padAuthData.Skip((int)ctr).Take(Math.Min(padAuthData.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
                     new BigInteger(padAuthDataRev.Skip((int)ctr).Take(Math.Min(padAuthDataRev.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
@@ -4694,7 +4694,7 @@ namespace ELTECSharp
             }
             Console.WriteLine(str); //for Sage Math
             Console.WriteLine(new BigInteger(key.Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
-            Console.WriteLine(hkey); //== 0
+            Console.WriteLine(hkey);
             Console.WriteLine(Sum); //== 0
             //K.<a>=GF(2**128)
             //X.<x>=PolynomialRing(K, implementation='NTL')
