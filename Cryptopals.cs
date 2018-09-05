@@ -3855,14 +3855,18 @@ namespace ELTECSharp
         }
         static BigInteger modexpGF2k(BigInteger A, BigInteger B, BigInteger M)
         {
+            //naive way for comparison
+            //BigInteger dc = 1;
+            //for (int i = 0; i < B; i++) {
+                //dc = modmulGF2k(dc, A, M);
+            //}
             BigInteger d = 1;
-            for (int i = 127; i >= 0; i--)
-            {
-                d = modmulGF2k(d, d, BigInteger.One << 128);
-                if (((BigInteger.One << i) & A) != 0)
-                {
-                    d = modmulGF2k(d, B, BigInteger.One << 128);
+            int bs = GetBitSize(B);
+            for (int i = bs; i > 0; i--) {
+                if (((BigInteger.One << (bs - i)) & B) != 0) {
+                    d = modmulGF2k(d, A, M);
                 }
+                A = modmulGF2k(A, A, M);
             }
             return d;
         }
@@ -3898,9 +3902,11 @@ namespace ELTECSharp
         }
         static BigInteger[] addGFE2k(BigInteger[] a, BigInteger[] b)
         {
-            BigInteger[] c = new BigInteger[a.Length];
-            for (int i = 0; i < a.Length; i++) {
-                c[i] = addGF2(a[i], b[i]);
+            BigInteger[] c = new BigInteger[Math.Max(a.Length, b.Length)];
+            for (int i = 0; i < Math.Max(a.Length, b.Length); i++) {
+                if (i >= a.Length) c[c.Length - 1 - i] = b[b.Length - 1 - i];
+                else if (i >= b.Length) c[c.Length - 1 - i] = a[a.Length - 1 - i];
+                else c[c.Length - 1 - i] = addGF2(a[a.Length - 1 - i], b[b.Length - 1 - i]);
             }
             return c;
         }
@@ -3916,8 +3922,7 @@ namespace ELTECSharp
         static Tuple<BigInteger[], BigInteger[]> divmodGFE2k(BigInteger[] A, BigInteger[] B)
         {
             BigInteger[] q = new BigInteger[A.Length], r = A; int d;
-            while ((d = r.TakeWhile((BigInteger c) => c != BigInteger.Zero).Count()) - B.TakeWhile((BigInteger c) => c != BigInteger.Zero).Count() >= 0)
-            {
+            while ((d = (r.Count() - 1 - r.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()) - (B.Count() - 1 - B.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count())) >= 0) {
                 q[d] = addGF2(q[d], 1);
                 r = addGFE2k(r, B.Concat(Enumerable.Repeat(BigInteger.Zero, d)).ToArray());
             }
@@ -4668,19 +4673,35 @@ namespace ELTECSharp
             byte[] padAuthDataRev = authData.Reverse().Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
             BigInteger[] coeff = new BigInteger[padAuthData.Length / 16 + cyphData.Length / 16 + 2];
             for (int ctr = 0; ctr < padAuthData.Length; ctr += 16) { //zero pad to block align
-                coeff[ctr / 16] = addGF2(new BigInteger(padAuthData.Skip((int)ctr).Take(Math.Min(padAuthData.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()), new BigInteger(padAuthDataRev.Skip((int)ctr).Take(Math.Min(padAuthDataRev.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
+                coeff[ctr / 16] = addGF2(new BigInteger(padAuthData.Skip((int)ctr).Take(Math.Min(padAuthData.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
+                    new BigInteger(padAuthDataRev.Skip((int)ctr).Take(Math.Min(padAuthDataRev.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             }
             for (int ctr = 0; ctr < cyphData.Length; ctr += 16) { //zero pad to block align
-                coeff[padAuthData.Length / 16 + ctr / 16] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()), new BigInteger(cyphData2.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
+                coeff[padAuthData.Length / 16 + ctr / 16] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
+                    new BigInteger(cyphData2.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             }
             coeff[coeff.Length - 2] = addGF2(new BigInteger(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
                 new BigInteger(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData2.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             coeff[coeff.Length - 1] = addGF2(tag, tag2);
             String str = String.Empty;
+            BigInteger Sum = BigInteger.Zero;
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
+            BigInteger hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
             for (int i = 0; i < coeff.Length; i++) {
-                str += coeff[i].ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                //str += coeff[i].ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                str += new BigInteger(coeff[i].ToByteArray().Reverse().Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                Sum = addGF2(Sum, modmulGF2k(coeff[i], modexpGF2k(hkey, coeff.Length - 1 - i, M), M));
             }
             Console.WriteLine(str); //for Sage Math
+            Console.WriteLine(new BigInteger(key.Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
+            Console.WriteLine(hkey); //== 0
+            Console.WriteLine(Sum); //== 0
+            //K.<a>=GF(2**128)
+            //X.<x>=PolynomialRing(K, implementation='NTL')
+            //X = PolynomialRing(GF(2**128), 'x')
+            //X.<x> = PolynomialRing(GF(2**128),implementation='NTL')
+            //f=210516491487439297890516450086636937392*x^5+213831087762393238717613734*x^4+75519418737987015648642996268311787752*x^3+64135913958761740324356987267667485226*x^2+0*x^1+252539564172952511994475028137682775069
+            //f.factor()
             //make monic polynomial
             Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
             BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2)); //what about remainder?
