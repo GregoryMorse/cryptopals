@@ -3983,27 +3983,28 @@ namespace ELTECSharp
         {
             BigInteger[] fprime = new BigInteger[f.Length];
             List<BigInteger[]> R = new List<BigInteger[]>();
-            R.Add(new BigInteger[f.Length]);
-            R[0][R[0].Length - 1] = BigInteger.One;
+            //R.Add(new BigInteger[] { BigInteger.One });
             int i;
             for (i = 0; i < f.Length - 1; i++) {
                 fprime[i + 1] = ((i + 1) & 1) != 0 ? addGF2(f[i], f[i]) : f[i]; //formal derivative f', not using multiplication in the ring but addition
             }
             BigInteger[] c = gcdGFE2k(f, fprime.Skip(fprime.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray()), w = divmodGFE2k(f, c).Item1;
             i = 0; //Step 1: Identify all factors in w
-            while (w.Last() != BigInteger.One || !w.Take(w.Length - 1).All((BigInteger d) => d == BigInteger.Zero)) {
+            while (w.Length != 1 || w[0] != BigInteger.One) {
                 BigInteger[] y = gcdGFE2k(w, c);
                 BigInteger[] fac = divmodGFE2k(w, y).Item1;
-                R[0] = mulGFE2k(R[0], fac.Concat(Enumerable.Repeat(BigInteger.Zero, i)).ToArray());
+                R.Add(fac); //to the ith power
                 w = y; c = divmodGFE2k(c, y).Item1; i++;
             }
             //c is now the product (with multiplicity) of the remaining factors of f
             //Step 2: Identify all remaining factors using recursion
             //Note that these are the factors of f that have multiplicity divisible by p
-            if (c.Last() != BigInteger.One || !c.Take(c.Length - 1).All((BigInteger d) => d == BigInteger.Zero)) {
-                c = c.Take(c.Length - 1).ToArray(); // c=c^(1/p) where q=p^m=2^128
-                R.AddRange(sqrFree(c));
-                R[0] = mulGFE2k(R[0], R[1]).Concat(Enumerable.Repeat(BigInteger.Zero, 1)).ToArray();
+            if (c.Length != 1 || c[0] != BigInteger.One) {
+                c = c.Where((cr, idx) => (idx & 1) == 0).ToArray(); // c=c^(1/p) where q=p^m=2^128
+                //square root of polynomial
+                //completed by applying the inverse of the Frobenius automorphism to the coefficients
+                //e.g. divide all polynomial exponents by p=2, hence all the even coefficients        
+                R.AddRange(sqrFree(c)); //to the pth=2 power
             }
             return R;
         }
