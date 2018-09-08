@@ -3838,6 +3838,7 @@ namespace ELTECSharp
         }
         static BigInteger modinvGF2k(BigInteger a, BigInteger n)
         {
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
             BigInteger i = n, v = 0, d = 1;
             while (a > 0)
             {
@@ -3845,7 +3846,7 @@ namespace ELTECSharp
                 a = divmodGF2(i, x).Item2;
                 i = x;
                 x = d;
-                d = addGF2(v, modmulGF2k(t, x, BigInteger.One << 128));
+                d = addGF2(v, modmulGF2k(t, x, M)); //this could just as equivalently be replaced with a simpler mulGF2k(t, x)
                 v = x;
             }
             v = divmodGF2(v, n).Item2;
@@ -3911,40 +3912,46 @@ namespace ELTECSharp
         }
         static BigInteger[] mulGFE2k(BigInteger[] A, BigInteger[] B)
         {
-            BigInteger[] p = new BigInteger[A.Length];
-            while (!A.All((BigInteger c) => c == BigInteger.Zero)) {
-                if (A[0] != BigInteger.Zero) p = addGFE2k(p, B.Concat(Enumerable.Repeat(BigInteger.Zero, A.Length - B.Length)).ToArray());
-                A = A.Skip(1).ToArray(); B = B.Concat(new BigInteger[] { BigInteger.Zero }).ToArray();
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
+            BigInteger[] p = new BigInteger[A.Length + B.Length - 1];
+            for (int i = 0; i < B.Length; i++) {
+                for (int j = 0; j < A.Length; j++) {
+                    p[i + j] = addGF2(modmulGF2k(A[j], B[i], M), p[i + j]);
+                }
             }
+            //while (!A.All((BigInteger c) => c == BigInteger.Zero)) {
+            //    if (A[0] != BigInteger.Zero) p = addGFE2k(p, B);
+            //    A = A.Skip(1).ToArray(); B = B.Concat(new BigInteger[] { BigInteger.Zero }).ToArray();
+            //}
             return p;
         }
-        static Tuple<BigInteger[], BigInteger[]> divmodGFE2k(BigInteger[] A, BigInteger[] B)
+        static Tuple<BigInteger[], BigInteger[]> divmodGFE2k(BigInteger[] A, BigInteger[] B) //non-tested/verified/approved
         {
             BigInteger[] q = new BigInteger[A.Length], r = A; int d;
             while ((d = (r.Count() - 1 - r.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()) - (B.Count() - 1 - B.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count())) >= 0) {
                 q[A.Length - d - 1] = divmodGF2(r[A.Length - d - 1], B[0]).Item1;
+                if (q[A.Length - d - 1] == BigInteger.Zero) break;
                 r = addGFE2k(r, mulGFE2k(q.Take(d+1).ToArray(), B));
             }
             return new Tuple<BigInteger[], BigInteger[]>(q, r);
         }
-        static BigInteger modinvGFE2k(BigInteger [] a, BigInteger [] n)
+        static BigInteger [] modinvGFE2k(BigInteger[] a, BigInteger[] n) //non-tested/verified/approved
         {
-            BigInteger i = n, v = 0, d = 1;
-            while (a > 0)
-            {
-                BigInteger t = divmodGF2(i, a).Item1, x = a;
-                a = divmodGF2(i, x).Item2;
+            BigInteger[] i = n, v = new BigInteger[] { BigInteger.Zero }, d = new BigInteger[] { BigInteger.One };
+            while (!a.All((BigInteger c) => c == BigInteger.Zero)) {
+                BigInteger [] t = divmodGFE2k(i, a).Item1, x = a;
+                a = divmodGFE2k(i, x).Item2;
                 i = x;
                 x = d;
-                d = addGF2(v, modmulGF2k(t, x, BigInteger.One << 128));
+                d = addGFE2k(v, mulGFE2k(t, x));
                 v = x;
             }
-            v = divmodGF2(v, n).Item2;
-            if (v < 0) v = addGF2(v, n) % n;
+            v = divmodGFE2k(v, n).Item2;
+            //if (v < 0) v = addGFE2k(v, n) % n;
             return v;
 
         }
-        static BigInteger[] gcdGFE2k(BigInteger[] a, BigInteger[] b)
+        static BigInteger[] gcdGFE2k(BigInteger[] a, BigInteger[] b) //non-tested/verified/approved
         {
             BigInteger[] r = a, ro = b;
             BigInteger[] s = new BigInteger[a.Length], so = new BigInteger[a.Length]; so[0] = BigInteger.One;
@@ -3962,11 +3969,12 @@ namespace ELTECSharp
         }
         //characteristic of GF(2) is 2 hence non-zero and the following algorithm:
         //https://en.wikipedia.org/wiki/Factorization_of_polynomials_over_finite_fields#Square-free_factorization
-        static BigInteger[] sqrFree(BigInteger[] f) //Yun's algorithm, g is monic polynomial
+        static List<BigInteger[]> sqrFree(BigInteger[] f) //Yun's algorithm, g is monic polynomial
         {
             BigInteger[] fprime = new BigInteger[f.Length];
-            BigInteger[] R = new BigInteger[f.Length];
-            R[R.Length - 1] = BigInteger.One;
+            List<BigInteger[]> R = new List<BigInteger[]>();
+            R.Add(new BigInteger[f.Length]);
+            R[0][R[0].Length - 1] = BigInteger.One;
             int i;
             for (i = 0; i < f.Length - 1; i++) {
                 fprime[i + 1] = ((i + 1) & 1) != 0 ? addGF2(f[i], f[i]) : f[i]; //formal derivative f', not using multiplication in the ring but addition
@@ -3976,7 +3984,7 @@ namespace ELTECSharp
             while (w.Last() != BigInteger.One || !w.Take(w.Length - 1).All((BigInteger d) => d == BigInteger.Zero)) {
                 BigInteger[] y = gcdGFE2k(w, c);
                 BigInteger[] fac = divmodGFE2k(w, y).Item1;
-                R = mulGFE2k(R, fac.Concat(Enumerable.Repeat(BigInteger.Zero, i)).ToArray());
+                R[0] = mulGFE2k(R[0], fac.Concat(Enumerable.Repeat(BigInteger.Zero, i)).ToArray());
                 w = y; c = divmodGFE2k(c, y).Item1; i++;
             }
             //c is now the product (with multiplicity) of the remaining factors of f
@@ -3984,7 +3992,8 @@ namespace ELTECSharp
             //Note that these are the factors of f that have multiplicity divisible by p
             if (c.Last() != BigInteger.One || !c.Take(c.Length - 1).All((BigInteger d) => d == BigInteger.Zero)) {
                 c = c.Take(c.Length - 1).ToArray(); // c=c^(1/p) where q=p^m=2^128
-                R = sqrFree(c).Concat(Enumerable.Repeat(BigInteger.Zero, 1)).ToArray();
+                R.AddRange(sqrFree(c));
+                R[0] = mulGFE2k(R[0], R[1]).Concat(Enumerable.Repeat(BigInteger.Zero, 1)).ToArray();
             }
             return R;
         }
@@ -4725,11 +4734,17 @@ namespace ELTECSharp
             //[q[0].integer_representation() for q in f.roots()]
             //[q.integer_representation() for q in f.list()]
             //f / f.list()[6]
+            //(f / f.list()[6]).derivative()
+            //(f / f.list()[6]).squarefree_decomposition()
+            //f.gcd((f / f.list()[6]).derivative())
             //make monic polynomial
-            Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
-            BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2)); //what about remainder?
-            BigInteger[] sqrF = sqrFree(monic);
-            Tuple<BigInteger[], int>[] ddfRes = ddf(sqrF);
+            BigInteger multiplier = modinvGF2k(coeff[0], M); //dividing by first coefficient means multiplying by its inverse!!!
+            //319133248887973560380385766776623898219
+            //Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
+            BigInteger [] monic = mulGFE2k(coeff, new BigInteger[] { multiplier });
+            //BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2));
+            List<BigInteger[]> sqrF = sqrFree(monic);
+            Tuple<BigInteger[], int>[] ddfRes = sqrF.SelectMany((sq) => ddf(sq)).ToArray();
             List<BigInteger> keyPosbl = new List<BigInteger>();
             for (int i = 0; i < ddfRes.Length; i++) {
                 BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
