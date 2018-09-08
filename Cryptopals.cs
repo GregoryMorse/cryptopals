@@ -4014,17 +4014,17 @@ namespace ELTECSharp
             List<Tuple<BigInteger[], int>> S = new List<Tuple<BigInteger[], int>>();
             BigInteger[] fs = f;
             while (fs.Length >= 2 * i) {
-                BigInteger[] xpoly = new BigInteger[1 << i]; xpoly[1] = BigInteger.One;
-                xpoly[xpoly.Length - 1] = BigInteger.One; //x^(q^i)-x where F_q[X]=F_2[X]
+                BigInteger[] xpoly = new BigInteger[(1 << i) + 1]; xpoly[0] = BigInteger.One;
+                xpoly[xpoly.Length - 2] = BigInteger.One; //x^(q^i)-x where F_q[X]=F_2[X]
                 BigInteger[] g = gcdGFE2k(fs, xpoly);
-                if (g.Last() != BigInteger.One || !g.Take(g.Length - 1).All((BigInteger d) => d == BigInteger.Zero)) {
+                if (g.Length != 1 || g[0] != BigInteger.One) {
                     S.Add(new Tuple<BigInteger[], int>(g, i));
                     fs = divmodGFE2k(fs, g).Item1;
                 }
                 i++;
             }
-            if (fs.Last() != BigInteger.One || !fs.Take(fs.Length - 1).All((BigInteger d) => d == BigInteger.Zero)) {
-                S.Add(new Tuple<BigInteger[], int>(fs, fs.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()));
+            if (fs.Length != 1 || fs[0] != BigInteger.One) {
+                S.Add(new Tuple<BigInteger[], int>(fs, fs.Length - 1));
             }
             if (S.Count == 0) S.Add(new Tuple<BigInteger[], int>(f, 1));
             return S.ToArray();
