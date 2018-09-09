@@ -4008,15 +4008,24 @@ namespace ELTECSharp
             }
             return R;
         }
+        //M=2^m
+        static BigInteger [] repSqr(BigInteger [] X, BigInteger m, BigInteger [] f)
+        {
+            BigInteger[] gl = X;
+            for (int i = 1; i < m; i++) {
+                gl = divmodGFE2k(mulGFE2k(gl, gl), f).Item2;
+            }
+            return gl;
+        }
         static Tuple<BigInteger[], int>[] ddf(BigInteger[] f)
         {
             int i = 1;
             List<Tuple<BigInteger[], int>> S = new List<Tuple<BigInteger[], int>>();
             BigInteger[] fs = f;
             while (fs.Length >= 2 * i) {
-                BigInteger[] xpoly = new BigInteger[(1 << i) + 1]; xpoly[0] = BigInteger.One;
-                xpoly[xpoly.Length - 2] = BigInteger.One; //x^(q^i)-x where F_q[X]=F_2[X]
-                BigInteger[] g = gcdGFE2k(fs, xpoly);
+                //x^(q^i)-x where F_q[X]=F_(2^128)[X]
+                //must use repeated squaring to calculate X^M mod f
+                BigInteger[] g = gcdGFE2k(fs, addGFE2k(repSqr(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger(128) * i, fs), new BigInteger[] { BigInteger.One, BigInteger.Zero }));
                 if (g.Length != 1 || g[0] != BigInteger.One) {
                     S.Add(new Tuple<BigInteger[], int>(g, i));
                     fs = divmodGFE2k(fs, g).Item1;
