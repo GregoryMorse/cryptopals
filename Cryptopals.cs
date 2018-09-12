@@ -4012,7 +4012,7 @@ namespace ELTECSharp
         static BigInteger [] repSqr(BigInteger [] X, BigInteger m, BigInteger [] f)
         {
             BigInteger[] gl = X;
-            for (int i = 1; i < m; i++) {
+            for (int i = 1; i <= m; i++) {
                 gl = divmodGFE2k(mulGFE2k(gl, gl), f).Item2;
             }
             return gl;
@@ -4022,10 +4022,14 @@ namespace ELTECSharp
             int i = 1;
             List<Tuple<BigInteger[], int>> S = new List<Tuple<BigInteger[], int>>();
             BigInteger[] fs = f;
+            BigInteger[] lSqr = new BigInteger[] { BigInteger.One, BigInteger.Zero };
             while (fs.Length >= 2 * i) {
                 //x^(q^i)-x where F_q[X]=F_(2^128)[X]
                 //must use repeated squaring to calculate X^M mod f
-                BigInteger[] g = gcdGFE2k(fs, addGFE2k(repSqr(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger(128) * i, fs), new BigInteger[] { BigInteger.One, BigInteger.Zero }));
+                //addGFE2k(repSqr(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger(7), fs), new BigInteger[] { BigInteger.One, BigInteger.Zero }); //128=2^7
+                //BigInteger[] g = gcdGFE2k(fs, addGFE2k(repSqr(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger(128) * i, fs), new BigInteger[] { BigInteger.One, BigInteger.Zero }));
+                lSqr = repSqr(lSqr, new BigInteger(128), fs); //instead of starting over, just do additional 128 each time
+                BigInteger[] g = gcdGFE2k(fs, addGFE2k(lSqr, new BigInteger[] { BigInteger.One, BigInteger.Zero }));
                 if (g.Length != 1 || g[0] != BigInteger.One) {
                     S.Add(new Tuple<BigInteger[], int>(g, i));
                     fs = divmodGFE2k(fs, g).Item1;
@@ -4762,6 +4766,9 @@ namespace ELTECSharp
             //[[22432413633722445097943963007179307015L, 1],[170212518110133693769122543667194027856L, 1],[210158611274146281517224503535298446691L, 1],
             //[79510262696675812766390810347978617508L,35413549109971219848440623448364065564L,74290645703835062417165689337537425287L,1]]
             //[q.integer_representation() for q in ((f / f.list()[6]) / list(f.factor())[3][0]).numerator().list()]
+            //(x^128-x) % (f / f.list()[6])
+            //[q.integer_representation() for q in ((x^128-x) % (f / f.list()[6])).list()]
+
             //make monic polynomial
             BigInteger multiplier = modinvGF2k(coeff[0], M); //dividing by first coefficient means multiplying by its inverse!!!
             //319133248887973560380385766776623898219
