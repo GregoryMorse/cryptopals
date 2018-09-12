@@ -3860,7 +3860,7 @@ namespace ELTECSharp
             //for (int i = 0; i < B; i++) {
                 //dc = modmulGF2k(dc, A, M);
             //}
-            BigInteger d = 1;
+            BigInteger d = BigInteger.One;
             int bs = GetBitSize(B);
             for (int i = bs; i > 0; i--) {
                 if (((BigInteger.One << (bs - i)) & B) != 0) {
@@ -4017,6 +4017,18 @@ namespace ELTECSharp
             }
             return gl;
         }
+        static BigInteger [] modexpGFE2k(BigInteger[] X, BigInteger m, BigInteger[] f)
+        {
+            BigInteger [] d = { BigInteger.One };
+            int bs = GetBitSize(m);
+            for (int i = bs; i > 0; i--) {
+                if (((BigInteger.One << (bs - i)) & m) != 0) {
+                    d = divmodGFE2k(mulGFE2k(d, X), f).Item2;
+                }
+                X = divmodGFE2k(mulGFE2k(X, X), f).Item2;
+            }
+            return d;
+        }
         static Tuple<BigInteger[], int>[] ddf(BigInteger[] f)
         {
             int i = 1;
@@ -4028,7 +4040,8 @@ namespace ELTECSharp
                 //must use repeated squaring to calculate X^M mod f
                 //addGFE2k(repSqr(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger(7), fs), new BigInteger[] { BigInteger.One, BigInteger.Zero }); //128=2^7
                 //BigInteger[] g = gcdGFE2k(fs, addGFE2k(repSqr(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger(128) * i, fs), new BigInteger[] { BigInteger.One, BigInteger.Zero }));
-                lSqr = repSqr(lSqr, new BigInteger(128), fs); //instead of starting over, just do additional 128 each time
+                lSqr = modexpGFE2k(lSqr, BigInteger.One << 128, fs);
+                //lSqr = repSqr(lSqr, new BigInteger(128), fs); //instead of starting over, just do additional 128 each time
                 BigInteger[] g = gcdGFE2k(fs, addGFE2k(lSqr, new BigInteger[] { BigInteger.One, BigInteger.Zero }));
                 if (g.Length != 1 || g[0] != BigInteger.One) {
                     S.Add(new Tuple<BigInteger[], int>(g, i));
@@ -4044,25 +4057,29 @@ namespace ELTECSharp
         }
         static BigInteger[][] edf(RandomNumberGenerator rng, BigInteger[] f, int d)
         {
-            int n = f.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count();
+            int n = f.Length - 1;
             int r = n / d;
             List<BigInteger[]> S = new List<BigInteger[]>();
+            S.Add(f);
             while (S.Count < r) {
-                BigInteger[] h = new BigInteger[f.Length];
+                BigInteger[] h = new BigInteger[f.Length - 1]; // deg(h) < n
                 //random_polynomial(1, f);
-                for (int i = 0; i < f.Length; i++) {
-                    h[i] = GetNextRandomBig(rng, f[i]);
+                h[0] = 1; //h is monic
+                for (int i = 1; i < f.Length - 1; i++) {
+                    do {
+                        h[i] = GetNextRandomBig(rng, (BigInteger.One << 128) - 1);
+                    } while (h[i] < BigInteger.Zero);
                 }
                 BigInteger[] g = gcdGFE2k(h, f);
-                if (g.Last() == BigInteger.One && g.Take(g.Length - 1).All((BigInteger c) => c == BigInteger.Zero)) {
-                    //g = modexpGFE2k(h, ((1 << d) - 1) / 3 - 1, f);
+                if (g.Length == 1 && g[0] == BigInteger.One) {
+                    g = addGFE2k(modexpGFE2k(h, ((BigInteger.One << (128 * d)) - 1) / 3, f), new BigInteger[] { BigInteger.One });
                 }
                 for (int i = 0; i < S.Count; i++) {
                     BigInteger[] u = S[i];
                     //implicitly apply the Chinese Remainder Theorem
-                    if (u.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count() == d) continue;
+                    if (u.Length - 1 == d) continue;
                     BigInteger[] gcd = gcdGFE2k(g, u);
-                    if ((gcd.Last() != BigInteger.One || !gcd.Take(gcd.Length - 1).All((BigInteger c) => c == BigInteger.Zero)) && !gcd.SequenceEqual(u)) {
+                    if ((gcd.Length != 1 || gcd[0] != BigInteger.One) && !gcd.SequenceEqual(u)) {
                         S.Remove(u);
                         S.Add(gcd);
                         S.Add(divmodGFE2k(u, gcd).Item1);
@@ -4774,22 +4791,33 @@ namespace ELTECSharp
             //319133248887973560380385766776623898219
             //Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
             BigInteger [] monic = mulGFE2k(coeff, new BigInteger[] { multiplier });
-            BigInteger [] reslt = divmodGFE2k(monic, new BigInteger[] { BigInteger.One, BigInteger.Parse("74290645703835062417165689337537425287"), BigInteger.Parse("35413549109971219848440623448364065564"), BigInteger.Parse("79510262696675812766390810347978617508") }).Item1;
+            //BigInteger [] reslt = divmodGFE2k(monic, new BigInteger[] { BigInteger.One, BigInteger.Parse("74290645703835062417165689337537425287"), BigInteger.Parse("35413549109971219848440623448364065564"), BigInteger.Parse("79510262696675812766390810347978617508") }).Item1;
             //BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2));
             List<BigInteger[]> sqrF = sqrFree(monic);
             Tuple<BigInteger[], int>[] ddfRes = sqrF.SelectMany((sq) => ddf(sq)).ToArray();
             List<BigInteger> keyPosbl = new List<BigInteger>();
             for (int i = 0; i < ddfRes.Length; i++) {
-                BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
-                for (int l = 0; l < edfRes.Length; l++) {
-                    if (edfRes[l].TakeWhile((BigInteger c) => c == BigInteger.Zero).Count() == 1) {
+                if (ddfRes[i].Item2 == 1)
+                { //a degree one factor will be the key
+                    BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
+                    for (int l = 0; l < edfRes.Length; l++) {
                         keyPosbl.Add(edfRes[l].Last());
                     }
                 }
             }
 
             if (keyPosbl.Count != 1) {
+                byte[] cyphDataOth = crypt_gcm(nonce, key, Enumerable.Repeat((byte)0, 16).ToArray());
+                for (int i = 0; i < keyPosbl.Count; i++) {
+                    byte [] posKey = encrypt_ecb(keyPosbl[i].ToByteArray(), Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray();
+                    if (new ByteArrayComparer().Equals(crypt_gcm(nonce, posKey, Enumerable.Repeat((byte)0, 16).ToArray()), cyphDataOth)) {
+                        Console.WriteLine("Key found: " + HexEncode(posKey));
+                    }
+                }
                 //make forgery, query oracle for validity
+            } else {
+                byte[] posKey = encrypt_ecb(keyPosbl[0].ToByteArray(), Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray();
+                Console.WriteLine("Key found: " + HexEncode(posKey));
             }
             while (keyPosbl.Count != 1) {
                 //try new messages
