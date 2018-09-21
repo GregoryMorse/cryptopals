@@ -3634,7 +3634,7 @@ namespace ELTECSharp
             BigInteger x2 = BigInteger.Remainder(u3 * BigInteger.ModPow(w3, p - 2, p), p); //or for other algo x1
             //y1=(2b+(a+x0x1)(x0+x1)-x2(x0-x1)^2)/2y0
             BigInteger diff = posRemainder(u.Item1 - x1, p);
-            return new Tuple<BigInteger, BigInteger>(x1, posRemainder(posRemainder(2*Eb+posRemainder(EaOrig+(u.Item1+conv)*(x1+conv), p)*(u.Item1 + conv + x1 + conv)-(x2 + conv)*diff*diff, p)* modInverse(2 * u.Item2, p), p));
+            return new Tuple<BigInteger, BigInteger>(x1, posRemainder(posRemainder(2 * Eb + posRemainder(EaOrig + (u.Item1 + conv) * (x1 + conv), p) * (u.Item1 + conv + x1 + conv) - (x2 + conv) * diff * diff, p) * modInverse(2 * u.Item2, p), p));
             //BigInteger x1 = BigInteger.Remainder(u3 * BigInteger.ModPow(w3, p - 2, p), p);
             //BigInteger v1 = x0 == 1 ? 0 : u.Item1, v2 = x0 + v1, v3 = x0 - v1;
             //v3 = v3 * v3; v3 = v3 * x1;
@@ -3710,7 +3710,7 @@ namespace ELTECSharp
                 BigInteger fac = PollardRho(n);
                 if (fac.Equals(BigInteger.Zero)) break;
                 if (fac.IsPowerOfTwo) fac = 2; else if (!IsProbablePrime(fac, 64)) break;
-                facs.Add(fac); 
+                facs.Add(fac);
                 n = n / fac;
                 BigInteger remainder, quot = BigInteger.DivRem(n, fac, out remainder);
                 while (remainder.Equals(BigInteger.Zero)) {
@@ -3766,7 +3766,7 @@ namespace ELTECSharp
             int k = 1;
             while (k < n) {
                 for (int j = k - 1; j >= 0; j--) {
-                //for (int j = 0; j <= k-1; j++) {
+                    //for (int j = 0; j <= k-1; j++) {
                     Tuple<BigInteger, BigInteger> mjk = mu(B[k], Q[j]); //mu(k,j) >= 0 ? > 1/2 : < -1/2, !(-1/2 >= mu(k,j) <= 1/2)
                     BigInteger mjk2 = mjk.Item1 * 2;
                     if ((mjk2 - mjk.Item2) > 0 || (mjk2 + mjk.Item2) < 0)
@@ -3777,7 +3777,7 @@ namespace ELTECSharp
                         mjkRnd += (mjkRem2 > mjk.Item2 ? 1 : (mjkRem2 < -mjk.Item2 ? -1 : 0));
                         List<Tuple<BigInteger, BigInteger>> test = B[k].Zip(B[j], (u, v) => reducFrac(new Tuple<BigInteger, BigInteger>(u.Item1 * v.Item2 - u.Item2 * v.Item1 * mjkRnd, u.Item2 * v.Item2))).ToList();
                         B[k] = test;
-                        Q = gramschmidt(B, Q.Take(k-1).ToList());
+                        Q = gramschmidt(B, Q.Take(k - 1).ToList());
                     }
                 }
                 Tuple<BigInteger, BigInteger> m = mu(B[k], Q[k - 1]);
@@ -3858,7 +3858,7 @@ namespace ELTECSharp
             //naive way for comparison
             //BigInteger dc = 1;
             //for (int i = 0; i < B; i++) {
-                //dc = modmulGF2k(dc, A, M);
+            //dc = modmulGF2k(dc, A, M);
             //}
             BigInteger d = BigInteger.One;
             int bs = GetBitSize(B);
@@ -3873,6 +3873,22 @@ namespace ELTECSharp
         public static byte ReverseBitsWith4Operations(byte b)
         {
             return (byte)(((b * 0x80200802ul) & 0x0884422110ul) * 0x0101010101ul >> 32);
+        }
+        static BigInteger calc_gcm_s(byte[] nonce, BigInteger h, byte[] cyphText, byte[] authData, BigInteger tag)
+        {
+            BigInteger g = BigInteger.Zero, M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
+            byte[] padAuthData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
+            byte[] padCyphText = cyphText.Concat(Enumerable.Repeat((byte)0, (16 - (cyphText.Length % 16)) % 16)).ToArray();
+            for (ulong ctr = 0; (int)ctr < padAuthData.Length; ctr += 16)
+            { //zero pad to block align
+                g = modmulGF2k(addGF2(g, new BigInteger(padAuthData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray())), h, M);
+            }
+            for (ulong ctr = 0; (int)ctr < padCyphText.Length; ctr += 16)
+            { //zero pad to block align
+                g = modmulGF2k(addGF2(g, new BigInteger(padCyphText.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray())), h, M);
+            }
+            g = modmulGF2k(addGF2(g, new BigInteger(BitConverter.GetBytes((ulong)authData.Length * 8).Reverse().Concat(BitConverter.GetBytes((ulong)cyphText.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray())), h, M);
+            return addGF2(g, tag); //tag = g + s, s = tag - g
         }
         static BigInteger calc_gcm_tag(byte[] nonce, byte[] key, byte[] cyphText, byte[] authData)
         {
@@ -3938,7 +3954,7 @@ namespace ELTECSharp
             }
             return new Tuple<BigInteger[], BigInteger[]>(q.Skip(q.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(), r);
         }
-        static BigInteger [] modinvGFE2k(BigInteger[] a, BigInteger[] n) //non-tested/verified/approved
+        /*static BigInteger [] modinvGFE2k(BigInteger[] a, BigInteger[] n) //non-tested/verified/approved
         {
             BigInteger[] i = n, v = new BigInteger[] { BigInteger.Zero }, d = new BigInteger[] { BigInteger.One };
             while (!a.All((BigInteger c) => c == BigInteger.Zero)) {
@@ -3953,7 +3969,7 @@ namespace ELTECSharp
             //if (v < 0) v = addGFE2k(v, n) % n;
             return v;
 
-        }
+        }*/
         //https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
         //https://en.wikipedia.org/wiki/Polynomial_greatest_common_divisor#Bézout's_identity_and_extended_GCD_algorithm
         static BigInteger[] gcdGFE2k(BigInteger[] a, BigInteger[] b)
@@ -4753,7 +4769,7 @@ namespace ELTECSharp
             BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
             BigInteger hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
             for (int i = 0; i < coeff.Length; i++) {
-                str += coeff[i].ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                str += "K.fetch_int(" + coeff[i].ToString() + ")" + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
                 //str += new BigInteger(coeff[i].ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
                 //str += new BigInteger(coeff[i].ToByteArray().Reverse().Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
                 //str += new BigInteger(coeff[i].ToByteArray().Reverse().Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
@@ -4807,20 +4823,58 @@ namespace ELTECSharp
             }
 
             if (keyPosbl.Count != 1) {
-                byte[] cyphDataOth = crypt_gcm(nonce, key, Enumerable.Repeat((byte)0, 16).ToArray());
+                byte[] cyphDataOth = crypt_gcm(nonce, key, Enumerable.Repeat((byte)0, cyphData2.Length).ToArray());
+                BigInteger tagOth = calc_gcm_tag(nonce, key, cyphDataOth, authData.Reverse().ToArray());
+                //make forgery, query oracle for validity
+                //forgery must have same length cypher text and authentication data or cannot be made with authentication key and must reverse AES key which is not possible
                 for (int i = 0; i < keyPosbl.Count; i++) {
-                    byte [] posKey = encrypt_ecb(keyPosbl[i].ToByteArray(), Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray();
-                    if (new ByteArrayComparer().Equals(crypt_gcm(nonce, posKey, Enumerable.Repeat((byte)0, 16).ToArray()), cyphDataOth)) {
-                        Console.WriteLine("Key found: " + HexEncode(posKey));
+                    BigInteger stag = calc_gcm_s(nonce, keyPosbl[i], cyphData, authData, tag);
+                    //try a forgery making sure the cypher data and authentication are the same length, the only way to forge
+                    BigInteger trytag = calc_gcm_s(nonce, keyPosbl[i], cyphDataOth, authData, stag);
+                    if (trytag == tagOth) { //oracle function
+                        Console.WriteLine("Authentication Key found by forgery: " + keyPosbl[i]); break;
                     }
                 }
-                //make forgery, query oracle for validity
+                //also can solve by using the 3rd nonse to narrow down the root possibilities
+                for (int ctr = 0; ctr < cyphData.Length; ctr += 16)
+                { //zero pad to block align
+                    coeff[padAuthData.Length / 16 + ctr / 16] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
+                        new BigInteger(cyphDataOth.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
+                }
+                coeff[coeff.Length - 1] = addGF2(tag, tagOth);
+                Sum = BigInteger.Zero;
+                str = String.Empty;
+                for (int i = 0; i < coeff.Length; i++)
+                {
+                    str += "K.fetch_int(" + coeff[i].ToString() + ")" + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                    //str += new BigInteger(coeff[i].ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                    //str += new BigInteger(coeff[i].ToByteArray().Reverse().Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                    //str += new BigInteger(coeff[i].ToByteArray().Reverse().Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
+                    Sum = addGF2(Sum, modmulGF2k(coeff[i], modexpGF2k(hkey, coeff.Length - 1 - i, M), M));
+                }
+                Console.WriteLine(str); //for Sage Math
+                Console.WriteLine(new BigInteger(key.Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
+                Console.WriteLine(hkey);
+                Console.WriteLine(Sum); //== 0
+
+                multiplier = modinvGF2k(coeff[0], M);
+                monic = mulGFE2k(coeff, new BigInteger[] { multiplier });
+                sqrF = sqrFree(monic);
+                ddfRes = sqrF.SelectMany((sq) => ddf(sq)).ToArray();
+                for (int i = 0; i < ddfRes.Length; i++) {
+                    if (ddfRes[i].Item2 == 1)
+                    { //a degree one factor will be the key
+                        BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
+                        for (int l = 0; l < edfRes.Length; l++) {
+                            if (keyPosbl.Contains(edfRes[l].Last())) {
+                                Console.WriteLine("Authentication Key found by 3rd same nonce message: " + edfRes[l].Last());
+                                break;
+                            }
+                        }
+                    }
+                }
             } else {
-                byte[] posKey = encrypt_ecb(keyPosbl[0].ToByteArray(), Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray();
-                Console.WriteLine("Key found: " + HexEncode(posKey));
-            }
-            while (keyPosbl.Count != 1) {
-                //try new messages
+                Console.WriteLine("Authentication Key found: " + keyPosbl[0]);
             }
             Console.WriteLine("8.63");
 
