@@ -4727,6 +4727,7 @@ namespace ELTECSharp
             key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
             //https://tools.ietf.org/html/rfc7714#section-16.1.1
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
+            goto p64;
             //authData = new byte[] { 0x80, 0x40, 0xf1, 0x7b, 0x80, 0x41, 0xf8, 0xd3, 0x55, 0x01, 0xa0, 0xb2 };
             //m = new byte[] { 0x47, 0x61, 0x6c, 0x6c, 0x69, 0x61, 0x20, 0x65, 0x73, 0x74, 0x20, 0x6f, 0x6d, 0x6e, 0x69, 0x73,
             //    0x20, 0x64, 0x69, 0x76, 0x69, 0x73, 0x61, 0x20, 0x69, 0x6e, 0x20, 0x70, 0x61, 0x72, 0x74, 0x65,
@@ -4879,6 +4880,48 @@ namespace ELTECSharp
             Console.WriteLine("8.63");
 
             //SET 8 CHALLENGE 64
+            p64:
+            aes = new Security.Cryptography.AuthenticatedAesCng();
+            aes.CngMode = Security.Cryptography.CngChainingMode.Gcm;
+            aes.Key = key;
+            aes.IV = nonce;
+            aes.AuthenticatedData = null;
+            aesgcm = aes.CreateAuthenticatedEncryptor();
+            cyphDataVerify = new byte[(m.Length - 1) / 16 * 16];
+            for (int i = 0; i < m.Length; i += 16) {
+                if (i + 16 >= m.Length) cyphDataVerify = cyphDataVerify.Concat(aesgcm.TransformFinalBlock(m, i, m.Length - i)).ToArray();
+                else aesgcm.TransformBlock(m, i, 16, cyphDataVerify, i);
+            }
+            VerifyTag = aesgcm.GetTag().Take(4).ToArray(); //32-bit MAC
+
+            cyphData = crypt_gcm(nonce, key, m);
+            tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
+            tgComp = tag.ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).ToArray();
+
+            //messages of 2^17 blocks
+            m = new byte[1 << 17];
+            rng.GetBytes(m);
+            cyphData = crypt_gcm(nonce, key, m);
+            tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
+            for (int i = 0; i < (1 << 17) * 128; i++) {
+                //compute Mdi
+                for (int ctr = 0; ctr < cyphData.Length; ctr += 16)
+                { //zero pad to block align
+                    new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                }
+                //compute Ms
+                //compute Ms^i
+                //compute Ad=sum(Mdi*Ms^i)
+                //compose T from Ad or Ad*X
+
+                //transpose T, reduced row echelon form of T via Guassian elimination
+                //query oracle
+                //update K
+                //X=transpose K, reduced row echelon form of K via Guassian elimination
+                //if K has 127 linearly independent rows, X will be 1-dimensional subspace with exactly one nonzero vector - h
+
+                //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
+            }
             Console.WriteLine("8.64");
 
         }
