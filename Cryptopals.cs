@@ -4104,6 +4104,76 @@ namespace ELTECSharp
             }
             return S.ToArray();
         }
+        static bool [,] matmul(bool [,] x, bool [,] y)
+        {
+            if (x.GetLength(1) != y.GetLength(0)) return null;
+            bool[,] ret = new bool[x.GetLength(0), y.GetLength(1)];
+            for (int outcol = 0; outcol < y.GetLength(1); outcol++) {
+                for (int row = 0; row < x.GetLength(0); row++) {
+                    bool val = false;
+                    for (int col = 0; col < x.GetLength(1); col++) {
+                        val ^= x[row, col] & y[col, outcol]; //multiplication needs to adapt to use modmulGF2k!!!
+                    }
+                    ret[row, outcol] = val;
+                }
+            }
+            return ret;
+        }
+        static bool [] sumrows(bool [,] x)
+        {
+            bool[] ret = new bool[x.GetLength(1)];
+            for (int col = 0; col < x.GetLength(1); col++) {
+                bool val = false;
+                for (int row = 0; row < x.GetLength(0); row++) {
+                    val ^= x[row, col];
+                }
+                ret[col] = val;
+            }
+            return ret;
+        }
+        static bool [,] transpose(bool [,] x)
+        {
+            bool[,] ret = new bool[x.GetLength(1), x.GetLength(0)];
+            for (int row = 0; row < x.GetLength(0); row++) {
+                for (int col = 0; col < x.GetLength(1); col++) {
+                    ret[col, row] = x[row, col];
+                }
+            }
+            return ret;
+        }
+        static bool [,] guassianElim(bool [,] x)
+        {
+            //bool[,] ret = new bool[x.GetLength(0), x.GetLength(1)];
+            //algorithm here is in place
+            int h = 1; //Initialization of pivot row
+            int k = 1; //Initialization of pivot column
+            while (h <= x.GetLength(0) && k <= x.GetLength(1)) {
+                //Find the k-th pivot
+                int i_max = Enumerable.Range(h, x.GetLength(0) - h + 1).Where((int i) => x[i, k]).Last(); //maximum index, also should consider absolute value!!!
+                if (x[i_max, k] == false) //No pivot in this column, pass to next column
+                    k++;
+                else {
+                    //swap rows h and i_max
+                    for (int col = 0; col < x.GetLength(1); col++) {
+                        x[i_max, col] ^= x[h, col];
+                        x[h, col] ^= x[i_max, col];
+                        x[i_max, col] ^= x[h, col];
+                    }
+                    //Do for all rows below pivot
+                    for (int i = h + 1; i < x.GetLength(0); i++) {
+                        bool f = x[i, k] & x[h, k]; //division needs correction!!!
+                        //Fill with zeros the lower part of the pivot column
+                        x[i, k] = false;
+                        //Do for all remaining elements in current row
+                        for (int j = k + 1; j <= x.GetLength(1); j++)
+                            x[i, j] = x[i, j] ^ x[h, j] & f; //multiplication needs correction!!!
+                    }
+                    h++; k++; //Increase pivot row and column
+                }
+            }
+            //Convert from row echelon form to reduced row echelon form via back substitution
+            return x; //ret;
+        }
 
         static void Set8()
         {
@@ -4727,6 +4797,7 @@ namespace ELTECSharp
             key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
             //https://tools.ietf.org/html/rfc7714#section-16.1.1
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
             goto p64;
             //authData = new byte[] { 0x80, 0x40, 0xf1, 0x7b, 0x80, 0x41, 0xf8, 0xd3, 0x55, 0x01, 0xa0, 0xb2 };
             //m = new byte[] { 0x47, 0x61, 0x6c, 0x6c, 0x69, 0x61, 0x20, 0x65, 0x73, 0x74, 0x20, 0x6f, 0x6d, 0x6e, 0x69, 0x73,
@@ -4767,7 +4838,6 @@ namespace ELTECSharp
             coeff[coeff.Length - 1] = addGF2(tag, tag2);
             String str = String.Empty;
             BigInteger Sum = BigInteger.Zero;
-            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
             BigInteger hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
             for (int i = 0; i < coeff.Length; i++) {
                 str += "K.fetch_int(" + coeff[i].ToString() + ")" + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
@@ -4903,25 +4973,76 @@ namespace ELTECSharp
             rng.GetBytes(m);
             cyphData = crypt_gcm(nonce, key, m);
             tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
-            for (int i = 0; i < (1 << 17) * 128; i++) {
-                //compute Mdi
-                for (int ctr = 0; ctr < cyphData.Length; ctr += 16)
-                { //zero pad to block align
-                    new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+            bool [,] Ms = new bool[128, 128];
+            bool [,] Mdi = new bool[128, 128];
+            bool [][] Ad = new bool[17][];
+            bool [,] T = new bool[17 * 128, (17 - 1) * 128];
+            bool [,] NT;
+            //bool [,] K;
+            //bool [,] X;
+            //compute Ms=1^2, x^2, (x^2)^2, ..., (x^127)^2
+            for (int i = 0; i < 128; i++) {
+                BigInteger sqr = modmulGF2k(BigInteger.One << i, BigInteger.One << i, M);
+                for (int row = 0; row < 128; row++) {
+                    Ms[row, i] = (sqr & (BigInteger.One << row)) != 0;
                 }
-                //compute Ms
-                //compute Ms^i
-                //compute Ad=sum(Mdi*Ms^i)
-                //compose T from Ad or Ad*X
-
-                //transpose T, reduced row echelon form of T via Guassian elimination
-                //query oracle
-                //update K
-                //X=transpose K, reduced row echelon form of K via Guassian elimination
-                //if K has 127 linearly independent rows, X will be 1-dimensional subspace with exactly one nonzero vector - h
-
-                //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
             }
+            //compute Mdi
+            for (int ctr = 16; ctr < cyphData.Length; ctr <<= 1) //only blocks 2^i but not i==0 since its the length block, but 2, 4, 8, 16, 32, 64, etc
+            { //zero pad to block align
+                BigInteger di = new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                uint v = (uint)ctr / 16;
+                uint c = 32;
+                v &= (uint)(-((int)v));
+                if (v != 0) c--;
+                if ((v & 0x0000FFFF) != 0) c -= 16;
+                if ((v & 0x00FF00FF) != 0) c -= 8;
+                if ((v & 0x0F0F0F0F) != 0) c -= 4;
+                if ((v & 0x33333333) != 0) c -= 2;
+                if ((v & 0x55555555) != 0) c -= 1;
+                for (int row = 0; row < 128; row++) {
+                    Mdi[row, c] = (di & (BigInteger.One << row)) != 0;
+                }
+                //compute Ms^i
+                bool[,] Msi = Ms;
+                for (int ct = 1; ct < c; ct++) {
+                    Msi = matmul(Msi, Ms);
+                }
+                //compute Ad[i]
+                Ad[c] = sumrows(matmul(Mdi, Msi));
+                //build a dependency matrix T with n*128 columns and(n-1)*128 rows.Each column represents a bit we can flip,
+                //and each row represents a cell of Ad(reading left - to - right, top - to - bottom).The cells where they intersect record whether a
+                //particular free bit affects a particular bit of Ad.
+                if (c != 17) {
+                    for (int cells = 0; cells < 128; cells++) {
+                        bool[,] Mdit = new bool[128, 128];
+                        for (int row = 0; row < 128; row++) {
+                            Mdit[row, c] = (di & (BigInteger.One << row)) != 0;
+                        }
+                        bool[] Adt = sumrows(matmul(Mdit, Msi));
+                        for (int col = 0; col < 128; col++) {
+                            T[c * 128 + cells, col] = (Adt[col] == Ad[c][col]) ? false : true;
+                        }
+                    }
+                }
+            }
+            //now we have computed Ad=sum(Mdi*Ms^i)
+            //compose T from Ad or Ad*X
+
+            //transpose T, reduced row echelon form of T via Guassian elimination
+            NT = guassianElim(transpose(T));
+            bool[,] ident = new bool[17 * 128, 17 * 128]; //identity matrix of size n*128
+            for (int i = 0; i < 17 * 128; i++) {
+                ident[i, i] = true;
+            }
+            ident = guassianElim(ident); //no transpose needed here obviously
+
+            //query oracle
+            //update K
+            //X=transpose K, reduced row echelon form of K via Guassian elimination
+            //if K has 127 linearly independent rows, X will be 1-dimensional subspace with exactly one nonzero vector - h
+
+            //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
             Console.WriteLine("8.64");
 
         }
