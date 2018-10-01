@@ -4149,7 +4149,7 @@ namespace ELTECSharp
             int k = 1; //Initialization of pivot column
             while (h <= x.GetLength(0) && k <= x.GetLength(1)) {
                 //Find the k-th pivot
-                int i_max = Enumerable.Range(h, x.GetLength(0) - h + 1).Where((int i) => x[i, k]).Last(); //maximum index, also should consider absolute value!!!
+                int i_max = Enumerable.Range(h, x.GetLength(0) - h + 1).Where((int i) => x[i, k]).Last(); //maximum index, also should consider absolute value but here its not applicable since no negative values though zero still possible
                 if (x[i_max, k] == false) //No pivot in this column, pass to next column
                     k++;
                 else {
@@ -4172,6 +4172,14 @@ namespace ELTECSharp
                 }
             }
             //Convert from row echelon form to reduced row echelon form via back substitution
+            //upper triangle matrix
+            bool[] resvect = new bool[x.GetLength(0)];
+            for (int i = x.GetLength(0) - 1; i >= 0; i--) {
+                resvect[i] = x[i, x.GetLength(1) - 1];
+                for (int j = x.GetLength(0) - 1; j >= i; j--) {
+
+                }
+            }
             return x; //ret;
         }
 
