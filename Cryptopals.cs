@@ -4131,6 +4131,18 @@ namespace ELTECSharp
             }
             return ret;
         }
+        static bool[] sumcols(bool[,] x)
+        {
+            bool[] ret = new bool[x.GetLength(0)];
+            for (int row = 0; row < x.GetLength(0); row++) {
+                bool val = false;
+                for (int col = 0; col < x.GetLength(1); col++) {
+                    val ^= x[row, col];
+                }
+                ret[row] = val;
+            }
+            return ret;
+        }
         static bool [,] transpose(bool [,] x)
         {
             bool[,] ret = new bool[x.GetLength(1), x.GetLength(0)];
@@ -4975,6 +4987,7 @@ namespace ELTECSharp
             cyphData = crypt_gcm(nonce, key, m);
             tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
             tgComp = tag.ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).ToArray();
+            hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
 
             //messages of 2^17 blocks
             m = new byte[1 << 17];
@@ -4995,10 +5008,21 @@ namespace ELTECSharp
                     Ms[row, i] = (sqr & (BigInteger.One << row)) != 0;
                 }
             }
+            //verify Ms*y=y^2
+            BigInteger tagsqr = modmulGF2k(tag, tag, M);
+            bool[,] tagm = new bool[128, 1];
+            for (int i = 0; i < 128; i++) {
+                tagm[i, 0] = (tag & (BigInteger.One << i)) != 0;
+            }
+            tagm = matmul(Ms, tagm);
+            BigInteger tagchk = BigInteger.Zero;
+            for (int i = 0; i < 128; i++) {
+                if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
+            }
             //compute Mdi
             for (int ctr = 16; ctr < cyphData.Length; ctr <<= 1) //only blocks 2^i but not i==0 since its the length block, but 2, 4, 8, 16, 32, 64, etc
             { //zero pad to block align
-                BigInteger di = new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                BigInteger di = new BigInteger(cyphData.Skip((int)cyphData.Length - ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
                 uint v = (uint)ctr / 16;
                 uint c = 32;
                 v &= (uint)(-((int)v));
@@ -5008,8 +5032,12 @@ namespace ELTECSharp
                 if ((v & 0x0F0F0F0F) != 0) c -= 4;
                 if ((v & 0x33333333) != 0) c -= 2;
                 if ((v & 0x55555555) != 0) c -= 1;
-                for (int row = 0; row < 128; row++) {
-                    Mdi[row, c] = (di & (BigInteger.One << row)) != 0;
+                c++;
+                for (int i = 0; i < 128; i++) {
+                    BigInteger cnst = modmulGF2k(di, BigInteger.One << i, M);
+                    for (int row = 0; row < 128; row++) {
+                        Mdi[row, i] = (cnst & (BigInteger.One << row)) != 0;
+                    }
                 }
                 //compute Ms^i
                 bool[,] Msi = Ms;
@@ -5018,6 +5046,14 @@ namespace ELTECSharp
                 }
                 //compute Ad[i]
                 Ad[c] = sumrows(matmul(Mdi, Msi));
+                //Ad[c] = sumcols(matmul(Mdi, Msi));
+                tagchk = BigInteger.Zero;
+                for (int i = 0; i < 128; i++) {
+                    if (Ad[c][i]) tagchk |= (BigInteger.One << i);
+                }
+                tagchk = modmulGF2k(tagchk, hkey, M);
+                tagsqr = modmulGF2k(di, modexpGF2k(hkey, BigInteger.One << (int)c, M), M);
+                //check di * h^2^i == Ad[c] * h
                 //build a dependency matrix T with n*128 columns and(n-1)*128 rows.Each column represents a bit we can flip,
                 //and each row represents a cell of Ad(reading left - to - right, top - to - bottom).The cells where they intersect record whether a
                 //particular free bit affects a particular bit of Ad.
