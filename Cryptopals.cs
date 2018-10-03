@@ -5009,10 +5009,10 @@ namespace ELTECSharp
                 }
             }
             //verify Ms*y=y^2
-            BigInteger tagsqr = modmulGF2k(tag, tag, M);
+            BigInteger tagsqr = modmulGF2k(hkey, hkey, M);
             bool[,] tagm = new bool[128, 1];
             for (int i = 0; i < 128; i++) {
-                tagm[i, 0] = (tag & (BigInteger.One << i)) != 0;
+                tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
             }
             tagm = matmul(Ms, tagm);
             BigInteger tagchk = BigInteger.Zero;
@@ -5045,13 +5045,18 @@ namespace ELTECSharp
                     Msi = matmul(Msi, Ms);
                 }
                 //compute Ad[i]
+                tagm = new bool[128, 1];
+                for (int i = 0; i < 128; i++) {
+                    tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
+                }
+                tagm = matmul(matmul(Mdi, Msi), tagm);
+                tagchk = BigInteger.Zero;
+                for (int i = 0; i < 128; i++)
+                {
+                    if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
+                }
                 Ad[c] = sumrows(matmul(Mdi, Msi));
                 //Ad[c] = sumcols(matmul(Mdi, Msi));
-                tagchk = BigInteger.Zero;
-                for (int i = 0; i < 128; i++) {
-                    if (Ad[c][i]) tagchk |= (BigInteger.One << i);
-                }
-                tagchk = modmulGF2k(tagchk, hkey, M);
                 tagsqr = modmulGF2k(di, modexpGF2k(hkey, BigInteger.One << (int)c, M), M);
                 //check di * h^2^i == Ad[c] * h
                 //build a dependency matrix T with n*128 columns and(n-1)*128 rows.Each column represents a bit we can flip,
