@@ -5032,7 +5032,7 @@ namespace ELTECSharp
             for (int i = 0; i < 128; i++) {
                 if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
             }*/
-            BigInteger sm = BigInteger.Zero;
+            //BigInteger sm = BigInteger.Zero;
             //compute Mdi
             for (int ctr = 32; ctr < cyphData.Length; ctr <<= 1) //only blocks 2^i but not i==0 since its the length block, but 2, 4, 8, 16, 32, 64, etc
             { //zero pad to block align
@@ -5057,6 +5057,20 @@ namespace ELTECSharp
                 for (int ct = 1; ct < c; ct++) {
                     Msi = matmul(Msi, Ms);
                 }
+                /*tagsqr = modmulGF2k(hkey, hkey, M);
+                for (int ct = 1; ct < c; ct++) {
+                    tagsqr = modmulGF2k(tagsqr, tagsqr, M);
+                }
+                tagm = new bool[128, 1];
+                for (int i = 0; i < 128; i++) {
+                    tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
+                }
+                tagm = matmul(Msi, tagm);
+                tagchk = BigInteger.Zero;
+                for (int i = 0; i < 128; i++) {
+                    if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
+                }*/
+
                 //compute Ad[i]
                 /*tagm = new bool[128, 1];
                 for (int i = 0; i < 128; i++) {
@@ -5094,23 +5108,23 @@ namespace ELTECSharp
                             }
                         }
                     }
-                    sm = addGF2(sm, modmulGF2k(di, modexpGF2k(hkey, c, M), M));
                 }
+                //sm = addGF2(sm, modmulGF2k(di, modexpGF2k(hkey, (BigInteger.One << (int)c), M), M));
             }
             //check Ad * h == sum(ci * h^i)
-            bool[,] tagm = new bool[128, 1];
+            /*tagm = new bool[128, 1];
             for (int i = 0; i < 128; i++) {
                 tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
             }
             tagm = matmul(Ad, tagm);
-            BigInteger tagchk = BigInteger.Zero;
+            tagchk = BigInteger.Zero;
             for (int i = 0; i < 128; i++) {
                 if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
-            }
+            }*/
 
 
-           //transpose T, reduced row echelon form of T via Guassian elimination
-           NT = guassianElim(transpose(T));
+            //transpose T, reduced row echelon form of T via Guassian elimination
+            NT = guassianElim(transpose(T));
             bool[,] ident = new bool[17 * 128, 17 * 128]; //identity matrix of size n*128
             for (int i = 0; i < 17 * 128; i++) {
                 ident[i, i] = true;
