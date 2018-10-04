@@ -2586,7 +2586,7 @@ namespace ELTECSharp
         static int GetBitSize(BigInteger num)
         {
             int s = 0;
-            while (BigInteger.Pow(2, s) <= num) s = s + 1;
+            while ((BigInteger.One << s) <= num) s = s + 1;
             return s;
         }
         static BigInteger GetRandomBitSize(RandomNumberGenerator rng, int BitSize, BigInteger Max)
@@ -3816,7 +3816,8 @@ namespace ELTECSharp
         static Tuple<BigInteger, BigInteger> divmodGF2(BigInteger A, BigInteger B)
         {
             BigInteger q = BigInteger.Zero, r = A; int d;
-            while ((d = GetBitSize(r) - GetBitSize(B)) >= 0) {
+            int Bsz = GetBitSize(B);
+            while ((d = GetBitSize(r) - Bsz) >= 0) {
                 q = q ^ (BigInteger.One << d); r = r ^ (B << d);
             }
             return new Tuple<BigInteger, BigInteger>(q, r);
@@ -3829,10 +3830,11 @@ namespace ELTECSharp
             //BigInteger p = mulGF2(A, B);
             //return divmodGF2(p, M).Item2;
             BigInteger p = 0;
+            int Msz = GetBitSize(M), Bsz = GetBitSize(B);
             while (A > 0) {
                 if ((A & 1) != BigInteger.Zero) p = p ^ B;
                 A = A >> 1; B = B << 1;
-                if (GetBitSize(B) == GetBitSize(M)) B = B ^ M;
+                if (++Bsz == Msz) { B = B ^ M; Bsz = GetBitSize(B); }
             }
             return p;
         }
@@ -4112,9 +4114,20 @@ namespace ELTECSharp
                 for (int row = 0; row < x.GetLength(0); row++) {
                     bool val = false;
                     for (int col = 0; col < x.GetLength(1); col++) {
-                        val ^= x[row, col] & y[col, outcol]; //multiplication needs to adapt to use modmulGF2k!!!
+                        val ^= x[row, col] & y[col, outcol];
                     }
                     ret[row, outcol] = val;
+                }
+            }
+            return ret;
+        }
+        static bool [,] matsum(bool [,] x, bool [,] y)
+        {
+            if (x.GetLength(0) != y.GetLength(0) || x.GetLength(1) != y.GetLength(1)) return null;
+            bool[,] ret = new bool[x.GetLength(0), x.GetLength(1)];
+            for (int row = 0; row < x.GetLength(0); row++) {
+                for (int col = 0; col < x.GetLength(1); col++) {
+                    ret[row, col] = x[row, col] ^ y[row, col];
                 }
             }
             return ret;
@@ -4996,7 +5009,7 @@ namespace ELTECSharp
             tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
             bool [,] Ms = new bool[128, 128];
             bool [,] Mdi = new bool[128, 128];
-            bool [][] Ad = new bool[17][];
+            bool [,] Ad = new bool[128, 128];
             bool [,] T = new bool[17 * 128, (17 - 1) * 128];
             bool [,] NT;
             //bool [,] K;
@@ -5009,7 +5022,7 @@ namespace ELTECSharp
                 }
             }
             //verify Ms*y=y^2
-            BigInteger tagsqr = modmulGF2k(hkey, hkey, M);
+            /*BigInteger tagsqr = modmulGF2k(hkey, hkey, M);
             bool[,] tagm = new bool[128, 1];
             for (int i = 0; i < 128; i++) {
                 tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
@@ -5018,11 +5031,12 @@ namespace ELTECSharp
             BigInteger tagchk = BigInteger.Zero;
             for (int i = 0; i < 128; i++) {
                 if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
-            }
+            }*/
+            BigInteger sm = BigInteger.Zero;
             //compute Mdi
-            for (int ctr = 16; ctr < cyphData.Length; ctr <<= 1) //only blocks 2^i but not i==0 since its the length block, but 2, 4, 8, 16, 32, 64, etc
+            for (int ctr = 32; ctr < cyphData.Length; ctr <<= 1) //only blocks 2^i but not i==0 since its the length block, but 2, 4, 8, 16, 32, 64, etc
             { //zero pad to block align
-                BigInteger di = new BigInteger(cyphData.Skip((int)cyphData.Length - ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                BigInteger di = new BigInteger(cyphData.Skip((int)cyphData.Length - ctr + 16).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
                 uint v = (uint)ctr / 16;
                 uint c = 32;
                 v &= (uint)(-((int)v));
@@ -5032,7 +5046,6 @@ namespace ELTECSharp
                 if ((v & 0x0F0F0F0F) != 0) c -= 4;
                 if ((v & 0x33333333) != 0) c -= 2;
                 if ((v & 0x55555555) != 0) c -= 1;
-                c++;
                 for (int i = 0; i < 128; i++) {
                     BigInteger cnst = modmulGF2k(di, BigInteger.One << i, M);
                     for (int row = 0; row < 128; row++) {
@@ -5045,41 +5058,59 @@ namespace ELTECSharp
                     Msi = matmul(Msi, Ms);
                 }
                 //compute Ad[i]
-                tagm = new bool[128, 1];
+                /*tagm = new bool[128, 1];
                 for (int i = 0; i < 128; i++) {
                     tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
                 }
                 tagm = matmul(matmul(Mdi, Msi), tagm);
                 tagchk = BigInteger.Zero;
-                for (int i = 0; i < 128; i++)
-                {
+                for (int i = 0; i < 128; i++) {
                     if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
                 }
-                Ad[c] = sumrows(matmul(Mdi, Msi));
+                tagsqr = modmulGF2k(di, modexpGF2k(hkey, BigInteger.One << (int)c, M), M);*/
+                bool[,] Adn = matmul(Mdi, Msi);
+                Ad = matsum(Adn, Ad);
+                //now we have computed Ad=sum(Mdi*Ms^i)
+                //compose T from Ad or Ad*X
+
                 //Ad[c] = sumcols(matmul(Mdi, Msi));
-                tagsqr = modmulGF2k(di, modexpGF2k(hkey, BigInteger.One << (int)c, M), M);
                 //check di * h^2^i == Ad[c] * h
                 //build a dependency matrix T with n*128 columns and(n-1)*128 rows.Each column represents a bit we can flip,
                 //and each row represents a cell of Ad(reading left - to - right, top - to - bottom).The cells where they intersect record whether a
                 //particular free bit affects a particular bit of Ad.
                 if (c != 17) {
-                    for (int cells = 0; cells < 128; cells++) {
+                    for (int flip = 0; flip < 128; flip++) {
                         bool[,] Mdit = new bool[128, 128];
-                        for (int row = 0; row < 128; row++) {
-                            Mdit[row, c] = (di & (BigInteger.One << row)) != 0;
+                        for (int i = 0; i < 128; i++) {
+                            BigInteger cnst = modmulGF2k(di ^ (BigInteger.One << flip), BigInteger.One << i, M);
+                            for (int row = 0; row < 128; row++) {
+                                Mdit[row, i] = (cnst & (BigInteger.One << row)) != 0;
+                            }
                         }
-                        bool[] Adt = sumrows(matmul(Mdit, Msi));
-                        for (int col = 0; col < 128; col++) {
-                            T[c * 128 + cells, col] = (Adt[col] == Ad[c][col]) ? false : true;
+                        Mdit = matmul(Mdit, Msi);
+                        for (int row = 0; row < 17 - 1; row++) { //first (n-1)*128 cells of Ad
+                            for (int i = 0; i < 128; i++) {
+                                T[i + row * 128, flip + (c - 1) * 128] = Mdit[row, i] != Adn[row, i]; //left to right, top to bottom
+                            }
                         }
                     }
+                    sm = addGF2(sm, modmulGF2k(di, modexpGF2k(hkey, c, M), M));
                 }
             }
-            //now we have computed Ad=sum(Mdi*Ms^i)
-            //compose T from Ad or Ad*X
+            //check Ad * h == sum(ci * h^i)
+            bool[,] tagm = new bool[128, 1];
+            for (int i = 0; i < 128; i++) {
+                tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
+            }
+            tagm = matmul(Ad, tagm);
+            BigInteger tagchk = BigInteger.Zero;
+            for (int i = 0; i < 128; i++) {
+                if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
+            }
 
-            //transpose T, reduced row echelon form of T via Guassian elimination
-            NT = guassianElim(transpose(T));
+
+           //transpose T, reduced row echelon form of T via Guassian elimination
+           NT = guassianElim(transpose(T));
             bool[,] ident = new bool[17 * 128, 17 * 128]; //identity matrix of size n*128
             for (int i = 0; i < 17 * 128; i++) {
                 ident[i, i] = true;
