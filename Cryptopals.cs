@@ -4235,7 +4235,7 @@ namespace ELTECSharp
             int curr = 0;
             BigInteger x;
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            goto p59;
+            goto p58;
             for (int i = 2; i < 1 << 16; i++) {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(j, i, out Rem);
                 if (Rem == BigInteger.Zero) {
@@ -4279,6 +4279,8 @@ namespace ELTECSharp
             }
             Console.WriteLine("8.57 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX, rcum).ToByteArray()));
 
+            p58:
+            goto p59;
             //SET 8 CHALLENGE 58
             p = BigInteger.Parse("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623");
             q = BigInteger.Parse("335062023296420808191071248367701059461");
@@ -4353,8 +4355,8 @@ namespace ELTECSharp
             //y' = y * g^(-n)=g^(m*r), g'=g^r, y'=(g')^m
             BigInteger Gprime = BigInteger.ModPow(g, rcum, p);
             BigInteger Yprime = BigInteger.Remainder(y * modInverse(BigInteger.ModPow(g, RecX, p), p), p);
-            BigInteger Mprime = PollardKangaroo(0, (q - 1) / rcum, 23, Gprime, p, Yprime); //(q - 1) / rcum is 40 bits in this case, 23 could also be good
-            Console.WriteLine("8.58 Secret key recovered: " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
+            BigInteger Mprime = PollardKangaroo(0, (p - 1) / rcum, 23, Gprime, p, Yprime); //(p - 1) / rcum is 40 bits in this case, 23 could also be good
+            Console.WriteLine("8.58 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX + Mprime * rcum, p - 1).ToByteArray()));
 
             p59:
             //SET 8 CHALLENGE 59
@@ -4373,6 +4375,7 @@ namespace ELTECSharp
             BigInteger[] Ords = new BigInteger[] { Ord, BigInteger.Parse("233970423115425145550826547352470124412"),
                 BigInteger.Parse("233970423115425145544350131142039591210"),
                 BigInteger.Parse("233970423115425145545378039958152057148") };
+            //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
             Tuple < BigInteger, BigInteger> APub = scaleEC(G, ASecret, Ea, GF);
@@ -4383,6 +4386,7 @@ namespace ELTECSharp
             Tuple<BigInteger, BigInteger> BShared = scaleEC(APub, BSecret, Ea, GF);
             Console.WriteLine("Base point and order correct: " + (scaleEC(G, BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1))));
             Console.WriteLine("Shared Secrets Identical: " + (AShared.Item1 == BShared.Item1));
+
             //Pohlig-Hellman algorithm for discrete logarithms
             rs = new List<int>();
             List<int> rsidx = new List<int>();
