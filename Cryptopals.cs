@@ -4331,8 +4331,9 @@ namespace ELTECSharp
             return x; //ret;
         }
 
-        static Tuple<bool[,], bool[][,]> calcAd(int nSize, byte[] cyphData, BigInteger M, bool [][,] Msis)
+        static Tuple<bool[,], bool[][,]> calcAd(int nSize, byte[] cyphData, BigInteger M, bool [][,] Msis, int cyphDataLen = 0)
         {
+            if (cyphDataLen == 0) cyphDataLen = cyphData.Length;
             bool[,] Ad = new bool[128, 128];
             bool[][,] Mdi = new bool[nSize + 1][,];
             bool[][,] Adn = new bool[nSize + 1][,];
@@ -4344,7 +4345,7 @@ namespace ELTECSharp
                 BigInteger di;
                 if (c == 0)
                 {
-                    di = new BigInteger(BitConverter.GetBytes((ulong)0).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                    di = new BigInteger(BitConverter.GetBytes((ulong)0).Reverse().Concat(BitConverter.GetBytes((ulong)cyphDataLen * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
                 }
                 else
                 {
@@ -4376,21 +4377,6 @@ namespace ELTECSharp
                 //now we have computed Ad=sum(Mdi*Ms^i)
                 //check di * h^(2^i) == Ad[c] * h
             }
-            //check Ad * h == sum(ci * h^i)
-            /*for (int c = 0; c < Adn.Length + 1; c++) {
-                bool[,] tagm = new bool[128, 1];
-                for (int i = 0; i < 128; i++) {
-                    tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
-                }
-                tagm = matmul(c == Adn.Length ? Ad : Adn[c], tagm); //Ad * h = e
-                BigInteger tagchk = BigInteger.Zero;
-                for (int i = 0; i < 128; i++) {
-                    if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
-                }
-                Console.WriteLine(tagchk);
-            }
-            BigInteger valide = calc_gcm_tag_squares(nonce, key, cyphData, new byte[] { });*/
-            //tagchk is e
             return new Tuple<bool[,], bool[][,]>(Ad, Adn);
         }
 
@@ -5224,8 +5210,20 @@ namespace ELTECSharp
             //bool[,] testMat = new bool[6, 4] { { false, false, false, false }, { false, true, false, false }, { false, false, true, true }, { true, true, false, true }, { true, true, false, true }, { true, true, true, true } };
             //testMat = transpose(gaussianElim(transpose(testMat)));
             //testMat = extractBasisMat(gaussianElim(augmentIdentityMat(testMat)));
+            /*
+            M = MatrixSpace(GF(2),6,4)
+            A = M([0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1])
+            MI = MatrixSpace(GF(2),6,6)
+            I = MI([1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1])
+            A.echelon_form()
+            I.echelon_form()
+            A.kernel()
+            I.kernel()
+            A.transpose() * Matrix(GF(2), [1,0,0,0,0,0]).transpose()
+            */
             //compute Mdi
-            do {
+            do
+            {
                 Tuple<bool[,], bool[][,]> AdAdn;
                 AdAdn = calcAd(nSize, cyphData, M, Msis);
                 Ad = AdAdn.Item1;
@@ -5278,25 +5276,6 @@ namespace ELTECSharp
                     //sm = addGF2(sm, modmulGF2k(di, modexpGF2k(hkey, (BigInteger.One << (int)c), M), M));
                 }
                 //test T is correct by modifying bits calculating Ad and using T to calculate Ad
-                //add column to T with Ad
-                //solve using Gaussian elimination by zeroing out extra columns or last used row of Ad since they can be the free variables
-                /*bool [,] solveT = new bool[T.GetLength(0), T.GetLength(0) + 1];
-                for (int row = 0; row < T.GetLength(0); row++) {
-                    for (int col = 0; col < T.GetLength(0); col++) {
-                        solveT[row, col] = T[row, col];
-                    }
-                }
-                for (int row = 0; row < nSize - 1 - 1; row++) {
-                    for (int col = 0; col < 128; col++) {
-                        solveT[col + row * 128, solveT.GetLength(1) - 1] = Ad[row, col];
-                    }
-                }
-                solveT = gaussianElim(solveT);
-                //last column is now the solution
-                bool[,] solutionBits = new bool[nSize * 128, 1];
-                for (int row = 0; row < solveT.GetLength(0); row++) {
-                    solutionBits[row, 0] = solveT[row, solveT.GetLength(1) - 1];
-                }*/
                 /*{
                     bool[,] testT = matmul(T, testBits);
                     bool[,] FlipAd = (bool[,])Ad.Clone();
@@ -5438,6 +5417,376 @@ namespace ELTECSharp
             Console.WriteLine("8.64");
 
         }
+        static void Set9()
+        {
+
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
+
+            Tuple<byte[], BigInteger> cyphtag;
+            byte[] cyphDataVerify;
+            byte[] cyphData;
+            BigInteger tag;
+            BigInteger hkey; //authentication key
+
+            byte[] key = new byte[16];
+            rng.GetBytes(key);
+            byte[] nonce = new byte[12]; // || 0^31 || 1
+            rng.GetBytes(nonce);
+            nonce = new byte[] { 0x51, 0x75, 0x3c, 0x65, 0x80, 0xc2, 0x72, 0x6f, 0x20, 0x71, 0x84, 0x14 };
+            key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+            //https://tools.ietf.org/html/rfc7714#section-16.1.1
+            byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
+
+            //https://csrc.nist.gov/csrc/media/projects/block-cipher-techniques/documents/bcm/comments/cwc-gcm/ferguson2.pdf
+            //messages of 2^17 blocks which are 128 bits each
+            int nSize = 17; //too slow for now with 17 ~ 7 minutes for crypt_gcm and calc_gcm_tag, probably need GCM MAC library
+            m = new byte[16 * (1 << nSize) - 8]; //partial 8 byte last block with 64 bits to attack via length variation
+            rng.GetBytes(m);
+
+            cyphtag = crypt_gcm_fastlib(nonce, key, m, new byte[] { });
+            cyphData = cyphDataVerify = cyphtag.Item1;
+            cyphData = cyphData.Concat(Enumerable.Repeat((byte)0, (16 - (cyphData.Length % 16)) % 16)).ToArray(); //just pad it up front
+            tag = cyphtag.Item2 & 0xFFFFFFFF; //32-bit MAC
+            //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData.Take(cyphData.Length - 8).ToArray()) & 0xFFFFFFFF; //32-bit MAC;
+            //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData.Take(cyphData.Length - 8).ToArray()) & 0xFFFFFFFF; //32-bit MAC;
+
+            //cyphData = crypt_gcm(nonce, key, m);
+            //tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
+            //tgComp = tag.ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).ToArray();
+
+            hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
+            Console.WriteLine("Secret key: " + hkey);
+            bool[,] Ms = new bool[128, 128];
+            bool[][,] Msis = new bool[nSize][,];
+            bool[,] Ad = new bool[128, 128];
+            //can 0 out (n*128) / (ncols(X)) per operation, start with 16+1 non-zero row
+            bool[,] T = null;
+            bool[,] NT, Km = null, Xm = null;
+            bool padLengthMode = true;
+            //compute Ms=1^2, x^2, (x^2)^2, ..., (x^127)^2
+            for (int i = 0; i < 128; i++)
+            {
+                BigInteger sqr = modmulGF2k(BigInteger.One << i, BigInteger.One << i, M);
+                for (int row = 0; row < 128; row++)
+                {
+                    Ms[row, i] = (sqr & (BigInteger.One << row)) != 0;
+                }
+            }
+            //compute Ms^i
+            Msis[0] = Ms;
+            for (int ct = 1; ct < nSize; ct++)
+            {
+                Msis[ct] = matmul(Msis[ct - 1], Ms);
+            }
+            //verify Ms*y=y^2
+            /*for (int ct = 1; ct < nSize + 1; ct++) {
+                BigInteger tagsqr = hkey; //modmulGF2k(hkey, hkey, M);
+                for (int i = 0; i < (1 << ct) - 1; i++) {
+                    tagsqr = modmulGF2k(tagsqr, hkey, M);
+                }
+                bool[,] tagm = new bool[128, 1];
+                for (int i = 0; i < 128; i++)
+                {
+                    tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
+                }
+                tagm = matmul(Msis[ct-1], tagm);
+                BigInteger tagchk = BigInteger.Zero;
+                for (int i = 0; i < 128; i++)
+                {
+                    if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
+                }
+                if (tagchk != tagsqr) {}
+            }*/
+            //BigInteger sm = BigInteger.Zero;
+            //bool[,] testMat = new bool[6, 4] { { false, false, false, false }, { false, true, false, false }, { false, false, true, true }, { true, true, false, true }, { true, true, false, true }, { true, true, true, true } };
+            //testMat = transpose(gaussianElim(transpose(testMat)));
+            //testMat = extractBasisMat(gaussianElim(augmentIdentityMat(testMat)));
+            //compute Mdi
+            do
+            {
+                Tuple<bool[,], bool[][,]> AdAdn;
+                AdAdn = calcAd(nSize, cyphData, M, Msis, cyphData.Length - 8);
+                Ad = AdAdn.Item1;
+                bool[][,] Adn = AdAdn.Item2;
+                //check Ad * h == sum(ci * h^i)
+                /*for (int c = 0; c < Adn.Length + 1; c++) {
+                    bool[,] tagm = new bool[128, 1];
+                    for (int i = 0; i < 128; i++) {
+                        tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
+                    }
+                    tagm = matmul(c == Adn.Length ? Ad : Adn[c], tagm); //Ad * h = e
+                    BigInteger tagchk = BigInteger.Zero;
+                    for (int i = 0; i < 128; i++) {
+                        if (tagm[i, 0]) tagchk |= (BigInteger.One << i);
+                    }
+                    Console.WriteLine(tagchk);
+                }
+                BigInteger valide = calc_gcm_tag_squares(nonce, key, cyphData.Take(cyphData.Length - 8).ToArray(), new byte[] { });*/
+                //tagchk is e
+
+                bool[,] AdX = (Xm == null) ? Ad : matmul(Ad, Xm);
+                bool[][,] AdnX = (Xm == null) ? Adn : Adn.Select((bool[,] curAdn) => matmul(curAdn, Xm)).ToArray();
+
+                //compose T from Ad or Ad*X
+                //build a dependency matrix T with n*128 columns and (n-1)*128 rows.Each column represents a bit we can flip,
+                //and each row represents a cell of Ad(reading left - to - right, top - to - bottom).The cells where they intersect record whether a
+                //particular free bit affects a particular bit of Ad.
+                //16+13+11*9=128, 11 round solving, since rounds slow due to inefficient Gaussian and fast GCM tag makes collision search fast, balance with this
+                int numcols = AdX.GetLength(1);
+                int numrows = (Xm == null ? (nSize - 1) : Math.Min((nSize * 128) / numcols, 32 - 1 - 10));
+                T = new bool[numrows * AdX.GetLength(1), nSize * 128 - (padLengthMode ? 0 : (8 * 8))];
+                for (int c = 1; c < nSize + 1; c++)
+                {
+                    int ctr = 16 * ((1 << c) - 1);
+                    //Console.WriteLine(c + " " + ((padLengthMode || c != 1) ? 128 : 64) + " " + ((c - 1) * 128 - ((padLengthMode || c == 1) ? 0 : 64)));
+                    for (int flip = 0; flip < ((padLengthMode || c != 1) ? 128 : 64); flip++)
+                    {
+                        byte[] cyphDataTest = cyphData.ToArray(); //make copy
+                        cyphDataTest[cyphDataTest.Length - ctr + (flip / 8)] ^= (byte)(1 << (flip % 8));
+                        BigInteger di = new BigInteger(cyphDataTest.Skip(cyphDataTest.Length - ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                        //BigInteger olddi = new BigInteger(cyphData.Skip(cyphData.Length - ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                        bool[,] Mdic = new bool[128, 128];
+                        //int bit = (flip / 8) * 8 + 7 - (flip % 8);
+                        for (int i = 0; i < 128; i++)
+                        {
+                            BigInteger cnst = modmulGF2k(di, BigInteger.One << i, M);
+                            for (int row = 0; row < 128; row++)
+                            {
+                                Mdic[row, i] = (cnst & (BigInteger.One << row)) != 0;
+                            }
+                        }
+                        bool[,] FlipAd = matmul(Mdic, Msis[c - 1]);
+                        if (Xm != null) FlipAd = matmul(FlipAd, Xm);
+                        //bool[,] Mdit = calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1;
+                        //each row represents a cell of Ad (reading left-to-right, top-to-bottom)
+                        for (int row = 0; row < numrows; row++)
+                        { //first (n-1)*128 cells of Ad
+                            for (int col = 0; col < numcols; col++)
+                            {
+                                //if (Mdit[row, col] != ((FlipAd[row, col] == Adn[c][row, col]) ? Ad[row, col] : !Ad[row, col])) {
+                                //    throw new ArgumentException();
+                                //}
+                                //if Ad set, hypothetical not set -> flip needed
+                                //if Ad not set, hypothetical not set -> no flip
+                                //if Ad set, hypothetical set -> flip does nothing
+                                //if Ad not set, hypothetical set -> flip causes error
+                                T[col + row * numcols, flip + (c - 1) * 128 - ((padLengthMode || c == 1) ? 0 : 64)] = (FlipAd[row, col] != AdnX[c][row, col]); // ^ Ad[row, col]; // ((FlipAd[row, col] == Adn[c][row, col]) ? Ad[row, col] : !Ad[row, col]); //left to right, top to bottom
+                            }
+                        }
+                    }
+                    //sm = addGF2(sm, modmulGF2k(di, modexpGF2k(hkey, (BigInteger.One << (int)c), M), M));
+                }
+                //test T is correct by modifying bits calculating Ad and using T to calculate Ad
+                //add column to T with Ad
+                //solve using Gaussian elimination by zeroing out extra columns or last used row of Ad since they can be the free variables
+                bool[,] solutionBits = new bool[T.GetLength(1), 1];
+                bool[,] Adt = new bool[128, 128];
+                if (padLengthMode) {
+                    bool[,] solveT = new bool[T.GetLength(0), T.GetLength(0) + 1];
+                    for (int row = 0; row < T.GetLength(0); row++) {
+                        for (int col = 0; col < T.GetLength(0); col++) {
+                            solveT[row, col] = T[row, col];
+                        }
+                    }
+                    BigInteger dit = new BigInteger(BitConverter.GetBytes((ulong)0).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
+                    for (int i = 0; i < 128; i++) {
+                        BigInteger cnst = modmulGF2k(dit, BigInteger.One << i, M);
+                        for (int row = 0; row < 128; row++) {
+                            Adt[row, i] = (cnst & (BigInteger.One << row)) != 0;
+                        }
+                    }
+                    if (Xm != null) Adt = matmul(Adt, Xm);
+                    for (int row = 0; row < numrows; row++) {
+                        for (int col = 0; col < numcols; col++) {
+                            solveT[col + row * numcols, solveT.GetLength(1) - 1] = (Adt[row, col] != AdnX[0][row, col]);
+                        }
+                    }
+                    solveT = gaussianElim(solveT);
+                    //last column is now the solution
+                    for (int row = 0; row < solveT.GetLength(0); row++) {
+                        solutionBits[row, 0] = solveT[row, solveT.GetLength(1) - 1];
+                    }
+                }
+                /*{
+                    bool[,] testT = matmul(T, solutionBits);
+                    bool[,] FlipAd = (bool[,])Ad.Clone();
+                    for (int i = 0; i < testT.GetLength(0); i++)
+                    {
+                        if (testT[i, 0]) FlipAd[i / 128, i % 128] = !FlipAd[i / 128, i % 128];
+                    }
+                    byte[] cyphDataTest = cyphData.ToArray(); //make copy
+                    for (int i = 0; i < solutionBits.GetLength(0); i++) {
+                        if (solutionBits[i, 0]) {
+                            int adjbit = (i + ((padLengthMode || (i < 64)) ? 0 : 64));
+                            int c = adjbit / 128 + 1;
+                            int flip = adjbit % 128;
+                            int ctr = 16 * ((1 << c) - 1);
+                            cyphDataTest[cyphDataTest.Length - ctr + (flip / 8)] ^= (byte)(1 << (flip % 8));
+                        }
+                    }
+                    bool[,] cAd = calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1;
+                    for (int row = 0; row < numrows; row++) {
+                        for (int col = 0; col < numcols; col++) {
+                            if (FlipAd[row, col] != cAd[row, col]) {
+                                throw new ArgumentException();
+                            }
+                        }
+                    }
+                }*/
+
+                //already have transpose T, reduced row echelon form of transpose T via Gaussian elimination
+                //https://en.wikipedia.org/wiki/Gaussian_elimination
+                //https://en.wikipedia.org/wiki/Kernel_(linear_algebra)#Computation_by_Gaussian_elimination
+                //bool[,] ident = new bool[(nSize - 1) * 128, (nSize - 1) * 128]; //identity matrix of size n*128
+                //for (int i = 0; i < (nSize - 1) * 128; i++) ident[i, i] = true;
+                NT = transpose(gaussianElim(T));
+                //The rows that correspond to the zero rows in the reduced row echelon form of T transpose form a basis for N(T).
+                //ident gaussian elimination yields ident but we need to concatenate the matrices via augmentation
+                NT = extractBasisMat(gaussianElim(augmentIdentityMat(NT)));
+                //since we are solving T * d = 0, can check all the d vectors of n*128 length to see if they satisfy this equation
+                /*for (int i = 0; i < NT.GetLength(0); i++)
+                {
+                    bool[,] dvec = new bool[NT.GetLength(1), 1];
+                    for (int col = 0; col < NT.GetLength(1); col++)
+                    {
+                        dvec[col, 0] = NT[i, col];
+                    }
+                    if (matmul(T, dvec).OfType<bool>().Any((bool v) => v))
+                    {
+                        //failure
+                        throw new ArgumentException();
+                    }
+                }*/
+                //query oracle
+                numrows = NT.GetLength(0);
+                numcols = NT.GetLength(1);
+                byte[] rnd = new byte[numrows];
+                int totalTries = 0;
+                while (true)
+                {
+                    totalTries++;
+                    bool[,] testBits = padLengthMode ? (bool[,])solutionBits.Clone() : new bool[numcols, 1]; //new bool[solutionBits.GetLength(0), solutionBits.GetLength(1)];
+                    if (numrows <= 16) { //exhaustive search before toggling mode and moving on to non-length padding mode
+                        if (padLengthMode && totalTries == (1 << numrows)) {
+                            padLengthMode = !padLengthMode;
+                            totalTries = -1;
+                            break;
+                        }
+                        for (int ci = 0; ci < numrows; ci++) {
+                            if (((1 << ci) & totalTries) != 0) { //totalTries bits indicate combinations
+                                for (int col = 0; col < numcols; col++) {
+                                    testBits[col, 0] ^= NT[ci, col];
+                                }
+                            }
+                        }
+                    } else {
+                        rng.GetBytes(rnd);
+                        for (int ci = 0; ci < numrows; ci++) {
+                            if ((rnd[ci] & 1) != 0) { //odd byte means inclusion
+                                for (int col = 0; col < numcols; col++) {
+                                    testBits[col, 0] ^= NT[ci, col];
+                                }
+                            }
+                        }
+                    }
+                    byte[] cyphDataTest = padLengthMode ? cyphData.ToArray() : cyphData.Take(cyphData.Length - 8).ToArray(); //make copy
+                    for (int bit = 0; bit < numcols; bit++)
+                    {
+                        if (testBits[bit, 0])
+                        {
+                            int adjbit = (bit + ((padLengthMode || (bit < 64)) ? 0 : 64));
+                            int c = adjbit / 128 + 1;
+                            int flip = adjbit % 128;
+                            int ctr = 16 * ((1 << c) - 1);
+                            cyphDataTest[cyphData.Length - ctr + (flip / 8)] ^= (byte)(1 << (flip % 8)); //careful to use original length here
+                        }
+                    }
+                    //FullTag = calc_gcm_tag(nonce, key, cyphDataTest, new byte[] { });
+                    //BigInteger tagtest = FullTag & 0xFFFFFFFF; //32-bit MAC
+                    BigInteger tagtest = calc_gcm_tag_fastlib(M, nonce, key, cyphDataTest) & 0xFFFFFFFF;
+                    //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData) & 0xFFFFFFFF;
+                    //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData.Take(cyphData.Length - 8).ToArray()) & 0xFFFFFFFF;
+                    //tag & 0xFFFF == tagtest & 0xFFFF
+                    if (tag == tagtest)
+                    {
+                        //recompute Ad with flipped bits
+                        //matsum(calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1, Ad);
+                        if (!padLengthMode) cyphDataTest = cyphDataTest.Concat(Enumerable.Repeat((byte)0, (16 - (cyphDataTest.Length % 16)) % 16)).ToArray();
+                        Ad = matsum(calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1, Ad);
+                        if (padLengthMode) {
+                            for (int ci = 0; ci < Adt.GetLength(0); ci++) {
+                                for (int col = 0; col < Adt.GetLength(1); col++) {
+                                    Ad[ci, col] ^= (Adt[ci, col] != AdnX[0][ci, col]);
+                                }
+                            }
+                        }
+                        //AdX = matsum(matmul(calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1, Xm), AdX);
+                        AdX = Xm == null ? Ad : matmul(Ad, Xm);
+                        break;
+                    }
+                }
+                if (totalTries == -1) continue;
+                //If it succeeds, we've gained more than just an easy forgery. Examine
+                //your matrix Ad.It should be a bunch of zero rows followed by a bunch
+                //of nonzero rows.We care about the nonzero rows corresponding to the
+                //bits of the tag.So if your tag is 16 bits, and you forced eight bits
+                //to zero, you should have eight nonzero rows of interest.
+                //update K
+                List<int> AdRows = new List<int>();
+                /*bool[,] tagm = new bool[128, 1];
+                for (int i = 0; i < 128; i++) {
+                    tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
+                }
+                matmul(Ad, tagm);*/
+                numcols = AdX.GetLength(1);
+                for (int i = 0; i < 32; i++)
+                {
+                    int col;
+                    for (col = 0; col < numcols; col++)
+                    {
+                        if (AdX[i, col]) break;
+                    }
+                    if (col == numcols) continue;
+                    AdRows.Add(i);
+                }
+                int CurRow = Km == null ? 0 : Km.GetLength(0);
+                bool[,] KmNew = new bool[CurRow + AdRows.Count, Ad.GetLength(1)];
+                if (Km != null) Array.Copy(Km, KmNew, Km.GetLength(0) * Km.GetLength(1));
+                Km = KmNew;
+                foreach (int i in AdRows)
+                {
+                    for (int col = 0; col < Ad.GetLength(1); col++)
+                    {
+                        if (padLengthMode)
+                            Km[CurRow, col] = Ad[i, col] ^ (Adt[i, col] != AdnX[0][i, col]);
+                        else
+                            Km[CurRow, col] = Ad[i, col];
+                    }
+                    CurRow++;
+                }
+                //can verify K * h == 0
+                //matmul(Km, tagm);
+                //K needs 127 linearly independent vectors, if there are more should not make a difference in solution
+                //instead of checking linear independence, its inferred by Xm being 1 row
+
+                //X=transpose K, reduced row echelon form of K via Gaussian elimination
+                Xm = transpose(gaussianElim(Km));
+                Xm = extractBasisMat(gaussianElim(augmentIdentityMat(Xm)));
+                Xm = transpose(Xm);
+                //matmul(Ad, Xm);
+                //if K has 127 linearly independent rows, X will be 1-dimensional subspace with exactly one nonzero vector - h
+            } while (Xm.GetLength(1) != 1);
+            BigInteger keyrecv = BigInteger.Zero;
+            for (int i = 0; i < 128; i++)
+            {
+                if (Xm[i, 0]) keyrecv |= (BigInteger.One << i);
+            }
+            Console.WriteLine("Key found: " + keyrecv);
+            //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
+            Console.WriteLine("9.65");
+        }
         static void Main(string[] args)
         {
             //Set1();
@@ -5447,7 +5796,8 @@ namespace ELTECSharp
             //Set5();
             //Set6();
             //Set7();
-            Set8();
+            //Set8();
+            Set9();
 
             Console.ReadKey();
         }
