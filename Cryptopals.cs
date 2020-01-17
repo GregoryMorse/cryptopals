@@ -5735,11 +5735,11 @@ namespace ELTECSharp
                 //to zero, you should have eight nonzero rows of interest.
                 //update K
                 List<int> AdRows = new List<int>();
-                bool[,] tagm = new bool[128, 1];
+                /*bool[,] tagm = new bool[128, 1];
                 for (int i = 0; i < 128; i++) {
                     tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
                 }
-                matmul(Ad, tagm);
+                matmul(Ad, tagm);*/
                 numcols = AdX.GetLength(1);
                 for (int i = 0; i < 32; i++)
                 {
@@ -5759,15 +5759,16 @@ namespace ELTECSharp
                 {
                     for (int col = 0; col < Ad.GetLength(1); col++)
                     {
-                        if (padLengthMode)
+                        if (padLengthMode) {
                             Km[CurRow, col] = Ad[i, col] ^ (Adt[i, col] != AdnX[0][i, col]);
-                        else
+                        } else {
                             Km[CurRow, col] = Ad[i, col];
+                        }
                     }
                     CurRow++;
                 }
-                //can verify K * h == 0
-                matmul(Km, tagm);
+                //can verify K * h == 0 or now K * h == t
+                //matmul(Km, tagm);
                 //K needs 127 linearly independent vectors, if there are more should not make a difference in solution
                 //instead of checking linear independence, its inferred by Xm being 1 row
 
