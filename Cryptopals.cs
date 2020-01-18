@@ -6,6 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Security.Cryptography;
+//https://www.nuget.org/packages/Security.Cryptography/
+//using CLR Security for fast AES GCM however this project originally at http://clrsecurity.codeplex.com and now https://github.com/MicrosoftArchive/clrsecurity is discontinued
+//BouncyCastle has an implementation
+//.NET Core 3.0 might have an implementation
 using System.Text;
 
 namespace ELTECSharp
@@ -5583,10 +5587,11 @@ namespace ELTECSharp
                 //solve using Gaussian elimination by zeroing out extra columns or last used row of Ad since they can be the free variables
                 bool[,] solutionBits = new bool[T.GetLength(1), 1];
                 bool[,] Adt = new bool[128, 128];
+                bool[,] AdtX;
                 if (padLengthMode) {
-                    bool[,] solveT = new bool[T.GetLength(0), T.GetLength(0) + 1];
+                    bool[,] solveT = new bool[T.GetLength(0), T.GetLength(1) + 1];
                     for (int row = 0; row < T.GetLength(0); row++) {
-                        for (int col = 0; col < T.GetLength(0); col++) {
+                        for (int col = 0; col < T.GetLength(1); col++) {
                             solveT[row, col] = T[row, col];
                         }
                     }
@@ -5597,17 +5602,21 @@ namespace ELTECSharp
                             Adt[row, i] = (cnst & (BigInteger.One << row)) != 0;
                         }
                     }
-                    if (Xm != null) Adt = matmul(Adt, Xm);
+                    AdtX = (Xm != null)  ? matmul(Adt, Xm) : Adt;
                     for (int row = 0; row < numrows; row++) {
                         for (int col = 0; col < numcols; col++) {
-                            solveT[col + row * numcols, solveT.GetLength(1) - 1] = (Adt[row, col] != AdnX[0][row, col]);
+                            solveT[col + row * numcols, solveT.GetLength(1) - 1] = (AdtX[row, col] != AdnX[0][row, col]);
                         }
                     }
                     solveT = gaussianElim(solveT);
+                    int ct = 0;
                     //last column is now the solution
                     for (int row = 0; row < solveT.GetLength(0); row++) {
-                        solutionBits[row, 0] = solveT[row, solveT.GetLength(1) - 1];
+                        while (!solveT[row, ct]) ct++;
+                        solutionBits[ct, 0] = solveT[row, solveT.GetLength(1) - 1];
+                        ct++;
                     }
+                    Console.WriteLine(ct);
                 }
                 /*{
                     bool[,] testT = matmul(T, solutionBits);
@@ -5718,7 +5727,7 @@ namespace ELTECSharp
                         if (padLengthMode) {
                             for (int ci = 0; ci < Adt.GetLength(0); ci++) {
                                 for (int col = 0; col < Adt.GetLength(1); col++) {
-                                    Ad[ci, col] ^= (Adt[ci, col] != AdnX[0][ci, col]);
+                                    Ad[ci, col] ^= (Adt[ci, col] != Adn[0][ci, col]);
                                 }
                             }
                         }
@@ -5735,11 +5744,11 @@ namespace ELTECSharp
                 //to zero, you should have eight nonzero rows of interest.
                 //update K
                 List<int> AdRows = new List<int>();
-                /*bool[,] tagm = new bool[128, 1];
+                bool[,] tagm = new bool[128, 1];
                 for (int i = 0; i < 128; i++) {
                     tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
                 }
-                matmul(Ad, tagm);*/
+                matmul(Ad, tagm);
                 numcols = AdX.GetLength(1);
                 for (int i = 0; i < 32; i++)
                 {
@@ -5755,20 +5764,15 @@ namespace ELTECSharp
                 bool[,] KmNew = new bool[CurRow + AdRows.Count, Ad.GetLength(1)];
                 if (Km != null) Array.Copy(Km, KmNew, Km.GetLength(0) * Km.GetLength(1));
                 Km = KmNew;
-                foreach (int i in AdRows)
-                {
-                    for (int col = 0; col < Ad.GetLength(1); col++)
-                    {
-                        if (padLengthMode) {
-                            Km[CurRow, col] = Ad[i, col] ^ (Adt[i, col] != AdnX[0][i, col]);
-                        } else {
-                            Km[CurRow, col] = Ad[i, col];
-                        }
+                foreach (int i in AdRows) {
+                    for (int col = 0; col < Ad.GetLength(1); col++) {
+                        Km[CurRow, col] = Ad[i, col];
                     }
                     CurRow++;
                 }
-                //can verify K * h == 0 or now K * h == t
-                //matmul(Km, tagm);
+                //Ad * h = Adt * h or (Ad - Adt) * h = 0
+                //can verify K * h == 0 (if using Ad without subtracting Adt)
+                matmul(Km, tagm);
                 //K needs 127 linearly independent vectors, if there are more should not make a difference in solution
                 //instead of checking linear independence, its inferred by Xm being 1 row
 
