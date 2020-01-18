@@ -5421,6 +5421,32 @@ namespace ELTECSharp
             Console.WriteLine("8.64");
 
         }
+        static bool fault(Tuple<BigInteger, BigInteger> Q1, Tuple<BigInteger, BigInteger> Q2)
+        {
+            int p = 2; //probability of fault is 1/p
+            return (Q1.Item1 * Q2.Item1) % p == 0;
+        }
+        static Tuple<BigInteger, BigInteger> addECfault(Tuple<BigInteger, BigInteger> P1, Tuple<BigInteger, BigInteger> P2, int a, BigInteger GF)
+        {
+            if (fault(P1, P2)) throw new ArgumentException();
+            return addEC(P1, P2, a, GF);
+        }
+        static bool scaleECfault(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF)
+        {
+            try
+            {
+                Tuple<BigInteger, BigInteger> result = new Tuple<BigInteger, BigInteger>(0, 1);
+                while (k > 0)
+                {
+                    if (!k.IsEven) result = addECfault(result, x, a, GF);
+                    x = addECfault(x, x, a, GF);
+                    k = k >> 1;
+                }
+                return false; // result;
+            }
+            catch (ArgumentException) { return true; }
+        }
+
         static void Set9()
         {
 
@@ -5791,6 +5817,27 @@ namespace ELTECSharp
             Console.WriteLine("Key found: " + keyrecv);
             //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
             Console.WriteLine("9.65");
+            p66:
+            //start with code from #59, addEC/scaleEC to inject fault
+            int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
+            BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
+                GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743"), Ord = BPOrd * 2 * 2 * 2;
+            Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
+
+            BigInteger d;
+            do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1); //Bob's secret key
+            Console.WriteLine("Secret key generated: " + d);
+            BigInteger hx, hy;
+            Tuple<BigInteger, BigInteger> h;
+            do
+            {
+                //random point with between x value between 1..Ord
+                do { hx = Crypto.GetNextRandomBig(rng, Ord); } while (hx <= 1);
+                hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + Gy, GF), GF);
+                h = scaleEC(new Tuple<BigInteger, BigInteger>(hx, hy), Ord, Ea, GF);
+            } while (hy == BigInteger.Zero || h.Equals(new Tuple<BigInteger, BigInteger>(0, 1)));
+
+            Console.WriteLine("9.66");
         }
         static void Main(string[] args)
         {
