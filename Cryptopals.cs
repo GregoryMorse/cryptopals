@@ -5436,7 +5436,7 @@ namespace ELTECSharp
         //there are two algorithms and in this problem we switch from index increasing to index decreasing
         static Tuple<BigInteger, BigInteger> scaleECdecrease(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF)
         {
-            int count = GetBitSize(k) - 1;
+            int count = GetBitSize(k) - 1 - 1;
             Tuple<BigInteger, BigInteger> result = x;
             while (count >= 0)
             {
@@ -5448,7 +5448,7 @@ namespace ELTECSharp
         }
         static bool scaleECfault(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF)
         {
-            int count = GetBitSize(k) - 1;
+            int count = GetBitSize(k) - 1 - 1;
             try {
                 Tuple<BigInteger, BigInteger> result = x;
                 while (count >= 0) {
@@ -5462,7 +5462,8 @@ namespace ELTECSharp
         }
         static int scaleECcheckfault(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF, int lastcount)
         {
-            int count = GetBitSize(k) - 1;
+            int count = GetBitSize(k) - 1 - 1;
+            if (lastcount == -1) lastcount = 0;
             try {
                 Tuple<BigInteger, BigInteger> result = x;
                 while (count >= lastcount) {
@@ -5470,7 +5471,7 @@ namespace ELTECSharp
                     count--;
                     if (((BigInteger.One << (count+1)) & k) != 0) result = addECfault(result, x, a, GF);
                 }
-                return -1; // result;
+                return int.MinValue; // result;
             }
             catch (ArgumentException) { return count; }
         }
@@ -5857,6 +5858,7 @@ namespace ELTECSharp
             BigInteger BSecret;
             do { BSecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (BSecret <= 1);
             Tuple<BigInteger, BigInteger> BPub = scaleECdecrease(G, BSecret, Ea, GF);
+            //BPub.Item1 == scaleEC(G, BSecret, Ea, GF).Item1 && BPub.Item2 == scaleEC(G, BSecret, Ea, GF).Item2;
             Tuple<BigInteger, BigInteger> AShared = scaleECdecrease(BPub, ASecret, Ea, GF);
             Tuple<BigInteger, BigInteger> BShared = scaleECdecrease(APub, BSecret, Ea, GF);
             Console.WriteLine("Base point and order correct: " + (scaleECdecrease(G, BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1))));
@@ -5871,11 +5873,12 @@ namespace ELTECSharp
             //List<Tuple<int, bool>> probableBits = new List<Tuple<int, bool>>();
             count--;
             BigInteger knownKey = BigInteger.One << count;
+            count--;
             //recoveredBits.Add(new Tuple<int, bool>(count, true));
             int res;
             while (count >= 0) {
                 k = knownKey;
-                kset = k ^ (BigInteger.One << (count - 1));
+                kset = k ^ (BigInteger.One << count);
                 do {
                     do {
                         //random point with between x value between 1..Ord
@@ -5887,8 +5890,12 @@ namespace ELTECSharp
                 } while (!((res != count-1) ^ (scaleECcheckfault(h, kset, Ea, GF, count-1) != count-1))); //instead of caring about only one match first, check both at once to speed up
                 //query oracle
                 bool leaksBit = scaleECfault(h, d, Ea, GF);
-                if (!leaksBit) { //probably opposite but can confirm if find fault in other direction
-                    if (res == count-1) k = kset;
+                if (!leaksBit && count != 0) { //probably opposite but can confirm if find fault in other direction
+                    if (res == count-1) {
+                        BigInteger tmp = k;
+                        k = kset;
+                        kset = tmp;
+                    }
                     do {
                         do {
                             //random point with between x value between 1..Ord
@@ -5897,15 +5904,15 @@ namespace ELTECSharp
                         } while (hy == BigInteger.Zero);
                         h = new Tuple<BigInteger, BigInteger>(hx, hy);
                         res = scaleECcheckfault(h, k, Ea, GF, count-1);
-                    } while (res != count-1);
+                    } while (res != count-1 || (scaleECcheckfault(h, kset, Ea, GF, count - 1) == count - 1));
                     leaksBit = scaleECfault(h, d, Ea, GF);
                 }
                 if (leaksBit) {
-                    count--;
-                    knownKey = (res == count - 1) ? k : kset;
+                    knownKey = (res != count-1) ? k : kset;
                     if ((knownKey & d) != knownKey) {
                         break;
                     }
+                    count--;
                 } //otherwise it found faults both ways so must try again as inconclusive
             }
             Console.WriteLine("Secret key determined: " + knownKey);
