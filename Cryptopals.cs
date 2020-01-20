@@ -5463,7 +5463,6 @@ namespace ELTECSharp
         static int scaleECcheckfault(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF, int lastcount)
         {
             int count = GetBitSize(k) - 1 - 1;
-            if (lastcount == -1) lastcount = 0;
             try {
                 Tuple<BigInteger, BigInteger> result = x;
                 while (count >= lastcount) {
@@ -5853,10 +5852,10 @@ namespace ELTECSharp
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
             int count = GetBitSize(BPOrd);
             BigInteger ASecret;
-            do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
+            do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1 || GetBitSize(ASecret) != count);
             Tuple<BigInteger, BigInteger> APub = scaleEC(G, ASecret, Ea, GF);
             BigInteger BSecret;
-            do { BSecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (BSecret <= 1);
+            do { BSecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (BSecret <= 1 || GetBitSize(BSecret) != count);
             Tuple<BigInteger, BigInteger> BPub = scaleECdecrease(G, BSecret, Ea, GF);
             //BPub.Item1 == scaleEC(G, BSecret, Ea, GF).Item1 && BPub.Item2 == scaleEC(G, BSecret, Ea, GF).Item2;
             Tuple<BigInteger, BigInteger> AShared = scaleECdecrease(BPub, ASecret, Ea, GF);
@@ -5864,8 +5863,8 @@ namespace ELTECSharp
             Console.WriteLine("Base point and order correct: " + (scaleECdecrease(G, BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1))));
             Console.WriteLine("Shared Secrets Identical: " + (AShared.Item1 == BShared.Item1));
 
-            BigInteger d;
-            do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1 || GetBitSize(d) != count); //Bob's secret key
+            BigInteger d = BSecret;
+            //do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1 || GetBitSize(d) != count); //Bob's secret key
             Console.WriteLine("Secret key generated: " + d);
             BigInteger k, kset, hx, hy;
             Tuple<BigInteger, BigInteger> h;
@@ -5876,7 +5875,7 @@ namespace ELTECSharp
             count--;
             //recoveredBits.Add(new Tuple<int, bool>(count, true));
             int res;
-            while (count >= 0) {
+            while (count >= 1) {
                 k = knownKey;
                 kset = k ^ (BigInteger.One << count);
                 do {
@@ -5890,7 +5889,7 @@ namespace ELTECSharp
                 } while (!((res != count-1) ^ (scaleECcheckfault(h, kset, Ea, GF, count-1) != count-1))); //instead of caring about only one match first, check both at once to speed up
                 //query oracle
                 bool leaksBit = scaleECfault(h, d, Ea, GF);
-                if (!leaksBit && count != 0) { //probably opposite but can confirm if find fault in other direction
+                if (!leaksBit) { //probably opposite but can confirm if find fault in other direction
                     if (res == count-1) {
                         BigInteger tmp = k;
                         k = kset;
@@ -5915,6 +5914,11 @@ namespace ELTECSharp
                     count--;
                 } //otherwise it found faults both ways so must try again as inconclusive
             }
+            //last bit can only be determined if it is turned off since turned off yields no operations hence no fault and cannot establish turned on
+            //so easier that we just determine it with a single simple operation
+            Tuple<BigInteger, BigInteger> test = scaleECdecrease(APub, knownKey, Ea, GF);
+            if (test.Item1 != AShared.Item1 || test.Item2 != AShared.Item2)
+                knownKey |= BigInteger.One;
             Console.WriteLine("Secret key determined: " + knownKey);
             Console.WriteLine("9.66");
         }
