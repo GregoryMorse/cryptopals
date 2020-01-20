@@ -5423,7 +5423,8 @@ namespace ELTECSharp
         }
         static bool fault(Tuple<BigInteger, BigInteger> Q1, Tuple<BigInteger, BigInteger> Q2)
         {
-            int p = 2; //probability of fault is 1/p
+            BigInteger p = BigInteger.One << 20; //probability of fault is 1/p
+            if (Q1.Item1 == 0 && Q1.Item2 == BigInteger.One) return false;
             return (Q1.Item1 * Q2.Item1) % p == 0;
         }
         static Tuple<BigInteger, BigInteger> addECfault(Tuple<BigInteger, BigInteger> P1, Tuple<BigInteger, BigInteger> P2, int a, BigInteger GF)
@@ -5431,28 +5432,54 @@ namespace ELTECSharp
             if (fault(P1, P2)) throw new ArgumentException();
             return addEC(P1, P2, a, GF);
         }
+        //https://en.wikipedia.org/wiki/Elliptic_curve_point_multiplication#Double-and-add
+        //there are two algorithms and in this problem we switch from index increasing to index decreasing
+        static Tuple<BigInteger, BigInteger> scaleECdecrease(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF)
+        {
+            int count = GetBitSize(k) - 1;
+            Tuple<BigInteger, BigInteger> result = x;
+            while (count >= 0)
+            {
+                result = addEC(result, result, a, GF);
+                if (((BigInteger.One << count) & k) != 0) result = addEC(result, x, a, GF);
+                count--;
+            }
+            return result;
+        }
         static bool scaleECfault(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF)
         {
-            try
-            {
-                Tuple<BigInteger, BigInteger> result = new Tuple<BigInteger, BigInteger>(0, 1);
-                while (k > 0)
-                {
-                    if (!k.IsEven) result = addECfault(result, x, a, GF);
-                    x = addECfault(x, x, a, GF);
-                    k = k >> 1;
+            int count = GetBitSize(k) - 1;
+            try {
+                Tuple<BigInteger, BigInteger> result = x;
+                while (count >= 0) {
+                    result = addECfault(result, result, a, GF);
+                    if (((BigInteger.One << count) & k) != 0) result = addECfault(result, x, a, GF);
+                    count--;
                 }
-                return false; // result;
+                return true; // result;
             }
-            catch (ArgumentException) { return true; }
+            catch (ArgumentException) { return false; }
         }
-
+        static int scaleECcheckfault(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF, int lastcount)
+        {
+            int count = GetBitSize(k) - 1;
+            try {
+                Tuple<BigInteger, BigInteger> result = x;
+                while (count >= lastcount) {
+                    result = addECfault(result, result, a, GF);
+                    count--;
+                    if (((BigInteger.One << (count+1)) & k) != 0) result = addECfault(result, x, a, GF);
+                }
+                return -1; // result;
+            }
+            catch (ArgumentException) { return count; }
+        }
         static void Set9()
         {
 
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-
+            goto p66;
             Tuple<byte[], BigInteger> cyphtag;
             byte[] cyphDataVerify;
             byte[] cyphData;
@@ -5817,26 +5844,71 @@ namespace ELTECSharp
             Console.WriteLine("Key found: " + keyrecv);
             //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
             Console.WriteLine("9.65");
-            p66:
+        p66:
             //start with code from #59, addEC/scaleEC to inject fault
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
                 GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743"), Ord = BPOrd * 2 * 2 * 2;
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
+            int count = GetBitSize(BPOrd);
+            BigInteger ASecret;
+            do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
+            Tuple<BigInteger, BigInteger> APub = scaleEC(G, ASecret, Ea, GF);
+            BigInteger BSecret;
+            do { BSecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (BSecret <= 1);
+            Tuple<BigInteger, BigInteger> BPub = scaleECdecrease(G, BSecret, Ea, GF);
+            Tuple<BigInteger, BigInteger> AShared = scaleECdecrease(BPub, ASecret, Ea, GF);
+            Tuple<BigInteger, BigInteger> BShared = scaleECdecrease(APub, BSecret, Ea, GF);
+            Console.WriteLine("Base point and order correct: " + (scaleECdecrease(G, BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1))));
+            Console.WriteLine("Shared Secrets Identical: " + (AShared.Item1 == BShared.Item1));
 
             BigInteger d;
-            do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1); //Bob's secret key
+            do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1 || GetBitSize(d) != count); //Bob's secret key
             Console.WriteLine("Secret key generated: " + d);
-            BigInteger hx, hy;
+            BigInteger k, kset, hx, hy;
             Tuple<BigInteger, BigInteger> h;
-            do
-            {
-                //random point with between x value between 1..Ord
-                do { hx = Crypto.GetNextRandomBig(rng, Ord); } while (hx <= 1);
-                hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + Gy, GF), GF);
-                h = scaleEC(new Tuple<BigInteger, BigInteger>(hx, hy), Ord, Ea, GF);
-            } while (hy == BigInteger.Zero || h.Equals(new Tuple<BigInteger, BigInteger>(0, 1)));
-
+            List<Tuple<int, bool>> recoveredBits = new List<Tuple<int, bool>>();
+            //List<Tuple<int, bool>> probableBits = new List<Tuple<int, bool>>();
+            count--;
+            BigInteger knownKey = BigInteger.One << count;
+            //recoveredBits.Add(new Tuple<int, bool>(count, true));
+            int res;
+            while (count >= 0) {
+                k = knownKey;
+                kset = k ^ (BigInteger.One << (count - 1));
+                do {
+                    do {
+                        //random point with between x value between 1..Ord
+                        do { hx = Crypto.GetNextRandomBig(rng, Ord); } while (hx <= 1);
+                        hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + Eb, GF), GF);
+                    } while (hy == BigInteger.Zero);
+                    h = new Tuple<BigInteger, BigInteger>(hx, hy);
+                    res = scaleECcheckfault(h, k, Ea, GF, count-1);
+                } while (!((res != count-1) ^ (scaleECcheckfault(h, kset, Ea, GF, count-1) != count-1))); //instead of caring about only one match first, check both at once to speed up
+                //query oracle
+                bool leaksBit = scaleECfault(h, d, Ea, GF);
+                if (!leaksBit) { //probably opposite but can confirm if find fault in other direction
+                    if (res == count-1) k = kset;
+                    do {
+                        do {
+                            //random point with between x value between 1..Ord
+                            do { hx = Crypto.GetNextRandomBig(rng, Ord); } while (hx <= 1);
+                            hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + Eb, GF), GF);
+                        } while (hy == BigInteger.Zero);
+                        h = new Tuple<BigInteger, BigInteger>(hx, hy);
+                        res = scaleECcheckfault(h, k, Ea, GF, count-1);
+                    } while (res != count-1);
+                    leaksBit = scaleECfault(h, d, Ea, GF);
+                }
+                if (leaksBit) {
+                    count--;
+                    knownKey = (res == count - 1) ? k : kset;
+                    if ((knownKey & d) != knownKey) {
+                        break;
+                    }
+                } //otherwise it found faults both ways so must try again as inconclusive
+            }
+            Console.WriteLine("Secret key determined: " + knownKey);
             Console.WriteLine("9.66");
         }
         static void Main(string[] args)
