@@ -3538,7 +3538,7 @@ namespace ELTECSharp
             if (P2.Equals(O)) return P1;
             if (P1.Equals(invertEC(P2, GF))) return new Tuple<BigInteger, BigInteger>(0, 1);
             BigInteger x1 = P1.Item1, y1 = P1.Item2, x2 = P2.Item1, y2 = P2.Item2, m;
-            m = (P1 == P2) ? posRemainder((3 * x1 * x1 + a) * modInverse(2 * y1, GF), GF) : posRemainder((y2 - y1) * modInverse(posRemainder(x2 - x1, GF), GF), GF);
+            m = (P1.Equals(P2)) ? posRemainder((3 * x1 * x1 + a) * modInverse(2 * y1, GF), GF) : posRemainder((y2 - y1) * modInverse(posRemainder(x2 - x1, GF), GF), GF);
             BigInteger x3 = posRemainder(m * m - x1 - x2, GF);
             return new Tuple<BigInteger, BigInteger>(x3, posRemainder(m * (x1 - x3) - y1, GF));
         }
@@ -3579,6 +3579,439 @@ namespace ELTECSharp
                 BigInteger b = BigInteger.ModPow(c, BigInteger.ModPow(2, (int)M - (int)i - 1, p - 1), p);
                 M = i; c = BigInteger.Remainder(b * b, p); t = BigInteger.Remainder(t * c, p); R = BigInteger.Remainder(R * b, p);
             }
+        }
+        static bool isSqrt(BigInteger n, BigInteger root)
+        {
+            BigInteger lowerBound = root * root;
+            return (n >= lowerBound && n <= lowerBound + root + root);
+        }
+        static BigInteger Sqrt(BigInteger n)
+        {
+            if (n == 0) return BigInteger.Zero;
+            if (n > 0) {
+                int bitLength = GetBitSize(n);
+                BigInteger root = BigInteger.One << (bitLength / 2);
+                while (!isSqrt(n, root)) {
+                    root += (n / root);
+                    root >>= 1;
+                }
+                return root;
+            }
+            throw new ArithmeticException("NaN");
+        }
+        static bool isPrime(BigInteger n)
+        {
+            BigInteger mx = Sqrt(n);
+            for (BigInteger i = 2; i <= mx; i++) {
+                if (BigInteger.Remainder(n, i) == BigInteger.Zero) return false;
+            }
+            return true;
+        }
+        static BigInteger nextPrime(BigInteger n)
+        {
+            if (n == 2) return 3;
+            do {
+                n += 2;
+            } while (!isPrime(n));
+            return n;
+        }
+        static BigInteger[] addPolyRing(BigInteger[] a, BigInteger[] b, BigInteger GF)
+        {
+            int alen = a.Length, blen = b.Length;
+            BigInteger[] c = new BigInteger[Math.Max(alen, blen)];
+            int clen = c.Length;
+            for (int i = 0; i < clen; i++)
+            {
+                int aoffs = alen - 1 - i, boffs = blen - 1 - i, coffs = clen - 1 - i;
+                if (i >= alen) c[coffs] = b[boffs];
+                else if (i >= blen) c[coffs] = a[aoffs];
+                else c[coffs] = posRemainder(a[aoffs] + b[boffs], GF);
+            }
+            return c.Skip(c.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray(); ;
+        }
+        static SortedList<BigInteger, BigInteger> addPolyRingSparse(SortedList<BigInteger, BigInteger> a, SortedList<BigInteger, BigInteger> b, BigInteger GF)
+        {
+            SortedList<BigInteger, BigInteger> c = new SortedList<BigInteger, BigInteger>();
+            SortedSet<BigInteger> idxs = new SortedSet<BigInteger>(a.Keys.ToList().Concat(b.Keys.ToList()));
+            foreach (BigInteger i in idxs)
+            {
+                if (!a.ContainsKey(i)) c[i] = b[i];
+                else if (!b.ContainsKey(i)) c[i] = a[i];
+                else c[i] = posRemainder(a[i] + b[i], GF);
+            }
+            return new SortedList<BigInteger, BigInteger>(c.Where((KeyValuePair<BigInteger, BigInteger> kv) => kv.Value != 0).ToDictionary(x => x.Key, x => x.Value));
+        }
+        static BigInteger[] mulPolyRing(BigInteger[] A, BigInteger[] B, BigInteger GF)
+        {
+            int alen = A.Length, blen = B.Length;
+            if (alen == 0) return A; if (blen == 0) return B;
+            BigInteger[] p = new BigInteger[alen + blen - 1];
+            for (int i = 0; i < blen; i++) {
+                if (B[i] == BigInteger.Zero) continue;
+                for (int j = 0; j < alen; j++) {
+                    if (A[j] == BigInteger.Zero) continue;
+                    int ijoffs = i + j;
+                    p[ijoffs] = posRemainder(A[j] * B[i] + p[ijoffs], GF);
+                }
+            }
+            //while (!A.All((BigInteger c) => c == BigInteger.Zero)) {
+            //    if (A[0] != BigInteger.Zero) p = posRemainder(p + B, GF);
+            //    A = A.Skip(1).ToArray(); B = B.Concat(new BigInteger[] { BigInteger.Zero }).ToArray();
+            //}
+            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+        }
+        static SortedList<BigInteger, BigInteger> mulPolyRingSparse(BigInteger[] A, SortedList<BigInteger, BigInteger> B, BigInteger GF)
+        {
+            int alen = A.Length;
+            if (alen == 0) return new SortedList<BigInteger, BigInteger>(); if (B.Count() == 0) return B;
+            SortedList<BigInteger, BigInteger> p = new SortedList<BigInteger, BigInteger>();
+            foreach (BigInteger i in B.Keys.Reverse())
+            {
+                for (int j = 0; j < alen; j++)
+                {
+                    BigInteger poffs = i + alen - j - 1;
+                    if (p.ContainsKey(poffs))
+                        p[poffs] = posRemainder(A[j] * B[i] + p[poffs], GF);
+                    else
+                        p[poffs] = posRemainder(A[j] * B[i], GF);
+                }
+            }
+            return new SortedList<BigInteger, BigInteger>(p.Where((KeyValuePair<BigInteger, BigInteger> kv) => kv.Value != 0).ToDictionary(x => x.Key, x => x.Value));
+        }
+
+        //https://en.wikipedia.org/wiki/Polynomial_long_division#Pseudo-code
+        static Tuple<BigInteger[], BigInteger[]> divmodPolyRing(BigInteger[] A, BigInteger[] B, BigInteger GF)
+        {
+            //if (B.Length == 0) throw;
+            int alen = A.Length, blen = B.Count();
+            BigInteger[] q = new BigInteger[alen], r = A; int d;
+            while (r.Length != 0 && (d = (r.Count() - 1) - (blen - 1)) >= 0)
+            {
+                int aoffs = alen - d - 1;
+                q[aoffs] = posRemainder(r[0] * modInverse(B[0], GF), GF);
+                if (q[aoffs] == BigInteger.Zero) break;
+                r = addPolyRing(r, mulPolyRing(new BigInteger[] { -1 }, mulPolyRing(B, q.Skip(aoffs).ToArray(), GF), GF), GF);
+            }
+            return new Tuple<BigInteger[], BigInteger[]>(q.Skip(q.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(), r);
+        }
+        static Tuple<SortedList<BigInteger, BigInteger>, BigInteger[]> divmodPolyRingSparse(SortedList<BigInteger, BigInteger> A, BigInteger[] B, BigInteger GF)
+        {
+            //if (B.Length == 0) throw;
+            SortedList<BigInteger, BigInteger> q = new SortedList<BigInteger, BigInteger>(), r = A; BigInteger d;
+            while (r.Count() != 0 && (d = (r.Last().Key) - (B.Count() - 1)) >= 0)
+            {
+                q[d] = posRemainder(r.Last().Value * modInverse(B[0], GF), GF);
+                if (q[d] == BigInteger.Zero) {
+                    q.Remove(d);
+                    break;
+                }
+                r = addPolyRingSparse(r, mulPolyRingSparse(new BigInteger[] { -1 }, mulPolyRingSparse(B, new SortedList<BigInteger, BigInteger>(q.TakeWhile((kv) => kv.Key <= d).ToDictionary(x => x.Key, x => x.Value)), GF), GF), GF);
+            }
+            BigInteger[] rret = new BigInteger[(int)r.Last().Key+1];
+            foreach (BigInteger i in r.Keys) rret[(int)(r.Last().Key - i)] = r[i];
+            return new Tuple<SortedList<BigInteger, BigInteger>, BigInteger[]>(q, rret);
+        }
+        //Generalized Remainder Theorem - still need to compute t recurrent series which for large degree divisor is not practical
+        //https://arxiv.org/abs/1506.06637
+        static BigInteger[] remainderPolyRingSparse(SortedList<BigInteger, BigInteger> A, BigInteger[] B, BigInteger GF)
+        {
+            //if (B.Length == 0) throw;
+            BigInteger n = A.Last().Key;
+            int m = B.Count() - 1;
+            BigInteger[] remainder = new BigInteger[m]; //m-1 terms
+            BigInteger[] t = new BigInteger[(int)n - m + 1];
+            t[0] = modInverse(B[0], GF); //t1
+            //B coefficients must be negated except for B[0]
+            //t1=1/b[m]
+            //tr=1/b[m]*sum_i=1^r-1(b[m-i]*t[r-i])
+            //t2=t1*b[m-1]*t1=t1^2*b[m-1]
+            //t3=t1*(b[m-1]*t2+b[m-2]*t1)=t1^3*b[m-1]^2+t1^2*b[m-2]
+            //t4=t1*(b[m-1]*t3+b[m-2]*t2+b[m-3]*t1)=t1^4*b[m-1]^3+2*t1^3*b[m-1]*b[m-2]+t1^2*b[m-3]
+            //t5=t1*(b[m-1]*t4+b[m-2]*t3+b[m-3]*t2+b[m-4]*t1)=t1^5*b[m-1]^4+3*t1^4*b[m-1]^2*b[m-2]+2*t1^3*b[m-1]*b[m-3]+tl^3*bm2^2+t1^2*bm4
+            for (int r = 2; r <= n - m + 1; r++) {
+                BigInteger sum = BigInteger.Zero;
+                for (int i = 1; i <= Math.Min(r - 1, m); i++) {
+                    sum = posRemainder(sum + posRemainder(-B[i] * t[r - i - 1], GF), GF);
+                }
+                t[r-1] = posRemainder(t[0] * sum, GF);
+            }
+            for (int k = 0; k < m; k++) {
+                if (A.ContainsKey(k)) remainder[m - 1 - k] = A[k];
+                BigInteger outersum = BigInteger.Zero;
+                for (int i = 0; i <= k; i++) {
+                    int j = k - i;
+                    BigInteger sum = BigInteger.Zero;
+                    //all in A between m+j and n
+                    foreach (KeyValuePair<BigInteger, BigInteger> kval in A.Where((kv) => kv.Key >= m + j)) {
+                        //for (int v = 0; v <= n - m - j; v++) {
+                        int v = (int)(n - kval.Key);
+                        //if (A.ContainsKey(n - v))
+                        sum = posRemainder(sum + posRemainder(t[(int)n - m - j + 1 - v - 1] * A[n - v], GF), GF);
+                    }
+                    outersum = posRemainder(outersum + posRemainder((i == m ? B[m - i] : (-B[m - i])) * sum, GF), GF);
+                }
+                remainder[m - 1 - k] = posRemainder(remainder[m - 1 - k] + outersum, GF); //make monic with posRemainder(t[0] * outersum, GF)
+            }
+            return remainder.Skip(remainder.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+        }
+        //https://github.com/sagemath/sage/blob/master/src/sage/libs/ntl/ntlwrap_impl.h
+        //https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/polynomial_quotient_ring_element.py
+        //https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/polynomial_quotient_ring.py
+        static BigInteger[] remainderPolyRingSparsePow2(SortedList<BigInteger, BigInteger> A, BigInteger[] B, BigInteger GF)
+        {
+            //note that (B%2^p)*(B%2^(p-1))=B%2^(2p-1)
+            //NTL in lzz_pX for integer field univariate polynomial implements rem with rem21 using the FFT method
+            //however in this case we can just do the classic modular exponentiation which works in log n and always keeps a reduced polynomial
+            int m = B.Count() - 1;
+            BigInteger[] remainder = new BigInteger[m]; //m-1 terms
+            foreach (KeyValuePair<BigInteger, BigInteger> elem in A) {
+                BigInteger exp = elem.Key;
+                BigInteger[] result = new BigInteger[] { BigInteger.One };
+                BigInteger[] b = new BigInteger[] { BigInteger.One, BigInteger.Zero };
+                while (exp > 0) {
+                    if ((exp & 1) == 1) {
+                        result = divmodPolyRing(mulPolyRing(result, b, GF), B, GF).Item2;
+                    }
+                    exp >>= 1;
+                    b = divmodPolyRing(mulPolyRing(b, b, GF), B, GF).Item2;
+                }
+                result = divmodPolyRing(mulPolyRing(new BigInteger[] { elem.Value }, result, GF), B, GF).Item2;
+                remainder = divmodPolyRing(addPolyRing(result, remainder, GF), B, GF).Item2;
+            }
+            return remainder;
+        }
+        static BigInteger[] substitutePolyRing(BigInteger[] A, BigInteger[] B, BigInteger[] divpoly, BigInteger GF)
+        {
+            BigInteger[] result = new BigInteger[] { BigInteger.Zero };
+            int alen = A.Length;
+            for (int i = 0; i < alen; i++) {
+                if (i == alen - 1) {
+                    result = addPolyRing(result, new BigInteger[] { A[i] }, GF);
+                } else {
+                    result = addPolyRing(result, mulPolyRing(modexpPolyRing(B, alen - i - 1, divpoly, GF), new BigInteger[] { A[i] }, GF), GF);
+                }
+            }
+            return result;
+        }
+        //https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
+        //https://en.wikipedia.org/wiki/Polynomial_greatest_common_divisor#Bézout's_identity_and_extended_GCD_algorithm
+        static BigInteger[] gcdPolyRing(BigInteger[] a, BigInteger[] b, BigInteger GF)
+        {
+            BigInteger[] r = a, ro = b;
+            BigInteger[] s = new BigInteger[] { BigInteger.Zero }, so = new BigInteger[] { BigInteger.One };
+            BigInteger[] t = new BigInteger[] { BigInteger.One }, to = new BigInteger[] { BigInteger.Zero };
+            while (r.Length != 0)
+            {
+                if (r[0] != BigInteger.One)
+                { //must be monic or division will not be correct!
+                    BigInteger multiplier = modInverse(r[0], GF);
+                    r = mulPolyRing(r, new BigInteger[] { multiplier }, GF);
+                }
+                BigInteger[] quot = divmodPolyRing(ro, r, GF).Item1;
+                BigInteger[] swap = ro;
+                ro = r; r = addPolyRing(swap, mulPolyRing(quot, r, GF), GF);
+                swap = so;
+                so = s; s = addPolyRing(swap, mulPolyRing(quot, s, GF), GF);
+                swap = to;
+                to = t; t = addPolyRing(swap, mulPolyRing(quot, t, GF), GF);
+            }
+            return ro;
+        }
+        //Extended Euclid GCD of 1
+        static BigInteger[] modInversePolyRing(BigInteger[] a, BigInteger[] n, BigInteger GF)
+        {
+            BigInteger[] i = n, v = new BigInteger[] { BigInteger.Zero }, d = new BigInteger[] { BigInteger.One };
+            while (a.Length > 0)
+            {
+                BigInteger[] t = divmodPolyRing(i, a, GF).Item1, x = a;
+                a = divmodPolyRing(i, x, GF).Item2;
+                i = x;
+                x = d;
+                d = addPolyRing(v, mulPolyRing(new BigInteger[] { -1 }, mulPolyRing(t, x, GF), GF), GF);
+                v = x;
+            }
+            v = mulPolyRing(new BigInteger[] { modInverse(i[0], GF) }, v, GF);
+            v = divmodPolyRing(v, n, GF).Item2;
+            //if (v < 0) v = (v + n) % n;
+            return v;
+        }
+        static BigInteger[] modexpPolyRing(BigInteger[] X, BigInteger m, BigInteger[] f, BigInteger GF)
+        {
+            BigInteger[] d = { BigInteger.One };
+            int bs = GetBitSize(m);
+            for (int i = bs; i > 0; i--)
+            {
+                if (((BigInteger.One << (bs - i)) & m) != 0)
+                {
+                    d = divmodPolyRing(mulPolyRing(d, X, GF), f, GF).Item2;
+                }
+                X = divmodPolyRing(mulPolyRing(X, X, GF), f, GF).Item2;
+            }
+            return d;
+        }
+        static Tuple<BigInteger[], BigInteger[]> invertECPolyRing(Tuple<BigInteger[], BigInteger[]> P, BigInteger GF)
+        {
+            return new Tuple<BigInteger[], BigInteger[]>(P.Item1, mulPolyRing(new BigInteger[] { -1 }, P.Item2, GF));
+        }
+        static Tuple<BigInteger[], BigInteger[]> addECPolyRing(Tuple<BigInteger[], BigInteger[]> P1, Tuple<BigInteger[], BigInteger[]> P2, int a, BigInteger GF, BigInteger[] divpoly, BigInteger[] f)
+        {
+            Tuple<BigInteger[], BigInteger[]> O = new Tuple<BigInteger[], BigInteger[]>(new BigInteger[] { BigInteger.Zero }, new BigInteger[] { BigInteger.One });
+            if (P1.Item1.SequenceEqual(O.Item1) && P1.Item2.SequenceEqual(O.Item2)) return P2;
+            if (P2.Item1.SequenceEqual(O.Item1) && P2.Item2.SequenceEqual(O.Item2)) return P1;
+            Tuple<BigInteger[], BigInteger[]> inv = invertECPolyRing(P2, GF);
+            if (P1.Item1.SequenceEqual(inv.Item1) && P1.Item2.SequenceEqual(inv.Item2)) return new Tuple<BigInteger[], BigInteger[]>(new BigInteger[] { BigInteger.Zero }, new BigInteger[] { BigInteger.One });
+            BigInteger[] x1 = P1.Item1, y1 = P1.Item2, x2 = P2.Item1, y2 = P2.Item2, m;
+            m = (P1.Item1.SequenceEqual(P2.Item1) && P1.Item2.SequenceEqual(P2.Item2)) ? divmodPolyRing(mulPolyRing(addPolyRing(mulPolyRing(new BigInteger[] { 3 }, mulPolyRing(x1, x1, GF), GF), new BigInteger[] { a }, GF), modInversePolyRing(mulPolyRing(mulPolyRing(new BigInteger[] { 2 }, y1, GF), f, GF), divpoly, GF), GF), divpoly, GF).Item2 : divmodPolyRing(mulPolyRing(addPolyRing(y2, mulPolyRing(new BigInteger[] { -1 }, y1, GF), GF), modInversePolyRing(divmodPolyRing(addPolyRing(x2, mulPolyRing(new BigInteger[] { -1 }, x1, GF), GF), divpoly, GF).Item2, divpoly, GF), GF), divpoly, GF).Item2;
+            BigInteger[] x3 = divmodPolyRing(addPolyRing(addPolyRing(mulPolyRing(f, mulPolyRing(m, m, GF), GF), mulPolyRing(new BigInteger[] { -1 }, x1, GF), GF), mulPolyRing(new BigInteger[] { -1 }, x2, GF), GF), divpoly, GF).Item2;
+            return new Tuple<BigInteger[], BigInteger[]>(x3, divmodPolyRing(addPolyRing(mulPolyRing(m, addPolyRing(x1, mulPolyRing(new BigInteger[] { -1 }, x3, GF), GF), GF), mulPolyRing(new BigInteger[] { -1 }, y1, GF), GF), divpoly, GF).Item2);
+        }
+        static Tuple<BigInteger[], BigInteger[]> scaleECPolyRing(Tuple<BigInteger[], BigInteger[]> x, BigInteger k, int a, BigInteger GF, BigInteger[] divpoly, BigInteger[] f)
+        {
+            Tuple<BigInteger[], BigInteger[]> result = new Tuple<BigInteger[], BigInteger[]>(new BigInteger[] { BigInteger.Zero }, new BigInteger[] { BigInteger.One });
+            while (k > 0)
+            {
+                if (!k.IsEven) result = addECPolyRing(result, x, a, GF, divpoly, f);
+                x = addECPolyRing(x, x, a, GF, divpoly, f);
+                k = k >> 1;
+            }
+            return result;
+        }
+        //https://en.wikipedia.org/wiki/Schoof%27s_algorithm
+        static BigInteger Schoof(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, BigInteger ExpectedBase)
+        {
+            BigInteger realT = GF + 1 - ExpectedBase;
+            //BigInteger sqrtp = TonelliShanks(rng, GF, GF);
+            BigInteger sqrtp4 = 4 * Sqrt(GF); //64-bit square root, can bump this up by one if less than lower bound if that is needed
+            BigInteger l = 2;
+            BigInteger prodS = BigInteger.One;
+            //need a random point on the EC
+            /*BigInteger x, ysquared, y;
+            do {
+                //x = GetNextRandomBig(rng, GF);
+                x = 3;
+                ysquared = posRemainder(x * x * x + Ea * x + Eb, GF);
+                y = TonelliShanks(rng, ysquared, GF);
+                y = BigInteger.Parse("138210074149391040327039341895683130372");
+            } while (y == BigInteger.Zero);
+            BigInteger xp = posRemainder(BigInteger.ModPow(x, GF, GF), GF), yp = posRemainder(BigInteger.ModPow(y, GF, GF), GF);*/
+            //https://en.wikipedia.org/wiki/Division_polynomials
+            //y=2*y^2 where y^2=x^3+ax+b
+            //BigInteger ysub = 2 * (x * x * x + Ea * x + Eb);
+            BigInteger[] f = new BigInteger[] { 1, 0, Ea, Eb }; //Eb, Ea, 0, 1
+            BigInteger[] ysub = mulPolyRing(new BigInteger[] { 2 }, f, GF);
+            List<BigInteger[]> divPolys = new List<BigInteger[]>(new BigInteger[][] {
+                new BigInteger[] { BigInteger.Zero },
+                new BigInteger[] { BigInteger.One },
+                mulPolyRing(new BigInteger[] { 2 }, ysub, GF),
+                new BigInteger[] { 3, 0, 6 * Ea, 12 * Eb, -new BigInteger(Ea) * Ea}, //-new BigInteger(Ea) * Ea, 12 * Eb, 6 * Ea, 0, 3
+                mulPolyRing(mulPolyRing(new BigInteger[] { 4 }, ysub, GF), new BigInteger[] { 1, 0, 5 * Ea, 20 * Eb, -5 * new BigInteger(Ea) * Ea, -4 * new BigInteger(Ea) * Eb, -8 * new BigInteger(Eb) * Eb - new BigInteger(Ea) * Ea * Ea }, GF) //-8 * new BigInteger(Eb) * Eb - new BigInteger(Ea) * Ea * Ea, -4 * new BigInteger(Ea) * Eb, -5 * new BigInteger(Ea) * Ea, 20 * Eb, 5 * Ea, 0, 1
+                });
+            //Tuple<BigInteger, BigInteger> xypsquared = new Tuple<BigInteger, BigInteger>(BigInteger.ModPow(x, GF * GF, GF), BigInteger.ModPow(y, GF * GF, GF));
+            BigInteger[] ysquared = mulPolyRing(ysub, ysub, GF);
+            BigInteger[] b6sqr = mulPolyRing(new BigInteger[] { new BigInteger(2 * 2) }, mulPolyRing(ysub, ysub, GF), GF);
+            //BigInteger b6sqrinv = modInverse(2 * 2 * y * y * 2 * 2 * y * y, GF); //(4y^2)^2
+            List<Tuple<BigInteger, BigInteger>> ts = new List<Tuple<BigInteger, BigInteger>>();
+            BigInteger t = BigInteger.Zero;
+            while (prodS <= sqrtp4) { //log2(GF) primes required on average
+                while (divPolys.Count <= l) {
+                    int m = divPolys.Count / 2; //m >= 2
+                    //even ones in odd psis need adjustment by b6^2=(2*y)^2=4y^2
+                    if ((m & 1) == 0) {
+                        divPolys.Add(addPolyRing(divmodPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m], GF), divPolys[m], GF), divPolys[m], GF), b6sqr, GF).Item1, mulPolyRing(new BigInteger[] { -1 }, mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 1], divPolys[m + 1], GF), divPolys[m + 1], GF), divPolys[m + 1], GF), GF), GF));
+                    } else {
+                        divPolys.Add(addPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m], GF), divPolys[m], GF), divPolys[m], GF), mulPolyRing(new BigInteger[] { -1 }, divmodPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 1], divPolys[m + 1], GF), divPolys[m + 1], GF), divPolys[m + 1], GF), b6sqr, GF).Item1, GF), GF));
+                    }
+                    //divPolys.Add(addPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m], GF), divPolys[m], GF), divPolys[m], GF), mulPolyRing(new BigInteger[] { -1 }, mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 1], divPolys[m + 1], GF), divPolys[m + 1], GF), divPolys[m + 1], GF), GF), GF));
+                    m++; //m >= 3
+                    divPolys.Add(divmodPolyRing(mulPolyRing(divPolys[m], addPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m - 1], GF), divPolys[m - 1], GF), mulPolyRing(new BigInteger[] { -1 }, mulPolyRing(mulPolyRing(divPolys[m - 2], divPolys[m + 1], GF), divPolys[m + 1], GF), GF), GF), GF), mulPolyRing(new BigInteger[] { 2 }, ysub, GF), GF).Item1);
+                }
+                BigInteger tl = BigInteger.Zero;
+                BigInteger[] divpoly = divPolys[(int)l]; //even ones need to be divided by 2*y
+                if (l == 2) {
+                    SortedList<BigInteger, BigInteger> xp = new SortedList<BigInteger, BigInteger>();
+                    xp.Add(GF, 1); //gcd should return 1
+                    //BigInteger[] gcdres = addPolyRing(gcdPolyRing(remainderPolyRingSparsePow2(xp, f, GF), f, GF), mulPolyRing(new BigInteger[] { -1 }, new BigInteger[] { 1, 0 }, GF), GF);
+                    //if (gcdres.Length == 1 & gcdres[0] == BigInteger.One) tl = 1;
+                } else {
+                    BigInteger pl = posRemainder(GF, l);
+                    if (pl >= l / 2) pl -= l;
+                    SortedList<BigInteger, BigInteger> xp = new SortedList<BigInteger, BigInteger>();
+                    xp.Add(GF, 1);
+                    //remainderPolyRingSparse(xp, divpoly, GF);
+                    //divmodPolyRingSparse(xp, divpoly, GF);
+                    //BigInteger[] modinv = modInversePolyRing(new BigInteger[] { BigInteger.One, BigInteger.Zero }, divpoly, GF);
+                    //divmodPolyRing(mulPolyRing(modinv, new BigInteger[] { BigInteger.One, BigInteger.Zero }, GF), divpoly, GF).Item2;
+                    BigInteger[] xprem = remainderPolyRingSparsePow2(xp, divpoly, GF);
+                    BigInteger[] yprem = modexpPolyRing(f, (GF - 1) / 2, divpoly, GF);
+                    //correct method of squaring is to substitute x value of prior fields into x, y of itself with the y multiplied by the original y
+                    BigInteger[] xpsquared = divmodPolyRing(substitutePolyRing(xprem, xprem, divpoly, GF), divpoly, GF).Item2;//divmodPolyRing(mulPolyRing(xprem, xprem, GF), divpoly, GF).Item2;
+                    BigInteger[] ypsquared = divmodPolyRing(mulPolyRing(substitutePolyRing(yprem, xprem, divpoly, GF), yprem, GF), divpoly, GF).Item2;//divmodPolyRing(mulPolyRing(yprem, yprem, GF), divpoly, GF).Item2;
+                    Tuple<BigInteger[], BigInteger[]> Q = scaleECPolyRing(new Tuple<BigInteger[], BigInteger[]>(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger[] { BigInteger.One }), posRemainder(pl, l), Ea, GF, divpoly, f);
+                    Tuple<BigInteger[], BigInteger[]> S = addECPolyRing(new Tuple<BigInteger[], BigInteger[]>(xpsquared, ypsquared), Q, Ea, GF, divpoly, f);
+                    if (!S.Item1.SequenceEqual(new BigInteger[] { BigInteger.Zero }) || !S.Item2.SequenceEqual(new BigInteger[] { BigInteger.One }))
+                    {
+                        //limited by 1 in y, and (l^2 - 3) / 2 in x
+                        BigInteger m;
+                        Tuple<BigInteger[], BigInteger[]> P = new Tuple<BigInteger[], BigInteger[]>(xprem, yprem);
+                        for (m = BigInteger.One; m <= (l - 1) / 2; m++)
+                        {
+                            //Tuple<BigInteger, BigInteger> xym = scaleEC(new Tuple<BigInteger[], BigInteger[]>(xprem, yprem), m, Ea, GF);
+                            if (addPolyRing(S.Item1, mulPolyRing(new BigInteger[] { -1 }, P.Item1, GF), GF).Length == 0)
+                            {
+                                tl = addPolyRing(S.Item2, mulPolyRing(new BigInteger[] { -1 }, P.Item2, GF), GF).Length == 0 ? m : l - m;
+                                break;
+                            }
+                            P = addECPolyRing(P, new Tuple<BigInteger[], BigInteger[]>(xprem, yprem), Ea, GF, divpoly, f);
+                        }
+                    }
+                    /*if (m > (l - 1) / 2) {
+                        //quadratic non-residue of x^2 === GF (mod l) === pl
+                        //since l is prime, do not need to deal with composite or prime power cases
+                        //instead of Tonelli-Shanks, can show non-residue by excluding 1 root (GF === 0 (mod l)), and 2 roots (gcd(GF, l) == 1) and is residue
+                        //but easier to just use Legendre symbol is -1 and prove non-residue = GF ^ ((l - 1) / 2) (mod l)
+                        //if (BigInteger.ModPow(GF, (l - 1) / 2, l) == -1) tl = 0;
+                        //if (pl != BigInteger.Zero && BigInteger.GreatestCommonDivisor(GF, l) != BigInteger.One) tl = 0;
+                        BigInteger w = TonelliShanks(rng, posRemainder(GF, l), l); //since we need result anyway might as well compute unless non-residue very common and much faster other methods
+                        if (w == BigInteger.Zero) tl = 0;
+                        else {
+                            Tuple<BigInteger, BigInteger> xyw = scaleEC(new Tuple<BigInteger, BigInteger>(x, y), w, Ea, GF);
+                            if (posRemainder(xp, divpoly) != posRemainder(xyw.Item1, divpoly)) { tl = BigInteger.Zero; }
+                            else { tl = yp == xyw.Item2 ? BigInteger.Remainder(2 * w, l) : BigInteger.Remainder(-2 * w, l); }
+                        }
+                    }*/
+                }
+                Console.WriteLine(l + " " + tl + " " + BigInteger.Remainder(realT, l));
+                //BigInteger.Remainder(realT, l) == tl;
+                ts.Add(new Tuple<BigInteger, BigInteger>(tl, l));
+                BigInteger a = prodS * modInverse(prodS, l);
+                BigInteger b = l * modInverse(l, prodS);
+                prodS *= l;
+                t = (a * tl + b * t) % prodS;
+                l = nextPrime(l);
+            }
+            //GetBitSize(GF) == int(Math.Ceiling(BigInteger.Log(GF, 2))); //128-bit field
+            //BigInteger t = BigInteger.Zero;
+            //chinese remainder theorem (CRT) on ts while |t| < 2*Sqrt(GF)
+            return GF + 1 - t;
+        }
+        static BigInteger SchoofElkiesAtkins(int Ea, int Eb, BigInteger GF)
+        {
+            BigInteger M = BigInteger.One, l = 2;
+            List<Tuple<List<BigInteger>, BigInteger>> Ap = new List<Tuple<List<BigInteger>, BigInteger>>();
+            List<Tuple<BigInteger, BigInteger>> Ep = new List<Tuple<BigInteger, BigInteger>>();
+            BigInteger t;
+            while (M < 4 * (GF ^ (1/2))) {
+                if (0 == 0) { //Atkin prime
+                    List<BigInteger> T = new List<BigInteger>();
+                } else { //Elkies prime
+                    //GetFactorOfDivisionPolynomialFactor(l, Ea, Eb, GF);
+                    BigInteger lambda = BigInteger.Zero;
+                    t = lambda + lambda / GF;
+                    Ep.Add(new Tuple<BigInteger, BigInteger>(t, l));
+                }
+            }
+            t = BigInteger.Zero;
+            return GF + 1 - t;
         }
         static Tuple<BigInteger, BigInteger> cswap(BigInteger a, BigInteger b, bool swap)
         {
@@ -4045,8 +4478,9 @@ namespace ELTECSharp
             }
             return new Tuple<BigInteger[], BigInteger[]>(q.Skip(q.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(), r);
         }
-        /*static BigInteger [] modinvGFE2k(BigInteger[] a, BigInteger[] n) //non-tested/verified/approved
+        static BigInteger [] modinvGFE2k(BigInteger[] a, BigInteger[] n) //should now be working but untested - final adjustment difference in polynomials was not present
         {
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
             BigInteger[] i = n, v = new BigInteger[] { BigInteger.Zero }, d = new BigInteger[] { BigInteger.One };
             while (!a.All((BigInteger c) => c == BigInteger.Zero)) {
                 BigInteger [] t = divmodGFE2k(i, a).Item1, x = a;
@@ -4056,11 +4490,12 @@ namespace ELTECSharp
                 d = addGFE2k(v, mulGFE2k(t, x));
                 v = x;
             }
+            v = mulGFE2k(new BigInteger[] { modinvGF2k(i[0], M) }, v);
             v = divmodGFE2k(v, n).Item2;
             //if (v < 0) v = addGFE2k(v, n) % n;
             return v;
 
-        }*/
+        }
         //https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
         //https://en.wikipedia.org/wiki/Polynomial_greatest_common_divisor#Bézout's_identity_and_extended_GCD_algorithm
         static BigInteger[] gcdGFE2k(BigInteger[] a, BigInteger[] b)
@@ -4536,9 +4971,14 @@ namespace ELTECSharp
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
                 GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743"), Ord = BPOrd * 2 * 2 * 2;
+            //BPOrd*(Gx, Gy) = (0, 1)
+            //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
+            //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
+            //Ord = SchoofElkiesAtkins(Ea, Eb, GF);
+            Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
-            goto p60;
+            //goto p60;
             //http://magma.maths.usyd.edu.au/calc/
             //E: y^2+a_1xy+a_3y=x^3+a_2x^2+a_4x+a_6 over GF(p)
             //K:=GF(233970423115425145524320034830162017933);
