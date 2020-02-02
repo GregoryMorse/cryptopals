@@ -2618,6 +2618,7 @@ namespace ELTECSharp
         }
         static BigInteger posRemainder(BigInteger dividend, BigInteger divisor)
         {
+            if (dividend >= 0 && dividend < divisor) return dividend;
             BigInteger r = dividend % divisor; //BigInteger.Remainder(dividend, divisor);
             //if ((r < 0 ? r + divisor : r) != modBarrettReduction(dividend, divisor)) throw new ArgumentException();
             return r < 0 ? r + divisor : r;
@@ -3651,7 +3652,10 @@ namespace ELTECSharp
                 int aoffs = alen - 1 - i, boffs = blen - 1 - i, coffs = clen - 1 - i;
                 if (i >= alen) c[coffs] = b[boffs];
                 else if (i >= blen) c[coffs] = a[aoffs];
-                else c[coffs] = posRemainder(a[aoffs] + b[boffs], GF);
+                else if (a[aoffs] >= 0 && a[aoffs] < GF && b[boffs] >= 0 && b[boffs] >= 0 && b[boffs] < GF) {
+                    c[coffs] = a[aoffs] + b[boffs];
+                    if (c[coffs] >= GF) c[coffs] -= GF;
+                } else c[coffs] = posRemainder(a[aoffs] + b[boffs], GF);
             }
             return clen == 0 || c[0] != BigInteger.Zero ? c : c.Skip(c.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray(); ;
         }
@@ -3769,8 +3773,11 @@ namespace ELTECSharp
                     //if (posRemainder(A[j] * B[i], GF) != posRemainder(mulKaratsuba(A[j] < 0 ? posRemainder(A[j], GF) : A[j], B[i] < 0 ? posRemainder(B[i], GF) : B[i]), GF)) throw new ArgumentException();
                     //p[ijoffs] += posRemainder(mulKaratsuba(A[j] < 0 ? posRemainder(A[j], GF) : A[j], B[i] < 0 ? posRemainder(B[i], GF) : B[i]), GF);
                     //p[ijoffs] += modmul(A[j], B[i], GF);
-                    p[ijoffs] += posRemainder(A[j] * B[i], GF);
-                    if (p[ijoffs] > GF) p[ijoffs] -= GF;
+                    //p[ijoffs] += posRemainder(A[j] * B[i], GF);
+                    //if (p[ijoffs] >= GF) p[ijoffs] -= GF;
+                    if (B[i] == -1) p[ijoffs] += (GF - A[j]);
+                    else if (A[j] == -1) p[ijoffs] += (GF - B[i]);
+                    else p[ijoffs] += A[j] * B[i];
                 }
             }
             //while (!A.All((BigInteger c) => c == BigInteger.Zero)) {
@@ -3780,7 +3787,8 @@ namespace ELTECSharp
             //if (!mulPolyRingKronecker(A, B, GF).SequenceEqual(p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).Select((x) => posRemainder(x, GF)).ToArray())) {
             //throw new ArgumentException();
             //}
-            return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(); //.Select((x) => posRemainder(x, GF)).ToArray();
+            //return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).Select((x) => posRemainder(x, GF)).ToArray();
         }
         static SortedList<BigInteger, BigInteger> mulPolyRingSparse(BigInteger[] A, SortedList<BigInteger, BigInteger> B, BigInteger GF)
         {
