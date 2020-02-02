@@ -2587,11 +2587,23 @@ namespace ELTECSharp
             r[r.Length - 1 - (BitSize % 8 == 0 ? 1 : 0)] |= (byte)(1 << ((BitSize - 1) % 8)); //always set bitsize-th bit
             return new BigInteger(r);
         }
-        static int GetBitSize(BigInteger num)
+        static int GetBitSizeSlow(BigInteger num)
         {
             int s = 0;
             while ((BigInteger.One << s) <= num) s = s + 1;
+            //if (s != GetBitSizeBinSearch(num)) throw new ArgumentException();
             return s;
+        }
+        static int GetBitSize(BigInteger num)
+        { //instead of 0, 1, 2, 3, 4... use 0, 1, 3, 7, 15, etc
+            int s = 0, t = 1, oldt = 1;
+            if (t <= 0) return 0;
+            while (true) {
+                if ((BigInteger.One << (s + t)) <= num) { oldt = t; t <<= 1; }
+                else if (t == 1) break;
+                else { s += oldt; t = 1; }
+            }
+            return s + 1;
         }
         static BigInteger GetRandomBitSize(RandomNumberGenerator rng, int BitSize, BigInteger Max)
         {
@@ -3726,7 +3738,8 @@ namespace ELTECSharp
                 if (B[i] < 0) Bpack += posRemainder(B[i], GF) << ((blen - i - 1) * packSize);
                 else Bpack |= B[i] << ((blen - i - 1) * packSize);
             }
-            BigInteger Cpack = Apack * Bpack; //should use Schonhage-Strassen here
+            //BigInteger Cpack = Apack * Bpack; //should use Schonhage-Strassen here
+            BigInteger Cpack = mulKaratsuba(Apack, Bpack);
             BigInteger[] p = new BigInteger[alen + blen - 1];
             BigInteger packMask = (BigInteger.One << packSize) - 1;
             for (int i = 0; i < alen + blen - 1; i++) {
@@ -4211,7 +4224,7 @@ namespace ELTECSharp
         static BigInteger[] phase(BigInteger [] z, int l, int psN)
         {
             BigInteger[] w = new BigInteger[psN];
-            BigInteger zf = z[0], k;
+            int zf = (int)z[0], k;
             if (zf % l == 0) k = zf;
             else {
                 k = (zf / l) * l;
