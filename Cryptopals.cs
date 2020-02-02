@@ -3703,12 +3703,20 @@ namespace ELTECSharp
         }
         static BigInteger mulKaratsuba(BigInteger num1, BigInteger num2)
         {
+            return doMulKaratsuba(num1, num2, GetBitSize(num1), GetBitSize(num2));
+        }
+        static BigInteger doMulKaratsuba(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
+        {
             if (num1 <= uint.MaxValue && num2 <= uint.MaxValue) {
                 return new BigInteger((System.UInt64)num1 * (System.UInt64)num2);
             }
             if (num1 <= uint.MaxValue || num2 <= uint.MaxValue) return num1 * num2;
             //if (num1 < 2 || num2 < 2) return num1 * num2;
-            int m = Math.Min(GetBitSize(num1), GetBitSize(num2));
+            while ((BigInteger.One << (num1bits-1)) > num1) num1bits--;
+            while ((BigInteger.One << (num2bits-1)) > num2) num2bits--;
+            //if (num1bits != GetBitSize(num1)) throw new ArgumentException();
+            //if (num2bits != GetBitSize(num2)) throw new ArgumentException();
+            int m = Math.Min(num1bits, num2bits);
             int m2 = m >> 1;
             BigInteger m2shift = BigInteger.One << m2;
             BigInteger low1, low2, high1, high2;
@@ -3716,10 +3724,11 @@ namespace ELTECSharp
             low2 = num2 & (m2shift - 1);
             high1 = num1 >> m2;
             high2 = num2 >> m2;
-            BigInteger z0 = mulKaratsuba(low1, low2);
-            BigInteger z1 = mulKaratsuba(low1 + high1, low2 + high2);
-            BigInteger z2 = mulKaratsuba(high1, high2);
-            return z2 * (BigInteger.One << (m2 << 1)) + (z1 - z2 - z0) * m2shift + z0;
+            BigInteger z0 = doMulKaratsuba(low1, low2, m2, m2);
+            BigInteger lowhigh1 = low1 + high1, lowhigh2 = low2 + high2;
+            BigInteger z1 = doMulKaratsuba(lowhigh1, lowhigh2, num1bits - m2 + 1, num2bits - m2 + 1);
+            BigInteger z2 = doMulKaratsuba(high1, high2, num1bits - m2, num2bits - m2);
+            return (z2 << (m2 << 1)) + ((z1 - z2 - z0) << m2) + z0;
         }
         //Kronecker substitution
         //https://en.wikipedia.org/wiki/Kronecker_substitution
@@ -3759,6 +3768,7 @@ namespace ELTECSharp
                     int ijoffs = i + j;
                     //if (posRemainder(A[j] * B[i], GF) != posRemainder(mulKaratsuba(A[j] < 0 ? posRemainder(A[j], GF) : A[j], B[i] < 0 ? posRemainder(B[i], GF) : B[i]), GF)) throw new ArgumentException();
                     //p[ijoffs] += posRemainder(mulKaratsuba(A[j] < 0 ? posRemainder(A[j], GF) : A[j], B[i] < 0 ? posRemainder(B[i], GF) : B[i]), GF);
+                    //p[ijoffs] += modmul(A[j], B[i], GF);
                     p[ijoffs] += posRemainder(A[j] * B[i], GF);
                     if (p[ijoffs] > GF) p[ijoffs] -= GF;
                 }
