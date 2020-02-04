@@ -4226,7 +4226,7 @@ namespace ELTECSharp
         {
             if (X.Length == 0) return X;
             BigInteger[] p = new BigInteger[(X.Length - 1) * m + 1];
-            for (int i = 0; i < X.Length; i++) p[i * 3] = X[i];
+            for (int i = 0; i < X.Length; i++) p[i * m] = X[i];
             return p;
         }
         static Tuple<BigInteger[], BigInteger[]> divmodPoly(BigInteger[] A, BigInteger[] B)
@@ -4257,8 +4257,9 @@ namespace ELTECSharp
             while (h < m && k < n)
             {
                 //Find the k-th pivot
-                int i_max = Enumerable.Range(h, m - h + 1 - 1).Where((int i) => x[i,k] != BigInteger.Zero).Select((int i) => new Tuple<BigInteger, int>(BigInteger.Abs(x[i, k]), i)).Min().Item2; //index of maximum which is first one with a bit set, also should consider absolute value but here its not applicable since no negative values though zero still possible
-                if (x[i_max, k] == BigInteger.Zero || i_max < h) //No pivot in this column, pass to next column
+                Tuple<BigInteger, int>[] res = Enumerable.Range(h, m - h + 1 - 1).Where((int i) => x[i, k] != BigInteger.Zero).Select((int i) => new Tuple<BigInteger, int>(BigInteger.Abs(x[i, k]), i)).ToArray();
+                int i_max = res.Length == 0 ? -1 : res.Min().Item2; //index of maximum which is first one with a bit set, also should consider absolute value but here its not applicable since no negative values though zero still possible
+                if (i_max < h || x[i_max, k] == BigInteger.Zero) //No pivot in this column, pass to next column
                     k++;
                 else {
                     //swap rows h and i_max
@@ -4289,6 +4290,7 @@ namespace ELTECSharp
         //Extended Euclid GCD of 1
         static BigInteger[] modInversePoly(BigInteger[] a, BigInteger[] n)
         {
+            //https://github.com/sagemath/sage/blob/master/src/sage/rings/polynomial/polynomial_element.pyx
             //use matrix to solve this as linear system since there can be non-monic polynomials or intermediate ones
             //Gaussian elimination row reduction to solve
             /*
@@ -4332,21 +4334,52 @@ namespace ELTECSharp
             //if (v < 0) v = (v + n) % n;*/
             return v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
         }
-        static BigInteger[] phase(BigInteger [] z, int zf, int l, int psN)
+        static Tuple<int, BigInteger[]> reducePoly(BigInteger[] a, int offs, int psN)
         {
-            BigInteger[] w = new BigInteger[psN];
+            int reduce = Enumerable.Range(0, offs).TakeWhile((val) => a[a.Length - 1 - val] == BigInteger.Zero).Count();
+            if (reduce != 0) {
+                a = a.Take(a.Length - reduce).ToArray();
+                offs -= reduce;
+            }
+            if (a.Length > psN) {
+                a = a.Skip(a.Length - psN).ToArray(); // mod x^psN
+                a = a.Skip(a.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray();
+            }
+            return new Tuple<int, BigInteger[]>(offs, a);
+        }
+        static Tuple<int, BigInteger[]> mulShiftedPoly(BigInteger[] a, int aoffs, BigInteger[] b, int boffs, int psN)
+        {
+            BigInteger[] c = mulPoly(a, b);
+            return reducePoly(c, aoffs + boffs, psN);
+        }
+        static Tuple<int, BigInteger[]> addShiftedPoly(BigInteger[] a, int aoffs, BigInteger[] b, int boffs, int psN)
+        {
+            BigInteger[] c;
+            if (aoffs < boffs) {
+                c = addPoly(a.Concat(Enumerable.Repeat(BigInteger.Zero, boffs - aoffs)).ToArray(), b);
+            } else if (aoffs > boffs) {
+                c = addPoly(a, b.Concat(Enumerable.Repeat(BigInteger.Zero, aoffs - boffs)).ToArray());
+            } else c = addPoly(a, b);
+            return reducePoly(c, Math.Max(aoffs, boffs), psN);
+        }
+        static Tuple<int, BigInteger[]> phase(BigInteger [] z, int zf, int l, int psN)
+        {
             int k; //degree of polynomial
             if (zf % l == 0) k = zf;
             else {
                 k = (zf / l) * l;
                 if (zf >= 0) k += l;
             }
+            int offset = k < 0 ? -k : 0;
+            BigInteger[] w = new BigInteger[psN + offset];
             for (; k < psN; k += l) {
-                w[w.Length - 1 - k] = l * z[z.Length - 1 + zf - k];
+                w[w.Length - 1 - offset - k] = l * z[z.Length - 1 + zf - k];
             }
-            return w.Skip(w.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray();
+            return new Tuple<int, BigInteger[]>(offset, w.Skip(w.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray());
         }
-        static List<Tuple<BigInteger, BigInteger, BigInteger>> getModularPoly(int l)
+        //https://sage.math.leidenuniv.nl/src/modular/ssmod/ssmod.py
+        //https://github.com/miracl/MIRACL/blob/master/source/curve/mueller.cpp
+        static List<List<Tuple<BigInteger, int>>> getModularPoly(int l)
         {
             //need mulPoly, divmodPoly, addPoly, modexpPoly since no ring here
             int s;
@@ -4372,20 +4405,17 @@ namespace ELTECSharp
                 BigInteger[] b = new BigInteger[n + 1];
                 b[0] = -1;
                 b[n] = 1;
-                BigInteger[] t = divmodPoly(mulPoly(a, modInversePoly(b, divpoly)), divpoly).Item2;
+                BigInteger[] t = mulShiftedPoly(a, 0, modInversePoly(b, divpoly), 0, psN).Item2;
                 x = addPoly(x, t);
             }
             x = mulPoly(x, new BigInteger[] { 240 });
             x[x.Length-1] += BigInteger.One;
-            x = divmodPoly(modexpPoly(x, 3), divpoly).Item2;
-            BigInteger[] y = getEta(psN);
-            y = y.Skip(y.Length - psN).ToArray(); // mod x^psN
-            y = y.Skip(y.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray();
-            y = modexpPoly(y, 24);
-            y = divmodPoly(y, divpoly).Item2;
+            x = reducePoly(modexpPoly(x, 3), 0, psN).Item2;
+            BigInteger[] y = reducePoly(getEta(psN), 0, psN).Item2;
+            y = reducePoly(modexpPoly(y, 24), 0, psN).Item2;
             //R.<x> = PolynomialRing(ZZ)
             //inverse_mod(252*x^2-24*x+1, x^3)
-            BigInteger[] klein = divmodPoly(mulPoly(x, modInversePoly(y, divpoly)), divpoly).Item2; //new BigInteger[] { 324, 24, 1}
+            BigInteger[] klein = reducePoly(mulPoly(x, modInversePoly(y, divpoly)), 0, psN).Item2; //new BigInteger[] { 324, 24, 1}
             //klein = divmodPoly(klein, new BigInteger[] {BigInteger.One, BigInteger.Zero}).Item1; // divide by x
             int kleindiv = 1; //divide by x but since negative powers just store this denominator
             psN *= l;
@@ -4393,63 +4423,91 @@ namespace ELTECSharp
             divpoly[0] = BigInteger.One;
             klein = substPowerPoly(klein, l); // divmodPoly(substPowerPoly(klein, l), divpoly).Item2;
             kleindiv *= l;
-            BigInteger[] z = getEta(psN);
-            z = z.Skip(z.Length - psN).ToArray(); // mod x^psN
-            z = z.Skip(z.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray();
-            y = divmodPoly(substPowerPoly(z, l), divpoly).Item2;
-            z = divmodPoly(mulPoly(z, modInversePoly(y, divpoly)), divpoly).Item2; //y = 1 / y; z *= y;
-            BigInteger[] flt = divmodPoly(modexpPoly(z, 2 * s), divpoly).Item2;
+            BigInteger[] z = reducePoly(getEta(psN), 0, psN).Item2;
+            y = reducePoly(substPowerPoly(z, l), 0, psN).Item2;
+            z = reducePoly(mulPoly(z, modInversePoly(y, divpoly)), 0, psN).Item2; //y = 1 / y; z *= y;
+            BigInteger[] flt = reducePoly(modexpPoly(z, 2 * s), 0, psN).Item2;
             //BigInteger[] xv = new BigInteger[v + 1];
             //xv[0] = 1;
             //flt = divmodPoly(flt, xv).Item1; // multiply by x^-v
             int fltdiv = v;
             BigInteger w = BigInteger.Pow(l, s);
-            y = divmodPoly(substPowerPoly(flt, l), divpoly).Item2;
+            y = reducePoly(substPowerPoly(flt, l), 0, psN).Item2;
             int ydiv = fltdiv * l;
             BigInteger[] yinvw = new BigInteger[ydiv + 1];
             yinvw[0] = w;
-            BigInteger[] zlt = divmodPoly(mulPoly(yinvw, modInversePoly(y, divpoly)), divpoly).Item2;
+            BigInteger[] zlt = reducePoly(mulPoly(yinvw, modInversePoly(y, divpoly)), 0, psN).Item2;
             // Calculate Power Sums
             z = new BigInteger[] { 1 };
             BigInteger[] f = new BigInteger[] { 1 };
             int fdiv = 0;
             BigInteger[][] ps = new BigInteger[l + 1 + 1][];
+            int[] psdiv = new int[l + 1 + 1];
             ps[0] = new BigInteger[] { l + 1 };
             for (int i = 1; i <= l + 1; i++) {
-                f = mulPoly(f, flt);
+                f = mulPoly(f, flt); //reducePoly(mulPoly(f, flt), 0, psN).Item2;
                 fdiv += fltdiv;
-                z = divmodPoly(mulPoly(z, zlt), divpoly).Item2;
-                ps[i] = addPoly(phase(f, -fdiv, l, psN), z);
+                z = reducePoly(mulPoly(z, zlt), 0, psN).Item2;
+                Tuple<int, BigInteger[]> pswithdiv = phase(f, -fdiv, l, psN);
+                pswithdiv = addShiftedPoly(pswithdiv.Item2, pswithdiv.Item1, z, 0, psN);
+                ps[i] = pswithdiv.Item2;
+                psdiv[i] = pswithdiv.Item1;
             }
             BigInteger[][] c = new BigInteger[l + 1 + 1][];
+            int[] cdiv = new int[l + 1 + 1];
             c[0] = new BigInteger[] { BigInteger.One };
             for (int i = 1; i <= l + 1; i++) {
                 c[i] = new BigInteger[] { BigInteger.Zero };
-                for (int j = 1; j <= i; j++) c[i] = addPoly(c[i], divmodPoly(mulPoly(ps[j], c[i - j]), divpoly).Item2);
+                for (int j = 1; j <= i; j++) {
+                    Tuple<int, BigInteger[]> res = mulShiftedPoly(ps[j], psdiv[j], c[i - j], cdiv[i - j], psN);
+                    res = addShiftedPoly(c[i], cdiv[i], res.Item2, res.Item1, psN);
+                    c[i] = res.Item2;
+                    cdiv[i] = res.Item1;
+                }
                 c[i] = divmodPoly(mulPoly(c[i], new BigInteger[] { -1 }), new BigInteger[] { i }).Item1;
             }
-            BigInteger[][] jlt = new BigInteger[l + 1 + 1][];
+            BigInteger[][] jlt = new BigInteger[v + 1][];
+            int[] jltdiv = new int[v + 1];
             jlt[0] = new BigInteger[] { BigInteger.One };
             jlt[1] = klein;
-            for (int i = 2; i <= v; i++)
-                jlt[i] = divmodPoly(mulPoly(jlt[i - 1], klein), divpoly).Item2;
-            for (int i = 1; i < l + 1; i++) {
+            jltdiv[1] = kleindiv;
+            for (int i = 2; i <= v; i++) {
+                Tuple<int, BigInteger[]> res = mulShiftedPoly(jlt[i - 1], jltdiv[i], klein, kleindiv, psN);
+                jlt[i] = res.Item2;
+                jltdiv[i] = res.Item1;
+            }
+            //x^(l+1) is first term
+            List<List<Tuple<BigInteger, int>>> coeffs = new List<List<Tuple<BigInteger, int>>>();
+            Console.Write("X^" + (l + 1));
+            coeffs.Add(new List<Tuple<BigInteger, int>>(new Tuple<BigInteger, int>[] { new Tuple<BigInteger, int>(BigInteger.One, 0) }));
+            for (int i = 1; i <= l + 1; i++) {
+                z = c[i];
+                int zdiv = cdiv[i];
                 BigInteger cf;
-                while (z.Length - 1 != 0) {
-                    int j = (-(z.Length - 1) / l);
-                    cf = z[0];
-                    z = addPoly(z, divmodPoly(mulPoly(jlt[j], new BigInteger[] { -cf }), divpoly).Item2);
-                    //cf*Y^j;
+                List<Tuple<BigInteger, int>> yvals = new List<Tuple<BigInteger, int>>();
+                Console.Write("+(");
+                while (zdiv != 0) {
+                    int j = zdiv / l;
+                    cf = z[z.Length - 1];
+                    Tuple<int, BigInteger[]> res = addShiftedPoly(z, zdiv, mulPoly(jlt[j], new BigInteger[] { -cf }), jltdiv[j], psN);
+                    z = res.Item2;
+                    zdiv = res.Item1;
+                    Console.Write("+" + cf + "*Y^" + j);
+                    yvals.Add(new Tuple<BigInteger, int>(cf, j));
+                    //(cf*Y^j;
                 }
                 cf = z[z.Length - 1];
-                //cf*X^(l+1-i)
-                if (z[z.Length - 1 - l] != BigInteger.Zero) throw new ArgumentException();
+                //+cf)*X^(l+1-i)
+                Console.Write(" + " + cf + ")*X^" + (l + 1 - i));
+                yvals.Add(new Tuple<BigInteger, int>(cf, 0));
+                coeffs.Add(yvals);
+                if (l <= z.Length - 1 && z[z.Length - 1 - l] != BigInteger.Zero) throw new ArgumentException();
             }
-            return new List<Tuple<BigInteger, BigInteger, BigInteger>>();
+            return coeffs; //coeff x^ y^ 
         }
         static BigInteger SchoofElkiesAtkins(int Ea, int Eb, BigInteger GF, BigInteger ExpectedBase)
         {
-            getModularPoly(3);
+            getModularPoly(11);
             BigInteger realT = GF + 1 - ExpectedBase;
             BigInteger delta = -16 * (4 * new BigInteger(Ea) * Ea * Ea + 27 * new BigInteger(Eb) * Eb);
             //4A^3+27B^2 == 0 is not allowed or j-invariant with 0 or 1728
@@ -5468,6 +5526,9 @@ namespace ELTECSharp
             BigInteger[] Ords = new BigInteger[] { Ord, BigInteger.Parse("233970423115425145550826547352470124412"),
                 BigInteger.Parse("233970423115425145544350131142039591210"),
                 BigInteger.Parse("233970423115425145545378039958152057148") };
+            Ords[1] = Schoof(Ea, PickGys[1], GF, rng, Ords[1]);
+            //Ords[2] = Schoof(Ea, PickGys[2], GF, rng, Ords[2]);
+            //Ords[3] = Schoof(Ea, PickGys[3], GF, rng, Ords[3]);
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
