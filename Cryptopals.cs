@@ -4341,8 +4341,8 @@ namespace ELTECSharp
                 a = a.Take(a.Length - reduce).ToArray();
                 offs -= reduce;
             }
-            if (a.Length > psN) {
-                a = a.Skip(a.Length - psN).ToArray(); // mod x^psN
+            if (a.Length - offs > psN) {
+                a = a.Skip(a.Length - offs - psN).ToArray(); // mod x^psN
                 a = a.Skip(a.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray();
             }
             return new Tuple<int, BigInteger[]>(offs, a);
@@ -4373,6 +4373,7 @@ namespace ELTECSharp
             int offset = k < 0 ? -k : 0;
             BigInteger[] w = new BigInteger[psN + offset];
             for (; k < psN; k += l) {
+                if (z.Length - 1 + zf < k) break;
                 w[w.Length - 1 - offset - k] = l * z[z.Length - 1 + zf - k];
             }
             return new Tuple<int, BigInteger[]>(offset, w.Skip(w.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray());
@@ -4445,7 +4446,7 @@ namespace ELTECSharp
             int[] psdiv = new int[l + 1 + 1];
             ps[0] = new BigInteger[] { l + 1 };
             for (int i = 1; i <= l + 1; i++) {
-                f = mulPoly(f, flt); //reducePoly(mulPoly(f, flt), 0, psN).Item2;
+                f = reducePoly(mulPoly(f, flt), 0, psN).Item2;
                 fdiv += fltdiv;
                 z = reducePoly(mulPoly(z, zlt), 0, psN).Item2;
                 Tuple<int, BigInteger[]> pswithdiv = phase(f, -fdiv, l, psN);
@@ -4472,7 +4473,7 @@ namespace ELTECSharp
             jlt[1] = klein;
             jltdiv[1] = kleindiv;
             for (int i = 2; i <= v; i++) {
-                Tuple<int, BigInteger[]> res = mulShiftedPoly(jlt[i - 1], jltdiv[i], klein, kleindiv, psN);
+                Tuple<int, BigInteger[]> res = mulShiftedPoly(jlt[i - 1], jltdiv[i - 1], klein, kleindiv, psN);
                 jlt[i] = res.Item2;
                 jltdiv[i] = res.Item1;
             }
