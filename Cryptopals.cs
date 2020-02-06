@@ -4305,6 +4305,23 @@ namespace ELTECSharp
             }
             return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
         }
+        static BigInteger[] mulPolyPow(BigInteger[] A, BigInteger[] B, int psN)
+        {
+            int alen = A.Length, blen = B.Length;
+            if (alen == 0) return A; if (blen == 0) return B;
+            BigInteger[] p = new BigInteger[alen + blen - 1];
+            for (int i = 0; i < blen; i++)
+            {
+                if (B[i] == BigInteger.Zero) continue;
+                for (int j = Math.Max(0, p.Length - psN - i - 1); j < alen ; j++) //p.Length - (j + i) > psN, p.Length - psN - i > j
+                {
+                    if (A[j] == BigInteger.Zero) continue;
+                    int ijoffs = i + j;
+                    p[ijoffs] += A[j] * B[i];
+                }
+            }
+            return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+        }
         static BigInteger[] modexpPoly(BigInteger[] X, BigInteger m)
         {
             BigInteger[] d = { BigInteger.One };
@@ -4314,6 +4331,20 @@ namespace ELTECSharp
                     d = mulPoly(d, X);
                 }
                 X = mulPoly(X, X);
+            }
+            return d;
+        }
+        static BigInteger[] modexpPolyPow(BigInteger[] X, BigInteger m, int psN)
+        {
+            BigInteger[] d = { BigInteger.One };
+            int bs = GetBitSize(m);
+            for (int i = bs; i > 0; i--)
+            {
+                if (((BigInteger.One << (bs - i)) & m) != 0)
+                {
+                    d = reducePoly(mulPoly(d, X), 0, psN).Item2;
+                }
+                X = reducePoly(mulPoly(X, X), 0, psN).Item2;
             }
             return d;
         }
@@ -4397,6 +4428,13 @@ namespace ELTECSharp
              M=matrix(ZZ,[[1,0,0,0,0,1],[-24,1,0,0,0,0],[252,-24,1,0,0,0],[0,252,-24,1,0,0],[0,0,252,0,1,0]])
              M.echelon_form() # last column 1, 24, 324, 1728, -81648
              */
+            //if we have a power series here, we want the result also to be in coefficients of the same power series, and hence
+            //the matrix equations can be reduced by this to eliminate all the known 0 coefficients
+            //otherwise this is way too computationally complex
+            //cannot necessarily deduce this as 0 coefficients could be in any positions and best it could guess by the smallest gap which might not be correct
+            //powers = a.Select((val, i) => new Tuple<BigInteger, int>(val, a.Length - 1 - i)).Where((val) => val.Item1 != BigInteger.Zero);
+
+
             BigInteger[,] M = new BigInteger[(n.Length - 1) * 2 - 1, (n.Length - 1) * 2];
             for (int i = 0; i < n.Length - 1; i++) {
                 for (int j = 0; j < n.Length - 1; j++) {
@@ -4428,6 +4466,32 @@ namespace ELTECSharp
             //v = mulPoly(new BigInteger[] { modInverse(i[0], GF) }, v);
             v = divmodPoly(v, n).Item2;
             //if (v < 0) v = (v + n) % n;*/
+            return v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+        }
+        static BigInteger[] modInversePolyPow(BigInteger[] a, BigInteger[] n, int pow)
+        {
+            int powlen = (n.Length - 1) / pow + (((n.Length - 1) % pow) != 0 ? 1 : 0);
+            BigInteger[,] M = new BigInteger[powlen * 2 - 1, powlen * 2];
+            for (int i = 0; i < powlen; i++) {
+                for (int j = 0; j < powlen; j++) {
+                    M[i + j, j] = i * pow <= a.Length - 1 ? a[a.Length - 1 - i * pow] : BigInteger.Zero;
+                }
+            }
+            for (int i = powlen; i < powlen + 1; i++) { //this will only work for x^n field
+                for (int j = 0; j < powlen - 1; j++) {
+                    M[i + j, j + powlen] = n[0];
+                }
+            }
+            M[0, M.GetLength(1) - 1] = BigInteger.One;
+            M = gaussianElimZZ(M);
+            BigInteger[] v = new BigInteger[n.Length - 1]; //no solution likely means identity matrix not seen - should check that case
+            for (int i = 0; i < powlen; i++)
+            {
+                v[v.Length - 1 - i * pow] = M[i, M.GetLength(1) - 1];
+            }
+            //if (!modInversePoly(a, n).SequenceEqual(v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray())) {
+            //    throw new ArgumentException();
+            //}
             return v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
         }
         static Tuple<int, BigInteger[]> reducePoly(BigInteger[] a, int offs, int psN)
@@ -4503,7 +4567,7 @@ namespace ELTECSharp
                 BigInteger[] b = new BigInteger[n + 1];
                 b[0] = -1;
                 b[n] = 1;
-                BigInteger[] t = mulShiftedPoly(a, 0, modInversePoly(b, divpoly), 0, psN).Item2;
+                BigInteger[] t = mulShiftedPoly(a, 0, modInversePolyPow(b, divpoly, n), 0, psN).Item2;
                 x = addPoly(x, t);
             }
             x = mulPoly(x, new BigInteger[] { 240 });
@@ -4523,8 +4587,8 @@ namespace ELTECSharp
             kleindiv *= l;
             BigInteger[] z = reducePoly(getEta(psN), 0, psN).Item2;
             y = reducePoly(substPowerPoly(z, l), 0, psN).Item2;
-            z = reducePoly(mulPoly(z, modInversePoly(y, divpoly)), 0, psN).Item2; //y = 1 / y; z *= y;
-            BigInteger[] flt = reducePoly(modexpPoly(z, 2 * s), 0, psN).Item2;
+            z = reducePoly(mulPoly(z, modInversePolyPow(y, divpoly, l)), 0, psN).Item2; //y = 1 / y; z *= y;
+            BigInteger[] flt = reducePoly(modexpPolyPow(z, 2 * s, psN), 0, psN).Item2;
             //BigInteger[] xv = new BigInteger[v + 1];
             //xv[0] = 1;
             //flt = divmodPoly(flt, xv).Item1; // multiply by x^-v
@@ -4534,7 +4598,7 @@ namespace ELTECSharp
             int ydiv = fltdiv * l;
             BigInteger[] yinvw = new BigInteger[ydiv + 1];
             yinvw[0] = w;
-            BigInteger[] zlt = reducePoly(mulPoly(yinvw, modInversePoly(y, divpoly)), 0, psN).Item2;
+            BigInteger[] zlt = reducePoly(mulPoly(yinvw, modInversePolyPow(y, divpoly, l)), 0, psN).Item2;
             // Calculate Power Sums
             z = new BigInteger[] { 1 };
             BigInteger[] f = new BigInteger[] { 1 };
@@ -4543,7 +4607,7 @@ namespace ELTECSharp
             int[] psdiv = new int[l + 1 + 1];
             ps[0] = new BigInteger[] { l + 1 };
             for (int i = 1; i <= l + 1; i++) {
-                f = reducePoly(mulPoly(f, flt), 0, psN).Item2;
+                f = reducePoly(mulPolyPow(f, flt, psN), 0, psN).Item2;
                 fdiv += fltdiv;
                 z = reducePoly(mulPoly(z, zlt), 0, psN).Item2;
                 Tuple<int, BigInteger[]> pswithdiv = phase(f, -fdiv, l, psN);
@@ -4704,6 +4768,7 @@ namespace ELTECSharp
                     Console.WriteLine((gcdres.Length == 1 ? "Atkin" : "Elkies") + " " + l);
                     if (gcdres.Length - 1 == 0) { //Atkin prime with degree 0
                         //List<BigInteger> T = new List<BigInteger>();
+                        l = nextPrime(l); continue;
                     } else {
                         //mueller 0 200 -o mueller.raw
                         //need to specify with 32 signed 32-bit numbers...
