@@ -4105,7 +4105,7 @@ namespace ELTECSharp
             //BigInteger b6sqrinv = modInverse(2 * 2 * y * y * 2 * 2 * y * y, GF); //(4y^2)^2
             List<Tuple<BigInteger, BigInteger>> ts = new List<Tuple<BigInteger, BigInteger>>();
             BigInteger t = BigInteger.Zero;
-            while (prodS <= sqrtp4) { //log2(GF) primes required on average
+            while (prodS < sqrtp4) { //log2(GF) primes required on average
                 while (divPolys.Count <= l * 2) { //l * 2 required for point multiplication algorithm
                     int m = divPolys.Count / 2; //m >= 2
                     //even ones in odd psis need adjustment by b6^2=(2*y)^2=4y^2
@@ -4159,14 +4159,18 @@ namespace ELTECSharp
                             Tuple<BigInteger[], BigInteger[]> S = addECPolyRing(new Tuple<BigInteger[], BigInteger[]>(xpsquared, ypsquared), Q, Ea, GF, divpoly, f);
                             if (S.Item1 == null) Q = S; //also can check xpsquared == Q.Item1
                             else if (!S.Item1.SequenceEqual(new BigInteger[] { BigInteger.Zero }) || !S.Item2.SequenceEqual(new BigInteger[] { BigInteger.One })) { //redundant with last check
-                                /*BigInteger[] modinv = modInversePolyRing(addPolyRing(xpsquared, mulPolyRing(Q.Item1, new BigInteger[] { -1 }, GF), GF), divpoly, GF);
+                                BigInteger[] modinv = modInversePolyRing(addPolyRing(xpsquared, mulPolyRing(Q.Item1, new BigInteger[] { -1 }, GF), GF), divpoly, GF);
                                 if (modinv != null) { //xpsquared != qalt.Item1
                                     BigInteger[] diffsqr = divmodPolyRing(mulPolyRing(addPolyRing(ypsquared, mulPolyRing(Q.Item2, new BigInteger[] { -1 }, GF), GF),
                                         modinv, GF), divpoly, GF).Item2;
                                     BigInteger[] xprime = addPolyRing(addPolyRing(divmodPolyRing(mulPolyRing(mulPolyRing(diffsqr, diffsqr, GF), f, GF), divpoly, GF).Item2,
                                         mulPolyRing(xpsquared, new BigInteger[] { -1 }, GF), GF), mulPolyRing(Q.Item1, new BigInteger[] { -1 }, GF), GF); //need to remember to multiply by y^2
                                     if (!xprime.SequenceEqual(S.Item1)) throw new ArgumentException();
-                                }*/
+                                    //xprime + yprime/lambda = xpsquared - ypsquared/lambda, or yprime = xpsquared*lambda - ypsquared - xprime*lambda
+                                    //lambda=(ypsquared-ypl)/(xpsquared-xpl)
+                                    BigInteger[] yprime = addPolyRing(divmodPolyRing(mulPolyRing(addPolyRing(xpsquared, mulPolyRing(xprime, new BigInteger[] { -1 }, GF), GF), diffsqr, GF), divpoly, GF).Item2, mulPolyRing(ypsquared, new BigInteger[] { -1 }, GF), GF);
+                                    if (!yprime.SequenceEqual(S.Item2)) throw new ArgumentException();
+                                }
                                 //limited by 1 in y, and (l^2 - 3) / 2 in x
                                 Tuple<BigInteger[], BigInteger[]> P = new Tuple<BigInteger[], BigInteger[]>(xprem, yprem);
                                 for (; m <= (l - 1) / 2; m++) {
