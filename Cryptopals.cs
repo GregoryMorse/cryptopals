@@ -4718,6 +4718,30 @@ namespace ELTECSharp
             }
             return c;
         }
+        static Tuple<BigInteger, BigInteger> mulquad(BigInteger p, BigInteger qnr, BigInteger x, BigInteger y, BigInteger a, BigInteger b)
+        {
+            return new Tuple<BigInteger, BigInteger>(posRemainder(a * x + b * y * qnr, p), posRemainder(a * y + b * x, p));
+        }
+        static Tuple<BigInteger, BigInteger> powquad(BigInteger p, BigInteger qnr, BigInteger x, BigInteger y, BigInteger e)
+        {
+            BigInteger k = e;
+            BigInteger a = 1;
+            BigInteger b = 0;
+            if (k == 0) return new Tuple<BigInteger, BigInteger>(a, b);
+            for (;;) {
+                if ((k & 1) != 0) {
+                    Tuple<BigInteger, BigInteger> ret = mulquad(p, qnr, x, y, a, b);
+                    a = ret.Item1;
+                    b = ret.Item2;
+                }
+                k >>= 1;
+                if (k == 0) return new Tuple<BigInteger, BigInteger>(a, b);
+                Tuple<BigInteger, BigInteger> retxy = mulquad(p, qnr, x, y, x, y);
+                x = retxy.Item1;
+                y = retxy.Item2;
+            }
+            
+        }
         static BigInteger SchoofElkiesAtkins(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, BigInteger ExpectedBase)
         {
             BigInteger realT = GF + 1 - ExpectedBase;
@@ -4768,7 +4792,78 @@ namespace ELTECSharp
                     Console.WriteLine((gcdres.Length == 1 ? "Atkin" : "Elkies") + " " + l);
                     if (gcdres.Length - 1 == 0) { //Atkin prime with degree 0
                         //List<BigInteger> T = new List<BigInteger>();
-                        l = nextPrime(l); continue;
+                        BigInteger k = posRemainder(GF, l);
+                        BigInteger v = TonelliShanks(rng, k, l);
+                        BigInteger lim = 1;
+                        BigInteger[][] u = new BigInteger[GetBitSize(l)][];
+                        u[0] = xprem;
+                        u[1] = substitutePolyRing(u[0], u[0], modPolyJ, GF);
+                        BigInteger r;
+                        for (r = 2; r <= l + 1; r++) {
+                            BigInteger[] C = null;
+                            if (posRemainder(l + 1, r) != 0) continue;
+                            BigInteger jj = (l + 1) / r;
+                            if ((jj & 1) == 0 && v == 0) continue;
+                            if ((jj & 1) == 1 && v != 0) continue;
+                            BigInteger kk = r, m = 0;
+                            bool first = true;
+                            while (true) {
+                                if ((kk & 1) != 0) {
+                                    if (first) C = u[(int)m];
+                                    else C = substitutePolyRing(u[(int)m], C, modPolyJ, GF);
+                                    first = false;
+                                }
+                                kk >>= 1;
+                                if (kk == 0) break;
+                                m++;
+                                if (m > lim) {
+                                    u[(int)m] = substitutePolyRing(u[(int)m - 1], u[(int)m - 1], modPolyJ, GF);
+                                }
+                            }
+                            if (C.SequenceEqual(new BigInteger[] { 1, 0 })) break;
+                        }
+                        BigInteger qnr = 2;
+                        while (TonelliShanks(rng, qnr, l) != 0) qnr++;
+                        BigInteger ord = l * l - 1;
+                        //find generator of F(l^2)
+                        BigInteger gx, gy = 1;
+                        for (gx = 1; gx < l; gx++) {
+                            bool gen = true;
+                            for (BigInteger jj = 2; jj < ord >> 1; jj++) {
+                                if (posRemainder(ord, jj) != 0) continue;
+                                Tuple<BigInteger, BigInteger> ab = powquad(l, qnr, gx, gy, ord / jj);
+                                if (ab.Item1 == 1 && ab.Item2 == 0) {
+                                    gen = false;
+                                    break;
+                                }
+                            }
+                            if (gen) break;
+                        }
+                        BigInteger candidates = 0;
+                        List<BigInteger> T = new List<BigInteger>();
+                        BigInteger rphi = 1;
+                        for (BigInteger i = 2; i < r; i++) if (BigInteger.GreatestCommonDivisor(i, r) == 1) rphi++;
+                        for (BigInteger jj = 1; jj < r; jj++) {
+                            if (jj > 1 && BigInteger.GreatestCommonDivisor(jj, r) != 1) continue;
+                            Tuple<BigInteger, BigInteger> ab = powquad(l, qnr, gx, gy, jj * ord / r);
+                            BigInteger tau = posRemainder((ab.Item1 + 1) * k * (int)modInverse(2, l), l);
+                            if (tau == 0) { //this special case means r==2 and we can determine a single candidate easy to use
+                                T.Add(tau); //posRemainder(GF + 1, l)
+                                break;
+                            } else if (TonelliShanks(rng, tau, l) != 0) {
+                                tau = TonelliShanks(rng, tau, l);
+                                tau = posRemainder(2 * tau, l);
+                                T.Add(posRemainder(GF + 1 + tau, l));
+                                T.Add(posRemainder(GF + 1 - tau, l));
+                                if (T.Count() == rphi) { //total will always be rphi at end
+                                    break;
+                                }
+                            }
+                        }
+                        if (T.Count() != 1) {
+                            //can save T for match sort algorithm...
+                            l = nextPrime(l); continue;
+                        } else tl = T[0];
                     } else {
                         //mueller 0 200 -o mueller.raw
                         //need to specify with 32 signed 32-bit numbers...
