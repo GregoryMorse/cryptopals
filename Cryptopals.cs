@@ -2434,6 +2434,7 @@ namespace ELTECSharp
         static BigInteger modInverse(BigInteger a, BigInteger n)
         {
             BigInteger i = n, v = 0, d = 1;
+            if (a < 0) a = posRemainder(a, n);
             while (a > 0) {
                 BigInteger t = i / a, x = a;
                 a = i % x;
@@ -4668,6 +4669,179 @@ namespace ELTECSharp
             }
             return coeffs; //coeff x^ y^ 
         }
+        static Tuple<int, BigInteger[]> mulShiftedPolyRing(BigInteger[] a, int aoffs, BigInteger[] b, int boffs, int psN, BigInteger GF)
+        {
+            BigInteger[] c = mulPolyRing(a, b, GF);
+            return reducePoly(c, aoffs + boffs, psN);
+        }
+        static Tuple<int, BigInteger[]> addShiftedPolyRing(BigInteger[] a, int aoffs, BigInteger[] b, int boffs, int psN, BigInteger GF)
+        {
+            BigInteger[] c;
+            if (aoffs < boffs)
+            {
+                c = addPolyRing(a.Concat(Enumerable.Repeat(BigInteger.Zero, boffs - aoffs)).ToArray(), b, GF);
+            }
+            else if (aoffs > boffs)
+            {
+                c = addPolyRing(a, b.Concat(Enumerable.Repeat(BigInteger.Zero, aoffs - boffs)).ToArray(), GF);
+            }
+            else c = addPolyRing(a, b, GF);
+            return reducePoly(c, Math.Max(aoffs, boffs), psN);
+        }
+        static BigInteger[] mulPolyRingPow(BigInteger[] A, BigInteger[] B, int psN, BigInteger GF)
+        {
+            int alen = A.Length, blen = B.Length;
+            if (alen == 0) return A; if (blen == 0) return B;
+            BigInteger[] p = new BigInteger[alen + blen - 1];
+            for (int i = 0; i < blen; i++)
+            {
+                if (B[i] == BigInteger.Zero) continue;
+                for (int j = Math.Max(0, p.Length - psN - i - 1); j < alen; j++)
+                {
+                    if (A[j] == BigInteger.Zero) continue;
+                    int ijoffs = i + j;
+                    if (B[i] == -1) p[ijoffs] += (GF - A[j]);
+                    else if (A[j] == -1) p[ijoffs] += (GF - B[i]);
+                    else p[ijoffs] += A[j] * B[i];
+                }
+            }
+            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).Select((x) => posRemainder(x, GF)).ToArray();
+        }
+        static List<List<Tuple<BigInteger, int>>> getModularPolyGF(int l, BigInteger GF)
+        {
+            //need mulPoly, divmodPoly, addPoly, modexpPoly since no ring here
+            int s;
+            for (s = 1; ; s++)
+                if (s * (l - 1) % 12 == 0) break; //s is either 1, 2, 3 or 6 from fastest to slowest
+            int v = s * (l - 1) / 12;
+            int psN = v + 2;
+            BigInteger[] divpoly = new BigInteger[psN + 1];
+            divpoly[0] = BigInteger.One;
+            BigInteger[] x = new BigInteger[] { BigInteger.Zero };
+            //calculate Klein=j(tau) from its definition
+            //x/(-x+1)==x+1
+            //8x^2/(-x^2+1)==8x^2
+            for (int n = 1; n < psN; n++)
+            {
+                //SortedList<BigInteger, BigInteger> a = new SortedList<BigInteger, BigInteger>();
+                //a.Add(n, new BigInteger(n * n * n)); //a=n^3*x^n
+                //SortedList<BigInteger, BigInteger> b = new SortedList<BigInteger, BigInteger>();
+                //b.Add(0, 1);
+                //b.Add(n, -1);
+                BigInteger[] a = new BigInteger[n + 1];
+                a[0] = new BigInteger(n * n * n); //a=n^3*x^n
+                BigInteger[] b = new BigInteger[n + 1];
+                b[0] = -1;
+                b[n] = 1;
+                BigInteger[] t = mulShiftedPolyRing(a, 0, modInversePolyRing(b, divpoly, GF), 0, psN, GF).Item2;
+                x = addPolyRing(x, t, GF);
+            }
+            x = mulPolyRing(x, new BigInteger[] { 240 }, GF);
+            x[x.Length - 1] += BigInteger.One;
+            x = modexpPolyRing(x, 3, divpoly, GF);
+            BigInteger[] y = reducePoly(getEta(psN), 0, psN).Item2;
+            y = modexpPolyRing(y, 24, divpoly, GF);
+            //R.<x> = PolynomialRing(ZZ)
+            //inverse_mod(252*x^2-24*x+1, x^3)
+            BigInteger[] klein = reducePoly(mulPolyRing(x, modInversePolyRing(y, divpoly, GF), GF), 0, psN).Item2; //new BigInteger[] { 324, 24, 1}
+            //klein = divmodPoly(klein, new BigInteger[] {BigInteger.One, BigInteger.Zero}).Item1; // divide by x
+            int kleindiv = 1; //divide by x but since negative powers just store this denominator
+            psN *= l;
+            divpoly = new BigInteger[psN + 1];
+            divpoly[0] = BigInteger.One;
+            
+            klein = substPowerPoly(klein, l); // divmodPoly(substPowerPoly(klein, l), divpoly).Item2;
+            kleindiv *= l;
+            BigInteger[] z = reducePoly(getEta(psN), 0, psN).Item2;
+            y = reducePoly(substPowerPoly(z, l), 0, psN).Item2;
+            z = reducePoly(mulPolyRing(z, modInversePolyRing(y, divpoly, GF), GF), 0, psN).Item2; //y = 1 / y; z *= y;
+            BigInteger[] flt = modexpPolyRing(z, 2 * s, divpoly, GF);
+            //BigInteger[] xv = new BigInteger[v + 1];
+            //xv[0] = 1;
+            //flt = divmodPoly(flt, xv).Item1; // multiply by x^-v
+            int fltdiv = v;
+            BigInteger w = BigInteger.Pow(l, s);
+            y = reducePoly(substPowerPoly(flt, l), 0, psN).Item2;
+            int ydiv = fltdiv * l;
+            BigInteger[] yinvw = new BigInteger[ydiv + 1];
+            yinvw[0] = w;
+            BigInteger[] zlt = reducePoly(mulPolyRing(yinvw, modInversePolyRing(y, divpoly, GF), GF), 0, psN).Item2;
+            // Calculate Power Sums
+            z = new BigInteger[] { 1 };
+            BigInteger[] f = new BigInteger[] { 1 };
+            int fdiv = 0;
+            BigInteger[][] ps = new BigInteger[l + 1 + 1][];
+            int[] psdiv = new int[l + 1 + 1];
+            ps[0] = new BigInteger[] { l + 1 };
+            for (int i = 1; i <= l + 1; i++)
+            {
+                f = mulPolyRingPow(f, flt, psN, GF);
+                fdiv += fltdiv;
+                z = reducePoly(mulPolyRing(z, zlt, GF), 0, psN).Item2;
+                Tuple<int, BigInteger[]> pswithdiv = phase(f, -fdiv, l, psN);
+                pswithdiv = addShiftedPolyRing(pswithdiv.Item2, pswithdiv.Item1, z, 0, psN, GF);
+                ps[i] = pswithdiv.Item2;
+                psdiv[i] = pswithdiv.Item1;
+            }
+            BigInteger[][] c = new BigInteger[l + 1 + 1][];
+            int[] cdiv = new int[l + 1 + 1];
+            c[0] = new BigInteger[] { BigInteger.One };
+            for (int i = 1; i <= l + 1; i++)
+            {
+                c[i] = new BigInteger[] { BigInteger.Zero };
+                for (int j = 1; j <= i; j++)
+                {
+                    Tuple<int, BigInteger[]> res = mulShiftedPolyRing(ps[j], psdiv[j], c[i - j], cdiv[i - j], psN, GF);
+                    res = addShiftedPolyRing(c[i], cdiv[i], res.Item2, res.Item1, psN, GF);
+                    c[i] = res.Item2;
+                    cdiv[i] = res.Item1;
+                }
+                //c[i] = divmodPoly(mulPolyRing(c[i], new BigInteger[] { -1 }, GF), new BigInteger[] { i }).Item1;
+                //c[i] = mulPolyRing(c[i], new BigInteger[] { -1 }, GF).Select((BigInteger val) => val / i).ToArray();
+                c[i] = mulPolyRing(c[i], new BigInteger[] { -1 }, GF).Select((BigInteger val) => posRemainder(val * modInverse(i, GF), GF)).ToArray();
+            }
+            BigInteger[][] jlt = new BigInteger[v + 1][];
+            int[] jltdiv = new int[v + 1];
+            jlt[0] = new BigInteger[] { BigInteger.One };
+            jlt[1] = klein;
+            jltdiv[1] = kleindiv;
+            for (int i = 2; i <= v; i++)
+            {
+                Tuple<int, BigInteger[]> res = mulShiftedPolyRing(jlt[i - 1], jltdiv[i - 1], klein, kleindiv, psN, GF);
+                jlt[i] = res.Item2;
+                jltdiv[i] = res.Item1;
+            }
+            //x^(l+1) is first term
+            List<List<Tuple<BigInteger, int>>> coeffs = new List<List<Tuple<BigInteger, int>>>();
+            //Console.Write("X^" + (l + 1));
+            coeffs.Add(new List<Tuple<BigInteger, int>>(new Tuple<BigInteger, int>[] { new Tuple<BigInteger, int>(BigInteger.One, 0) }));
+            for (int i = 1; i <= l + 1; i++)
+            {
+                z = c[i];
+                int zdiv = cdiv[i];
+                BigInteger cf;
+                List<Tuple<BigInteger, int>> yvals = new List<Tuple<BigInteger, int>>();
+                //Console.Write("+(");
+                while (zdiv != 0)
+                {
+                    int j = zdiv / l;
+                    cf = z[z.Length - 1];
+                    Tuple<int, BigInteger[]> res = addShiftedPolyRing(z, zdiv, mulPolyRing(jlt[j], new BigInteger[] { -cf }, GF), jltdiv[j], psN, GF);
+                    z = res.Item2;
+                    zdiv = res.Item1;
+                    //Console.Write("+" + cf + "*Y^" + j);
+                    yvals.Add(new Tuple<BigInteger, int>(cf, j));
+                    //(cf*Y^j;
+                }
+                cf = z[z.Length - 1];
+                //+cf)*X^(l+1-i)
+                //Console.Write(" + " + cf + ")*X^" + (l + 1 - i));
+                yvals.Add(new Tuple<BigInteger, int>(cf, 0));
+                coeffs.Add(yvals);
+                if (l <= z.Length - 1 && z[z.Length - 1 - l] != BigInteger.Zero) throw new ArgumentException();
+            }
+            return coeffs; //coeff x^ y^ 
+        }
         static List<List<Tuple<BigInteger, int>>> diffdx(List<List<Tuple<BigInteger, int>>> modPoly)
         {
             List<List<Tuple<BigInteger, int>>> dx = new List<List<Tuple<BigInteger, int>>>();
@@ -4765,7 +4939,9 @@ namespace ELTECSharp
                 BigInteger tl = BigInteger.Zero;
                 if (l <= 9) tl = getSchoofRemainder(Ea, Eb, GF, rng, l, divPolys, f);
                 else {
-                    List<List<Tuple<BigInteger, int>>> modPoly = getModularPoly((int)l);
+                    //List<List<Tuple<BigInteger, int>>> modPoly = getModularPoly((int)l);
+                    //modPoly = modPoly.Select((val) => val.Select((innerval) => new Tuple<BigInteger, int>(posRemainder(innerval.Item1, GF), innerval.Item2)).ToList()).ToList();
+                    List<List<Tuple<BigInteger, int>>> modPoly = getModularPolyGF((int)l, GF);
                     BigInteger[] modPolyJ = new BigInteger[modPoly.Count()];
                     for (int i = 0; i < modPoly.Count(); i++) {
                         BigInteger sum = BigInteger.Zero;
