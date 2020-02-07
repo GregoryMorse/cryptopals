@@ -4062,9 +4062,9 @@ namespace ELTECSharp
             BigInteger[] modinv = modInversePolyRing(denom, divpoly, GF);
             BigInteger[] rx = addPolyRing(new BigInteger[] { BigInteger.One, BigInteger.Zero },
                 modinv == null ? num : divmodPolyRing(mulPolyRing(num, modinv, GF), divpoly, GF).Item2, GF);
-            BigInteger[] ymodinv = modInversePolyRing(ydenom, divpoly, GF);
+            BigInteger[] ymodinv = modInversePolyRing(divmodPolyRing(ydenom, divpoly, GF).Item2, divpoly, GF);
             BigInteger[] ry = ymodinv == null ? ynum : divmodPolyRing(mulPolyRing(ynum, ymodinv, GF), divpoly, GF).Item2; //this likely needs a modInverse to make the y coefficient in the numerator
-            BigInteger[] yinv = modInversePolyRing(mulPolyRing(f, mulPolyRing(x.Item2, new BigInteger[] { 2 }, GF), GF), divpoly, GF); //divide by y
+            BigInteger[] yinv = modInversePolyRing(divmodPolyRing(mulPolyRing(f, mulPolyRing(x.Item2, new BigInteger[] { 2 }, GF), GF), divpoly, GF).Item2, divpoly, GF); //divide by y
             //BigInteger[] yinv = modInversePolyRing(ysub, divpoly, GF); //divide by y
             return new Tuple<BigInteger[], BigInteger[]>(substitutePolyRing(rx, x.Item1, divpoly, GF), divmodPolyRing(mulPolyRing(substitutePolyRing(ry, x.Item1, divpoly, GF), yinv, GF), divpoly, GF).Item2);
         }
@@ -4935,7 +4935,7 @@ namespace ELTECSharp
             BigInteger t = BigInteger.Zero;
             List<BigInteger[]> divPolys = null;
             //https://github.com/miracl/MIRACL/blob/master/source/curve/sea.cpp
-            while (prodS <= sqrtp4) { //log2(GF) primes required on average
+            while (prodS <= (sqrtp4 >> 24)) { //log2(GF) primes required on average
                 BigInteger tl = BigInteger.Zero;
                 if (l <= 9) tl = getSchoofRemainder(Ea, Eb, GF, rng, l, divPolys, f);
                 else {
@@ -5173,6 +5173,29 @@ namespace ELTECSharp
                 prodS *= l;
                 t = (a * tl + b * t) % prodS;
                 l = nextPrime(l);
+            }
+            if (prodS <= sqrtp4) {
+                sqrtGF = Sqrt(4 * GF);
+                BigInteger x, y;
+                do {
+                    x = GetRandomBitSize(rng, GetBitSize(GF), GF);
+                    y = TonelliShanks(rng, posRemainder(x * x * x + x * Ea + Eb, GF), GF);
+                } while (y == 0); //all finite points are also generators if prime order of points
+                Tuple<BigInteger, BigInteger> P = new Tuple<BigInteger, BigInteger>(x, y);
+                Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1, Ea, GF);
+                //Tuple<BigInteger, BigInteger> Q1 = addEC(Q, scaleEC(new Tuple<BigInteger, BigInteger>(x, y), sqrtGF, Ea, GF), Ea, GF);
+                //Q1 == scaleEC(new Tuple<BigInteger, BigInteger>(x, y), realT + sqrtGF, Ea, GF); //here is the discrete log
+                //Q == scaleEC(new Tuple<BigInteger, BigInteger>(x, y), realT, Ea, GF);
+                //fullt = t % prodS, fullt = t + m * prodS
+                BigInteger mval = (realT - t) / prodS;
+                //Tuple<BigInteger, BigInteger> Ycalc = addEC(scaleEC(P, t, Ea, GF), scaleEC(P, mval * prodS, Ea, GF), Ea, GF);
+                //Q.Item1 == Ycalc.Item1 && Q.Item2 == Ycalc.Item2;
+                Tuple<BigInteger, BigInteger> GprimeEC = scaleEC(P, prodS, Ea, GF);
+                Tuple<BigInteger, BigInteger> YprimeEC = addEC(Q, invertEC(scaleEC(P, t, Ea, GF), GF), Ea, GF);
+                //Tuple<BigInteger, BigInteger> YprimeECcalc = scaleEC(GprimeEC, mval, Ea, GF);
+                //YprimeECcalc.Item1 == YprimeEC.Item1 && YprimeECcalc.Item2 == YprimeEC.Item2
+                BigInteger Mprime = PollardKangarooEC(0, sqrtp4 / prodS, 13, GprimeEC, Ea, GF, YprimeEC); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
+                t = t + Mprime * prodS;
             }
             //t = BigInteger.Zero;
             return GF + 1 - t;
