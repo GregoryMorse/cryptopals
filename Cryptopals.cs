@@ -3560,6 +3560,10 @@ namespace ELTECSharp
         static Tuple<BigInteger, BigInteger> scaleEC(Tuple<BigInteger, BigInteger> x, BigInteger k, int a, BigInteger GF)
         {
             Tuple<BigInteger, BigInteger> result = new Tuple<BigInteger, BigInteger>(0, 1);
+            if (k < 0) {
+                x = invertEC(x, GF);
+                k = -k;
+            }
             while (k > 0) {
                 if (!k.IsEven) result = addEC(result, x, a, GF);
                 x = addEC(x, x, a, GF);
@@ -5227,22 +5231,35 @@ namespace ELTECSharp
                 List<BigInteger>[] R = new List<BigInteger>[2] { new List<BigInteger>(), new List<BigInteger>() };
                 for (int ct = 0; ct <= 1; ct++) {
                     for (int i = 0; i < tau[ct].Count(); i++) {
-                        R[ct].Add(((tau[ct][i] - t) * modInverse(prodS * m[1 - ct], m[ct])) % m[ct]);
+                        BigInteger r = posRemainder((tau[ct][i] - t) * modInverse(posRemainder(prodS * m[1 - ct], m[ct]), m[ct]), m[ct]);
+                        if (ct == 0 && r > (m[0] >> 1)) r -= m[0];
+                        if (ct == 1 && r > (m[1] >> 1)) r -= m[1]; //this should not be necessary though since r[0] already scaled
+                        R[ct].Add(r);
                     }
                 }
                 Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1 - t, Ea, GF);
-                List<Tuple<BigInteger, BigInteger>> Q1 = new List<Tuple<BigInteger, BigInteger>>();
+                Tuple<BigInteger, BigInteger> PMe = scaleEC(P, prodS, Ea, GF);
+                Tuple <BigInteger, BigInteger> Pm0 = scaleEC(PMe, m[0], Ea, GF), Pm1 = scaleEC(PMe, m[1], Ea, GF);
+                //List<Tuple<BigInteger, BigInteger>> Q1 = new List<Tuple<BigInteger, BigInteger>>();
+                SortedList<BigInteger, Tuple<Tuple<BigInteger, BigInteger>, int>> Q1 = new SortedList<BigInteger, Tuple<Tuple<BigInteger, BigInteger>, int>>();
                 for (int i = 0; i < R[0].Count(); i++) {
-                    Q1.Add(addEC(Q, invertEC(scaleEC(P, R[0][i] * m[1] * prodS, Ea, GF), GF), Ea, GF));
+                    Tuple<BigInteger, BigInteger> Q1pt = addEC(Q, invertEC(scaleEC(Pm1, R[0][i], Ea, GF), GF), Ea, GF);
+                    //Q1.Add(Q1pt);
+                    Q1.Add(Q1pt.Item1, new Tuple<Tuple<BigInteger, BigInteger>, int>(Q1pt, i));
                 }
                 BigInteger r1 = 0, r2 = 0;
                 for (int i = 0; i < R[1].Count(); i++) {
-                    Tuple<BigInteger, BigInteger> Q2 = scaleEC(P, R[1][i] * m[0] * prodS, Ea, GF);
-                    if (Q1.Any((val) => val.Item1 == Q2.Item1)) {
-                        r1 = R[0][Q1.Select((val, idx) => new Tuple<Tuple<BigInteger, BigInteger>, int>(val, idx)).First((val) => val.Item1.Item1 == Q2.Item1).Item2]; r2 = R[1][i];
+                    Tuple<BigInteger, BigInteger> Q2 = scaleEC(Pm0, R[1][i], Ea, GF);
+                    //if (Q1.Any((val) => val.Item1 == Q2.Item1)) {
+                    if (Q1.ContainsKey(Q2.Item1)) {
+                        //r1 = R[0][Q1.Select((val, idx) => new Tuple<Tuple<BigInteger, BigInteger>, int>(val, idx)).First((val) => val.Item1.Item1 == Q2.Item1).Item2];
+                        r1 = R[0][Q1[Q2.Item1].Item2];
+                        r2 = R[1][i];                        
+                        break;
                     }
                 }
                 t = t + prodS * (r1 * m[1] + r2 * m[0]);
+                prodS *= m[0] * m[1];
                 /*BigInteger totalCombs = 1; //naive CRT combination method
                 for (int i = 0; i < Ap.Count(); i++) totalCombs *= Ap[i].Item1.Count();
                 for (BigInteger i = 0; i < totalCombs; i++) {
