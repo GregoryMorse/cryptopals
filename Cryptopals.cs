@@ -4920,7 +4920,7 @@ namespace ELTECSharp
             }
             
         }
-        static BigInteger SchoofElkiesAtkins(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, BigInteger ExpectedBase)
+        static BigInteger SchoofElkiesAtkin(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, BigInteger ExpectedBase)
         {
             BigInteger realT = GF + 1 - ExpectedBase;
             BigInteger delta = -16 * (4 * new BigInteger(Ea) * Ea * Ea + 27 * new BigInteger(Eb) * Eb);
@@ -6268,7 +6268,7 @@ namespace ELTECSharp
             //BPOrd*(Gx, Gy) = (0, 1)
             //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
             //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
-            Ord = SchoofElkiesAtkins(Ea, Eb, GF, rng, Ord);
+            //Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
             //Ord = Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
@@ -6285,6 +6285,9 @@ namespace ELTECSharp
             //Ords[1] = Schoof(Ea, PickGys[1], GF, rng, Ords[1]);
             //Ords[2] = Schoof(Ea, PickGys[2], GF, rng, Ords[2]);
             //Ords[3] = Schoof(Ea, PickGys[3], GF, rng, Ords[3]);
+            Ords[1] = SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, Ords[1]);
+            //Ords[2] = SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, Ords[2]);
+            Ords[3] = SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, Ords[3]);
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
