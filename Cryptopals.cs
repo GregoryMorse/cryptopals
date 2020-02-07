@@ -5186,8 +5186,64 @@ namespace ELTECSharp
                     y = TonelliShanks(rng, posRemainder(x * x * x + x * Ea + Eb, GF), GF);
                 } while (y == 0); //all finite points are also generators if prime order of points
                 Tuple<BigInteger, BigInteger> P = new Tuple<BigInteger, BigInteger>(x, y);
-                Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1, Ea, GF);
-                BigInteger totalCombs = 1; //naive CRT combination method
+                //Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1, Ea, GF);
+
+                List<Tuple<List<BigInteger>, BigInteger>> A1 = new List<Tuple<List<BigInteger>, BigInteger>>(), 
+                    A2 = new List<Tuple<List<BigInteger>, BigInteger>>();
+                int n1 = 1, n2 = 1; //partition into 2 sets
+                for (int i = 0; i < Ap.Count; i++) {
+                    if (n1 <= n2) {
+                        A1.Add(Ap[i]);
+                        n1 += Ap[i].Item1.Count();
+                    } else {
+                        A2.Add(Ap[i]);
+                        n2 += Ap[i].Item1.Count();
+                    }
+                }
+                List<BigInteger>[] tau = new List<BigInteger>[2] { new List<BigInteger>(), new List<BigInteger>() };
+                BigInteger[] m = new BigInteger[2] { 1, 1 };
+                for (int ct = 0; ct <= 1; ct++) { //generate CRT combinations of both sets
+                    List<Tuple<List<BigInteger>, BigInteger>> Acur = ct == 0 ? A1 : A2;
+                    BigInteger totalCombs = 1;
+                    for (int i = 0; i < Acur.Count(); i++) totalCombs *= Acur[i].Item1.Count();
+                    for (BigInteger i = 0; i < totalCombs; i++)
+                    {
+                        BigInteger tryT = BigInteger.Zero;
+                        BigInteger tryProdS = BigInteger.One;
+                        int j;
+                        BigInteger itmp = i;
+                        for (j = 0; j < Acur.Count(); j++)
+                        {
+                            BigInteger a = tryProdS * modInverse(tryProdS, Acur[j].Item2);
+                            BigInteger b = Acur[j].Item2 * modInverse(Acur[j].Item2, tryProdS);
+                            tryProdS *= Acur[j].Item2;
+                            tryT = (a * Acur[j].Item1[(int)(itmp % Acur[j].Item1.Count())] + b * tryT) % tryProdS;
+                            itmp /= Acur[j].Item1.Count();
+                        }
+                        tau[ct].Add(tryT);
+                        if (i == 0) m[ct] = tryProdS;
+                    }
+                }
+                List<BigInteger>[] R = new List<BigInteger>[2] { new List<BigInteger>(), new List<BigInteger>() };
+                for (int ct = 0; ct <= 1; ct++) {
+                    for (int i = 0; i < tau[ct].Count(); i++) {
+                        R[ct].Add(((tau[ct][i] - t) * modInverse(prodS * m[1 - ct], m[ct])) % m[ct]);
+                    }
+                }
+                Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1 - t, Ea, GF);
+                List<Tuple<BigInteger, BigInteger>> Q1 = new List<Tuple<BigInteger, BigInteger>>();
+                for (int i = 0; i < R[0].Count(); i++) {
+                    Q1.Add(addEC(Q, invertEC(scaleEC(P, R[0][i] * m[1] * prodS, Ea, GF), GF), Ea, GF));
+                }
+                BigInteger r1 = 0, r2 = 0;
+                for (int i = 0; i < R[1].Count(); i++) {
+                    Tuple<BigInteger, BigInteger> Q2 = scaleEC(P, R[1][i] * m[0] * prodS, Ea, GF);
+                    if (Q1.Any((val) => val.Item1 == Q2.Item1)) {
+                        r1 = R[0][Q1.Select((val, idx) => new Tuple<Tuple<BigInteger, BigInteger>, int>(val, idx)).First((val) => val.Item1.Item1 == Q2.Item1).Item2]; r2 = R[1][i];
+                    }
+                }
+                t = t + prodS * (r1 * m[1] + r2 * m[0]);
+                /*BigInteger totalCombs = 1; //naive CRT combination method
                 for (int i = 0; i < Ap.Count(); i++) totalCombs *= Ap[i].Item1.Count();
                 for (BigInteger i = 0; i < totalCombs; i++) {
                     BigInteger tryT = t;
@@ -5206,7 +5262,7 @@ namespace ELTECSharp
                         prodS = tryProdS;
                         break;
                     }
-                }
+                }*/
             }
             if (prodS <= sqrtp4) {
                 //sqrtGF = Sqrt(4 * GF);
