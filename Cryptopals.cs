@@ -4927,15 +4927,17 @@ namespace ELTECSharp
             //getPrimes(1024);
             BigInteger M = BigInteger.One, l = 2;
             BigInteger prodS = BigInteger.One;
+            BigInteger prodA = BigInteger.One;
             BigInteger[] f = new BigInteger[] { 1, 0, Ea, Eb }; //Eb, Ea, 0, 1
             //modular polynomials are needed first
             //https://github.com/miracl/MIRACL/blob/master/source/curve/mueller.cpp
             List<Tuple<List<BigInteger>, BigInteger>> Ap = new List<Tuple<List<BigInteger>, BigInteger>>();
-            List<Tuple<BigInteger, BigInteger>> Ep = new List<Tuple<BigInteger, BigInteger>>();
+            //List<Tuple<BigInteger, BigInteger>> Ep = new List<Tuple<BigInteger, BigInteger>>();
             BigInteger t = BigInteger.Zero;
             List<BigInteger[]> divPolys = null;
             //https://github.com/miracl/MIRACL/blob/master/source/curve/sea.cpp
-            while (prodS <= (sqrtp4 >> 24)) { //log2(GF) primes required on average
+            //while (prodS <= (sqrtp4 >> 24)) { //log2(GF) primes required on average
+            while (prodA * prodS <= sqrtp4) {
                 BigInteger tl = BigInteger.Zero;
                 if (l <= 9) tl = getSchoofRemainder(Ea, Eb, GF, rng, l, divPolys, f);
                 else {
@@ -5029,8 +5031,8 @@ namespace ELTECSharp
                             } else if (TonelliShanks(rng, tau, l) != 0) {
                                 tau = TonelliShanks(rng, tau, l);
                                 tau = posRemainder(2 * tau, l);
-                                T.Add(posRemainder(GF + 1 + tau, l));
-                                T.Add(posRemainder(GF + 1 - tau, l));
+                                T.Add(posRemainder(tau, l));
+                                T.Add(posRemainder(-tau, l));
                                 if (T.Count() == rphi) { //total will always be rphi at end
                                     break;
                                 }
@@ -5038,6 +5040,8 @@ namespace ELTECSharp
                         }
                         if (T.Count() != 1) {
                             //can save T for match sort algorithm...
+                            Ap.Add(new Tuple<List<BigInteger>, BigInteger>(T, l));
+                            prodA *= l;
                             l = nextPrime(l); continue;
                         } else tl = T[0];
                     } else {
@@ -5174,8 +5178,38 @@ namespace ELTECSharp
                 t = (a * tl + b * t) % prodS;
                 l = nextPrime(l);
             }
+            if (Ap.Count() != 0) {
+                BigInteger x, y;
+                do
+                {
+                    x = GetRandomBitSize(rng, GetBitSize(GF), GF);
+                    y = TonelliShanks(rng, posRemainder(x * x * x + x * Ea + Eb, GF), GF);
+                } while (y == 0); //all finite points are also generators if prime order of points
+                Tuple<BigInteger, BigInteger> P = new Tuple<BigInteger, BigInteger>(x, y);
+                Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1, Ea, GF);
+                BigInteger totalCombs = 1; //naive CRT combination method
+                for (int i = 0; i < Ap.Count(); i++) totalCombs *= Ap[i].Item1.Count();
+                for (BigInteger i = 0; i < totalCombs; i++) {
+                    BigInteger tryT = t;
+                    BigInteger tryProdS = prodS;
+                    int j;
+                    BigInteger itmp = i;
+                    for (j = 0; j < Ap.Count(); j++) {
+                        BigInteger a = tryProdS * modInverse(tryProdS, Ap[j].Item2);
+                        BigInteger b = Ap[j].Item2 * modInverse(Ap[j].Item2, tryProdS);
+                        tryProdS *= Ap[j].Item2;
+                        tryT = (a * Ap[j].Item1[(int)(itmp % Ap[j].Item1.Count())] + b * tryT) % tryProdS;
+                        itmp /= Ap[j].Item1.Count();
+                    }
+                    if (Q.Item1 == scaleEC(P, tryT, Ea, GF).Item1 && Q.Item2 == scaleEC(P, tryT, Ea, GF).Item2) {
+                        t = tryT;
+                        prodS = tryProdS;
+                        break;
+                    }
+                }
+            }
             if (prodS <= sqrtp4) {
-                sqrtGF = Sqrt(4 * GF);
+                //sqrtGF = Sqrt(4 * GF);
                 BigInteger x, y;
                 do {
                     x = GetRandomBitSize(rng, GetBitSize(GF), GF);
@@ -5184,8 +5218,8 @@ namespace ELTECSharp
                 Tuple<BigInteger, BigInteger> P = new Tuple<BigInteger, BigInteger>(x, y);
                 Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1, Ea, GF);
                 //Tuple<BigInteger, BigInteger> Q1 = addEC(Q, scaleEC(new Tuple<BigInteger, BigInteger>(x, y), sqrtGF, Ea, GF), Ea, GF);
-                //Q1 == scaleEC(new Tuple<BigInteger, BigInteger>(x, y), realT + sqrtGF, Ea, GF); //here is the discrete log
-                //Q == scaleEC(new Tuple<BigInteger, BigInteger>(x, y), realT, Ea, GF);
+                //Q1 == scaleEC(P, realT + sqrtGF, Ea, GF); //here is the discrete log
+                //Q == scaleEC(P, realT, Ea, GF);
                 //fullt = t % prodS, fullt = t + m * prodS
                 BigInteger mval = (realT - t) / prodS;
                 //Tuple<BigInteger, BigInteger> Ycalc = addEC(scaleEC(P, t, Ea, GF), scaleEC(P, mval * prodS, Ea, GF), Ea, GF);
