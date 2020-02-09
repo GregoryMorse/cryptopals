@@ -4244,12 +4244,14 @@ namespace ELTECSharp
                 BigInteger a = prodS * modInverse(prodS, l);
                 BigInteger b = l * modInverse(l, prodS);
                 prodS *= l;
-                t = (a * tl + b * t) % prodS;
+                t = posRemainder(a * tl + b * t, prodS);
                 l = nextPrime(l);
             }
             //GetBitSize(GF) == int(Math.Ceiling(BigInteger.Log(GF, 2))); //128-bit field
             //BigInteger t = BigInteger.Zero;
             //chinese remainder theorem (CRT) on ts while |t| < 2*Sqrt(GF)
+            if (t > Sqrt(4 * GF))
+                t -= prodS;
             return GF + 1 - t;
         }
         //Dedekind Eta function (1-x)(1-x^2)(1-x^3)... infinite expansion
@@ -5068,7 +5070,7 @@ namespace ELTECSharp
                         if (gcdres.Length - 1 == 1) { //degree == 1
                             //one square root
                             discrim = 0;
-                            g = -gcdres[gcdres.Length - 1];
+                            g = posRemainder(-gcdres[gcdres.Length - 1], GF);
                         } else { //degree == 2
                             //two square roots
                             discrim = 1;
@@ -5159,7 +5161,8 @@ namespace ELTECSharp
                             divPolys = getDivPolys(divPolys, lambda * 2, Ea, Eb, f, GF);
                             BigInteger k = (l + tau * tau - (4 * l) % l) % l;
                             BigInteger sqrroot = TonelliShanks(rng, k, l); //compute Jacobian the long way
-                            if (sqrroot != 0 && discrim == 0 || sqrroot == 0 && discrim == 1) continue;
+                            if (l == 31 && tau == 10) l = l;
+                            if ((sqrroot != 0 || k % l != 0) && discrim == 0 || sqrroot == 0 && discrim == 1) continue;
                             Tuple<BigInteger[], BigInteger[]> R = scaleECDivPoly(new Tuple<BigInteger[], BigInteger[]>(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger[] { BigInteger.One}), lambda, GF, divPolys, fl, f);
                             if (xprem.SequenceEqual(R.Item1)) {
                                 if (yprem.SequenceEqual(R.Item2)) {
@@ -5179,7 +5182,7 @@ namespace ELTECSharp
                 BigInteger a = prodS * modInverse(prodS, l);
                 BigInteger b = l * modInverse(l, prodS);
                 prodS *= l;
-                t = (a * tl + b * t) % prodS;
+                t = posRemainder(a * tl + b * t, prodS);
                 l = nextPrime(l);
             }
             if (Ap.Count() != 0) {
@@ -5232,9 +5235,10 @@ namespace ELTECSharp
                 for (int ct = 0; ct <= 1; ct++) {
                     for (int i = 0; i < tau[ct].Count(); i++) {
                         BigInteger r = posRemainder((tau[ct][i] - t) * modInverse(posRemainder(prodS * m[1 - ct], m[ct]), m[ct]), m[ct]);
-                        if (ct == 0 && r > (m[0] >> 1)) r -= m[0];
-                        if (ct == 1 && r > (m[1] >> 1)) r -= m[1]; //this should not be necessary though since r[0] already scaled
+                        if (ct == 0 && r > (m[ct] >> 1)) r -= m[ct];
+                        //if (ct == 1 && r > (m[1] >> 1)) r -= m[1]; //this should not be necessary though since r[0] already scaled
                         R[ct].Add(r);
+                        if (ct == 1) R[ct].Add(r - m[ct]); //abs(R[1]) <= m[1] so must try both positive and negative value
                     }
                 }
                 Tuple<BigInteger, BigInteger> Q = scaleEC(P, GF + 1 - t, Ea, GF);
@@ -5251,14 +5255,14 @@ namespace ELTECSharp
                 for (int i = 0; i < R[1].Count(); i++) {
                     Tuple<BigInteger, BigInteger> Q2 = scaleEC(Pm0, R[1][i], Ea, GF);
                     //if (Q1.Any((val) => val.Item1 == Q2.Item1)) {
-                    if (Q1.ContainsKey(Q2.Item1)) {
+                    if (Q1.ContainsKey(Q2.Item1) && Q1[Q2.Item1].Item1.Item2 == Q2.Item2) {
                         //r1 = R[0][Q1.Select((val, idx) => new Tuple<Tuple<BigInteger, BigInteger>, int>(val, idx)).First((val) => val.Item1.Item1 == Q2.Item1).Item2];
                         r1 = R[0][Q1[Q2.Item1].Item2];
                         r2 = R[1][i];                        
                         break;
                     }
                 }
-                t = t + prodS * (r1 * m[1] + r2 * m[0]);
+                t = t + prodS * (r1 * m[1] + r2 * m[0]); //(r1 * m[1] + r2 * m[0]) % (m[0] * m[1]) //but no modulo needed and wrong in fact as already calculated exactly including sign
                 prodS *= m[0] * m[1];
                 /*BigInteger totalCombs = 1; //naive CRT combination method
                 for (int i = 0; i < Ap.Count(); i++) totalCombs *= Ap[i].Item1.Count();
@@ -5304,7 +5308,8 @@ namespace ELTECSharp
                 BigInteger Mprime = PollardKangarooEC(0, sqrtp4 / prodS, 13, GprimeEC, Ea, GF, YprimeEC); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
                 t = t + Mprime * prodS;
             }
-            //t = BigInteger.Zero;
+            if (t > Sqrt(4 * GF)) //atkins case has already solved the sign
+                t -= prodS;
             return GF + 1 - t;
         }
         static Tuple<BigInteger, BigInteger> cswap(BigInteger a, BigInteger b, bool swap)
@@ -6285,7 +6290,7 @@ namespace ELTECSharp
             //Ords[1] = Schoof(Ea, PickGys[1], GF, rng, Ords[1]);
             //Ords[2] = Schoof(Ea, PickGys[2], GF, rng, Ords[2]);
             //Ords[3] = Schoof(Ea, PickGys[3], GF, rng, Ords[3]);
-            Ords[1] = SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, Ords[1]);
+            //Ords[1] = SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, Ords[1]);
             //Ords[2] = SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, Ords[2]);
             Ords[3] = SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, Ords[3]);
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
