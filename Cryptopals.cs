@@ -3710,6 +3710,111 @@ namespace ELTECSharp
             //if (res != d) throw new ArgumentException();
             return d;
         }
+        static BigInteger[] dft(BigInteger[] A, int m, int n)
+        {
+            bool even = (m % 2) == 0;
+            int len = A.Length;
+            int v = 1;
+            for (int slen = len >> 1; slen > 0; slen >>= 1) {
+                for (int j = 0; j < len; j += (slen << 1)) {
+                    int idx = j;
+                    int x = BitConverter.ToInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * 0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v);
+                    if (even) x >>= 1;
+                    for (int k = slen - 1; k >= 0; k--) {
+                        BigInteger d = A[idx + slen] <<= x;
+                        A[idx + slen] = A[idx];
+                        A[idx] += d;
+                        A[idx + slen] -= d;
+                        idx++;
+                    }
+                }
+                v++;
+            }
+            return A;
+        }
+        static BigInteger[] idft(BigInteger[] A, int m, int n)
+        {
+            bool even = (m % 2) == 0;
+            int len = A.Length;
+            int v = n - 1;
+            for (int slen = 1; slen <= (len >> 1); slen <<= 1) {
+                for (int j = 0; j < len; j += (slen << 1)) {
+                    int idx = j;
+                    int idx2 = idx + slen;
+                    int x = BitConverter.ToInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * 0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v);
+                    x += (1 << (n - v - (even ? 0 : 1))) + 1;
+                    for (int k = slen-1; k >= 0; k--) {
+                        BigInteger c = A[idx];
+                        A[idx] += A[idx2];
+                        A[idx] = A[idx] >> 1;
+                        c -= A[idx2];
+                        A[idx2] = c >> x;
+                        idx++; idx2++;
+                    }
+                }
+                v--;
+            }
+            return A;
+        }
+        //https://github.com/tbuktu/ntru/blob/master/src/main/java/net/sf/ntru/arith/SchönhageStrassen.java
+        static BigInteger mulSchonhageStrassen(BigInteger num1, BigInteger num2)
+        {
+            int num1bits = GetBitSize(num1), num2bits = GetBitSize(num2);
+            int M = Math.Max(num1bits, num2bits);
+            int m = GetBitSize(M << 1); //smallest m >= log2(2*M)
+            int n = m / 2 + 1;
+            bool even = (m % 2) == 0;
+            int numPieces = 1 << (even ? n : (n + 1));
+            //int pieceSize = 1 << (n - 1);
+            //int numPiecesA = (num1bits + pieceSize) / pieceSize;
+            //int numPiecesB = (num2bits + pieceSize) / pieceSize;
+            BigInteger u = 0;// = new BigInteger[(numPiecesA * (3 * n + 5))];
+            BigInteger v = 0;// = new BigInteger[(numPiecesA * (3 * n + 5))];
+            int bitLength = numPieces * (3 * n + 5);
+            for (int i = 0; i < numPieces; i++) {
+                u = 0;
+                v = 0;
+            }
+            BigInteger gamma = u * v;
+            int halfNumPcs = numPieces / 2;
+            BigInteger[] gammai = new BigInteger[numPieces];
+            BigInteger[] zi = new BigInteger[numPieces];
+            Array.Copy(gammai, 0, zi, 0, numPieces);
+            for (int i = 0; i < gammai.Length - halfNumPcs; i++)
+                zi[i] -= gammai[i + halfNumPcs];
+            for (int i = 0; i < gammai.Length - (halfNumPcs << 1); i++)
+                zi[i] += gammai[i + (halfNumPcs << 1)];
+            for (int i = 0; i < gammai.Length - 3 * halfNumPcs; i++)
+                zi[i] -= gammai[i + 3 * halfNumPcs];
+
+            //build u and v from a and b allocating 3n+5 bits in u and v per n+2 bits from a and b respectively
+            BigInteger[] ai = new BigInteger[halfNumPcs], bi = new BigInteger[halfNumPcs];
+            //for (int i = 0; i < halfNumPcs; i++)
+            //ai[i] = num1 & >>
+            //for (int i = 0; i < halfNumPcs; i++)
+            //bi[i] = num2 & >>
+            ai = dft(ai, m, n);
+            //ai - ai;
+            bi = dft(bi, m, n);
+            //bi - bi
+            BigInteger[] c = new BigInteger[halfNumPcs];
+            for (int i = 0; i < halfNumPcs; i++)
+                c[i] = ai[i] * bi[i];
+            c = idft(c, m, n);
+            //c - c
+            BigInteger z = 0;
+            for (int i = 0; i < halfNumPcs; i++) {
+                BigInteger eta = i >= numPieces ? 0 : zi[i];
+                eta -= c[i];
+                int shift = i * (1 << (n - 1));
+                z += (c[i] << shift);
+                z += (eta << shift);
+                z += (eta << (shift + (1 << (n - 1))));
+            }
+            //z - z
+            return z;
+
+        }
         static BigInteger mulKaratsuba(BigInteger num1, BigInteger num2)
         {
             return doMulKaratsuba(num1, num2, GetBitSize(num1), GetBitSize(num2));
