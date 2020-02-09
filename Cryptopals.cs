@@ -4191,7 +4191,7 @@ namespace ELTECSharp
                       //if (BigInteger.ModPow(GF, (l - 1) / 2, l) == -1) tl = 0;
                       //if (pl != BigInteger.Zero && BigInteger.GreatestCommonDivisor(GF, l) != BigInteger.One) tl = 0;
                         BigInteger w = TonelliShanks(rng, posRemainder(GF, l), l); //since we need result anyway might as well compute unless non-residue very common and much faster other methods
-                        if (w == BigInteger.Zero) tl = 0; //no square root, or one square root if posRemainder(GF, l) == 0
+                        if (w == BigInteger.Zero) tl = 0; //no square root, or one square root if posRemainder(GF, l) == 0 but zero either way...
                         else
                         {
                             //posRemainder(GF, l) != 0 //so there are 2 square roots
@@ -4987,7 +4987,7 @@ namespace ELTECSharp
                             BigInteger[] C = null;
                             if (posRemainder(l + 1, r) != 0) continue;
                             BigInteger jj = (l + 1) / r;
-                            if ((jj & 1) == 0 && v == 0) continue;
+                            if ((jj & 1) == 0 && (v == 0 && (k % l) != 0)) continue;
                             if ((jj & 1) == 1 && v != 0) continue;
                             BigInteger kk = r, m = 0;
                             bool first = true;
@@ -5007,7 +5007,7 @@ namespace ELTECSharp
                             if (C.SequenceEqual(new BigInteger[] { 1, 0 })) break;
                         }
                         BigInteger qnr = 2;
-                        while (TonelliShanks(rng, qnr, l) != 0) qnr++;
+                        while (TonelliShanks(rng, qnr, l) != 0 || (qnr % l) == 0) qnr++;
                         BigInteger ord = l * l - 1;
                         //find generator of F(l^2)
                         BigInteger gx, gy = 1;
@@ -5159,10 +5159,9 @@ namespace ELTECSharp
                         for (BigInteger lambda = BigInteger.One; lambda <= (l - 1) / 2; lambda++) {
                             BigInteger tau = (lambda + modInverse(lambda, l) * GF) % l;
                             divPolys = getDivPolys(divPolys, lambda * 2, Ea, Eb, f, GF);
-                            BigInteger k = (l + tau * tau - (4 * l) % l) % l;
+                            BigInteger k = (l + tau * tau - (4 * GF) % l) % l;
                             BigInteger sqrroot = TonelliShanks(rng, k, l); //compute Jacobian the long way
-                            if (l == 31 && tau == 10) l = l;
-                            if ((sqrroot != 0 || k % l != 0) && discrim == 0 || sqrroot == 0 && discrim == 1) continue;
+                            if ((sqrroot != 0 || (k % l) != 0) && discrim == 0 || sqrroot == 0 && discrim == 1) continue;
                             Tuple<BigInteger[], BigInteger[]> R = scaleECDivPoly(new Tuple<BigInteger[], BigInteger[]>(new BigInteger[] { BigInteger.One, BigInteger.Zero }, new BigInteger[] { BigInteger.One}), lambda, GF, divPolys, fl, f);
                             if (xprem.SequenceEqual(R.Item1)) {
                                 if (yprem.SequenceEqual(R.Item2)) {
@@ -6273,7 +6272,7 @@ namespace ELTECSharp
             //BPOrd*(Gx, Gy) = (0, 1)
             //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
             //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
-            //Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
+            Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
             //Ord = Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
