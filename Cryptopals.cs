@@ -3712,19 +3712,27 @@ namespace ELTECSharp
         }
         static BigInteger[] dft(BigInteger[] A, int m, int n)
         {
-            bool even = (m % 2) == 0;
+            bool even = (m & 1) == 0;
             int len = A.Length;
             int v = 1;
+            int twoton = 1 << n;
+            int twotonp1 = 1 << (n + 1);
+            BigInteger testMask = BigInteger.One << twotonp1;
+            BigInteger testMaskm1 = testMask - 1;
+            BigInteger subMask = (BigInteger.One << twoton) - 1;
             for (int slen = len >> 1; slen > 0; slen >>= 1) {
                 for (int j = 0; j < len; j += (slen << 1)) {
                     int idx = j;
-                    int x = BitConverter.ToInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * 0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v);
+                    int x = (int)((BitConverter.ToUInt32(BitConverter.GetBytes(idx+len).Select((b) => (byte)(((b * (UInt64)0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v)) >> (32 - 1 - n));
                     if (even) x >>= 1;
+                    BigInteger xmask = (BigInteger.One << (twotonp1 - x)) - 1;
                     for (int k = slen - 1; k >= 0; k--) {
-                        BigInteger d = A[idx + slen] <<= x;
+                        BigInteger d = ((A[idx + slen] & xmask) << x) | (A[idx + slen] >> (twotonp1 - x));
                         A[idx + slen] = A[idx];
                         A[idx] += d;
-                        A[idx + slen] -= d;
+                        if ((A[idx] & testMask) != 0) A[idx] = (A[idx] & testMaskm1) + 1;
+                        A[idx + slen] += ((d & subMask) << twoton) | (d >> twoton);
+                        if ((A[idx + slen] & testMask) != 0) A[idx + slen] = (A[idx + slen] & testMaskm1) + 1;
                         idx++;
                     }
                 }
@@ -3734,21 +3742,29 @@ namespace ELTECSharp
         }
         static BigInteger[] idft(BigInteger[] A, int m, int n)
         {
-            bool even = (m % 2) == 0;
+            bool even = (m & 1) == 0;
             int len = A.Length;
             int v = n - 1;
+            int twoton = 1 << n;
+            int twotonp1 = 1 << (n + 1);
+            BigInteger testMask = BigInteger.One << twotonp1;
+            BigInteger testMaskm1 = testMask - 1;
+            BigInteger subMask = (BigInteger.One << twoton) - 1;
             for (int slen = 1; slen <= (len >> 1); slen <<= 1) {
                 for (int j = 0; j < len; j += (slen << 1)) {
                     int idx = j;
                     int idx2 = idx + slen;
-                    int x = BitConverter.ToInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * 0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v);
+                    int x = (int)((BitConverter.ToUInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * (UInt64)0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v)) >> (32 - n));
                     x += (1 << (n - v - (even ? 0 : 1))) + 1;
+                    BigInteger xmask = (BigInteger.One << x) - 1;
                     for (int k = slen-1; k >= 0; k--) {
                         BigInteger c = A[idx];
                         A[idx] += A[idx2];
-                        A[idx] = A[idx] >> 1;
-                        c -= A[idx2];
-                        A[idx2] = c >> x;
+                        if ((A[idx] & testMask) != 0) A[idx] = (A[idx] & testMaskm1) + 1;
+                        A[idx] = (A[idx] >> 1) | ((A[idx] & 1) << (twotonp1 - 1));
+                        c += ((A[idx2] & subMask) << twoton) | (A[idx2] >> twoton);
+                        if ((c & testMask) != 0) c = (c & testMaskm1) + 1;
+                        A[idx2] = (c >> x) | ((c & xmask) << (twotonp1 - x));
                         idx++; idx2++;
                     }
                 }
@@ -3757,74 +3773,97 @@ namespace ELTECSharp
             return A;
         }
         //https://github.com/tbuktu/ntru/blob/master/src/main/java/net/sf/ntru/arith/SchönhageStrassen.java
-        static BigInteger mulSchonhageStrassen(BigInteger num1, BigInteger num2)
+        static BigInteger mulSchonhageStrassen(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
         {
-            int num1bits = GetBitSize(num1), num2bits = GetBitSize(num2);
             int M = Math.Max(num1bits, num2bits);
-            int m = GetBitSize(M << 1); //smallest m >= log2(2*M)
-            int n = m / 2 + 1;
-            bool even = (m % 2) == 0;
+            int m = GetBitSize(M) + 1; //smallest m >= log2(2*M) //minimum of at least one bit number
+            //m = (n - 1) << 1; or (6 - 1) << 1 == 10
+            int n = (m >> 1) + 1; //n >= 6 only for this implementation and small sizes would not be useful here anyway
+            bool even = (m & 1) == 0;
             int numPieces = 1 << (even ? n : (n + 1));
-            //int pieceSize = 1 << (n - 1);
-            //int numPiecesA = (num1bits + pieceSize) / pieceSize;
-            //int numPiecesB = (num2bits + pieceSize) / pieceSize;
-            BigInteger u = 0;// = new BigInteger[(numPiecesA * (3 * n + 5))];
-            BigInteger v = 0;// = new BigInteger[(numPiecesA * (3 * n + 5))];
-            int bitLength = numPieces * (3 * n + 5);
-            for (int i = 0; i < numPieces; i++) {
-                u = 0;
-                v = 0;
+            int pieceLog = n - 1 - 5;
+            int pieceSize = 1 << pieceLog;
+            int pieceBits = 1 << (n - 1);
+            int numPiecesA = (num1bits + pieceSize) >> pieceLog;
+            int numPiecesB = (num2bits + pieceSize) >> pieceLog;
+            BigInteger u = 0;
+            BigInteger v = 0;
+            int uBitLength = 0, vBitLength = 0;
+            BigInteger pieceMask = (BigInteger.One << (n + 2)) - 1;
+            int threen5 = 3 * n + 5;
+            for (int i = 0; i < numPiecesA && i << (n - 1) < num1bits; i++) {
+                u |= ((num1 >> (i << (n - 1))) & pieceMask) << uBitLength;
+                uBitLength += threen5;
             }
-            BigInteger gamma = u * v;
-            int halfNumPcs = numPieces / 2;
-            BigInteger[] gammai = new BigInteger[numPieces];
-            BigInteger[] zi = new BigInteger[numPieces];
-            Array.Copy(gammai, 0, zi, 0, numPieces);
+            for (int i = 0; i < numPiecesB && i << (n - 1) < num2bits; i++) {
+                v |= ((num2 >> (i << (n - 1))) & pieceMask) << vBitLength;
+                vBitLength += threen5;
+            }
+            //BigInteger gamma = u * v;
+            BigInteger gamma = doBigMul(u, v, uBitLength, vBitLength);
+            int halfNumPcs = numPieces >> 1;
+            int numPiecesG = (GetBitSize(gamma) + threen5 - 1) / threen5;
+            BigInteger[] gammai = new BigInteger[numPiecesG];
+            BigInteger threen5mask = (BigInteger.One << threen5) - 1;
+            for (int i = 0; i < numPiecesG; i++) {
+                gammai[i] = (gamma >> (i * threen5)) & threen5mask;
+            }
+            BigInteger[] zi = new BigInteger[numPiecesG];
+            Array.Copy(gammai, 0, zi, 0, numPiecesG);
             for (int i = 0; i < gammai.Length - halfNumPcs; i++)
-                zi[i] -= gammai[i + halfNumPcs];
+                zi[i] = (zi[i] - gammai[i + halfNumPcs]) & pieceMask;
             for (int i = 0; i < gammai.Length - (halfNumPcs << 1); i++)
-                zi[i] += gammai[i + (halfNumPcs << 1)];
+                zi[i] = (zi[i] + gammai[i + (halfNumPcs << 1)]) & pieceMask;
             for (int i = 0; i < gammai.Length - 3 * halfNumPcs; i++)
-                zi[i] -= gammai[i + 3 * halfNumPcs];
+                zi[i] = (zi[i] - gammai[i + 3 * halfNumPcs]) & pieceMask;
 
             //build u and v from a and b allocating 3n+5 bits in u and v per n+2 bits from a and b respectively
             BigInteger[] ai = new BigInteger[halfNumPcs], bi = new BigInteger[halfNumPcs];
-            //for (int i = 0; i < halfNumPcs; i++)
-            //ai[i] = num1 & >>
-            //for (int i = 0; i < halfNumPcs; i++)
-            //bi[i] = num2 & >>
+            BigInteger fullPieceMask = (BigInteger.One << pieceBits);// - 1;
+            for (int i = 0; i < halfNumPcs; i++) {
+                ai[i] = (num1 >> (i << (n - 1))) & fullPieceMask;
+                bi[i] = (num2 >> (i << (n - 1))) & fullPieceMask;
+            }
             ai = dft(ai, m, n);
-            //ai - ai;
             bi = dft(bi, m, n);
-            //bi - bi
+            int nbits = 1 << n;
+            BigInteger halfMask = (BigInteger.One << nbits) - 1;
+            BigInteger adjHalf = halfMask + 2; // (BigInteger.One << nbits) + 1;
+            for (int i = 0; i < bi.Length; i++) {
+                ai[i] = (ai[i] & halfMask) - (ai[i] >> nbits);
+                if (ai[i] < 0) ai[i] += adjHalf;
+                bi[i] = (bi[i] & halfMask) - (bi[i] >> nbits);
+                if (bi[i] < 0) bi[i] += adjHalf;
+            }
             BigInteger[] c = new BigInteger[halfNumPcs];
             for (int i = 0; i < halfNumPcs; i++)
-                c[i] = ai[i] * bi[i];
+                c[i] = doBigMul(ai[i] & halfMask, bi[i] & halfMask, nbits, nbits);
+                //c[i] = (ai[i] & halfMask) * (bi[i] & halfMask);
             c = idft(c, m, n);
-            //c - c
+            for (int i = 0; i < c.Length; i++) {
+                c[i] = (c[i] & halfMask) - (c[i] >> nbits);
+                if (c[i] < 0) c[i] += adjHalf;
+            }
             BigInteger z = 0;
             for (int i = 0; i < halfNumPcs; i++) {
-                BigInteger eta = i >= numPieces ? 0 : zi[i];
-                eta -= c[i];
-                int shift = i * (1 << (n - 1));
-                z += (c[i] << shift);
-                z += (eta << shift);
-                z += (eta << (shift + (1 << (n - 1))));
+                BigInteger eta = i >= zi.Length ? 0 : zi[i];
+                if (eta.IsZero && c[i].IsZero) continue;
+                eta = (eta - c[i]) & pieceMask;
+                int shift = i << (n - 1);
+                if (eta.IsZero) z += c[i] << shift;
+                else z += ((c[i] + eta) << shift) + (eta << (shift + nbits));
             }
-            //z - z
+            nbits = 1 << m;
+            halfMask = (BigInteger.One << nbits) - 1;
+            adjHalf = halfMask + 2; //(BigInteger.One << nbits) + 1;
+            z = (z & halfMask) - (z >> nbits);
+            if (z < 0) z += adjHalf;
             return z;
 
         }
-        static BigInteger mulKaratsuba(BigInteger num1, BigInteger num2)
+
+        static BigInteger mulKaratsuba(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
         {
-            return doMulKaratsuba(num1, num2, GetBitSize(num1), GetBitSize(num2));
-        }
-        static BigInteger doMulKaratsuba(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
-        {
-            if (num1 <= uint.MaxValue && num2 <= uint.MaxValue) {
-                return new BigInteger((System.UInt64)num1 * (System.UInt64)num2);
-            }
-            if (num1 <= uint.MaxValue || num2 <= uint.MaxValue) return num1 * num2;
             //if (num1 < 2 || num2 < 2) return num1 * num2;
             while ((BigInteger.One << (num1bits-1)) > num1) num1bits--;
             while ((BigInteger.One << (num2bits-1)) > num2) num2bits--;
@@ -3838,11 +3877,85 @@ namespace ELTECSharp
             low2 = num2 & (m2shift - 1);
             high1 = num1 >> m2;
             high2 = num2 >> m2;
-            BigInteger z0 = doMulKaratsuba(low1, low2, m2, m2);
+            BigInteger z0 = doBigMul(low1, low2, m2, m2);
             BigInteger lowhigh1 = low1 + high1, lowhigh2 = low2 + high2;
-            BigInteger z1 = doMulKaratsuba(lowhigh1, lowhigh2, num1bits - m2 + 1, num2bits - m2 + 1);
-            BigInteger z2 = doMulKaratsuba(high1, high2, num1bits - m2, num2bits - m2);
+            BigInteger z1 = doBigMul(lowhigh1, lowhigh2, num1bits - m2 + 1, num2bits - m2 + 1);
+            BigInteger z2 = doBigMul(high1, high2, num1bits - m2, num2bits - m2);
             return (z2 << (m2 << 1)) + ((z1 - z2 - z0) << m2) + z0;
+        }
+        static void testMul()
+        {
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            System.Diagnostics.Stopwatch s = new System.Diagnostics.Stopwatch();
+            /*for (int n = 10; n < 32; n++) {
+                BigInteger a;
+                do
+                {
+                    a = GetRandomBitSize(rng, 1 << 20, BigInteger.One << (1 << 20));
+                } while (a < 0);
+                BigInteger b;
+                do
+                {
+                    b = GetRandomBitSize(rng, 1 << 20, BigInteger.One << (1 << 20));
+                } while (b < 0);
+                thresh = 1 << n;
+                s.Start();
+                BigInteger ck = bigMul(a, b);
+                s.Stop();
+                Console.WriteLine(n + " - " + s.ElapsedMilliseconds);
+                s.Reset();
+            }*/
+            for (int n = 1 << 21; n < 1 << 24; n+=32768)
+            {
+                BigInteger a;
+                do
+                {
+                    a = GetRandomBitSize(rng, n, BigInteger.One << n);
+                } while (a < 0);
+                BigInteger b;
+                do
+                {
+                    b = GetRandomBitSize(rng, n, BigInteger.One << n);
+                } while (b < 0);
+                /*s.Start();
+                BigInteger c = a * b;
+                s.Stop();
+                Console.WriteLine("BigInteger*:        " + s.ElapsedMilliseconds);
+                s.Reset();*/
+                s.Start();
+                BigInteger ck = bigMul(a, b);
+                s.Stop();
+                Console.WriteLine("BigMul:             " + s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
+                BigInteger cs = mulSchonhageStrassen(a, b, GetBitSize(a), GetBitSize(b));
+                s.Stop();
+                Console.WriteLine("Schonhage-Strassen: " + s.ElapsedMilliseconds);
+                s.Reset();
+                //if (c != ck) throw new ArgumentException();
+                if (ck != cs) throw new ArgumentException();
+            }
+        }
+        //static int thresh;
+        static BigInteger doBigMul(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
+        {
+            if (num1 <= uint.MaxValue && num2 <= uint.MaxValue) {
+                UInt64 res = (UInt64)num1 * (UInt64)num2;
+                return new BigInteger(res);
+            }
+            if (num1 <= uint.MaxValue || num2 <= uint.MaxValue ||
+                num1bits < 4096 && num2bits < 4096) return num1 * num2; //experimentally determined threshold 8192 is next best
+            //if (num1bits >= 1728 * 64 && num2bits >= 1728 * 64)
+                //return mulSchonhageStrassen(num1, num2, num1bits, num2bits);
+            return mulKaratsuba(num1, num2, num1bits, num2bits);
+        }
+        static BigInteger bigMul(BigInteger num1, BigInteger num2)
+        {
+            int signum = num1.Sign * num2.Sign;
+            if (num1.Sign < 0) num1 = -num1;
+            if (num2.Sign < 0) num2 = -num2;
+            BigInteger res = doBigMul(num1, num2, GetBitSize(num1), GetBitSize(num2));
+            return signum < 0 ? -res : res;
         }
         //Kronecker substitution
         //https://en.wikipedia.org/wiki/Kronecker_substitution
@@ -3862,7 +3975,7 @@ namespace ELTECSharp
                 else Bpack |= B[i] << ((blen - i - 1) * packSize);
             }
             //BigInteger Cpack = Apack * Bpack; //should use Schonhage-Strassen here
-            BigInteger Cpack = mulKaratsuba(Apack, Bpack);
+            BigInteger Cpack = bigMul(Apack, Bpack);
             BigInteger[] p = new BigInteger[alen + blen - 1];
             BigInteger packMask = (BigInteger.One << packSize) - 1;
             for (int i = 0; i < alen + blen - 1; i++) {
@@ -7803,6 +7916,7 @@ namespace ELTECSharp
         }
         static void Main(string[] args)
         {
+            testMul();
             //Set1();
             //Set2();
             //Set3();
