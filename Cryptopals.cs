@@ -2595,6 +2595,21 @@ namespace ELTECSharp
             //if (s != GetBitSizeBinSearch(num)) throw new ArgumentException();
             return s;
         }
+        static int GetBitSizeReflection(BigInteger num)
+        {
+            //uint[] bits = (uint[])typeof(BigInteger).GetField("_bits", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
+            uint[] bits = (uint[])typeof(BigInteger).GetProperty("_Bits", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
+            if (bits == null)
+            {
+                //int sign = (int)typeof(BigInteger).GetField("_sign", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
+                int sign = (int)typeof(BigInteger).GetProperty("_Sign", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
+                bits = new uint[] { (uint)(sign < 0 ? sign & int.MaxValue : sign) };
+            }
+            int uintLength = (int)typeof(BigInteger).GetMethod("Length", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(num,
+                new object[] { bits });
+            int topbits = (int)typeof(BigInteger).GetMethod("BitLengthOfUInt", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(num, new object[] { bits[uintLength - 1] });
+            return (uintLength - 1) * sizeof(uint) * 8 + topbits;
+        }
         static int GetBitSize(BigInteger num)
         { //instead of 0, 1, 2, 3, 4... use 0, 1, 3, 7, 15, etc
             int s = 0, t = 1, oldt = 1;
@@ -3574,28 +3589,30 @@ namespace ELTECSharp
         static BigInteger TonelliShanks(RNGCryptoServiceProvider rng, BigInteger n, BigInteger p) //inverse modular square root
         {
             //Console.WriteLine(BigInteger.ModPow(n, (p - 1) / 2, p) == 1); //Euler's criterion must equal one or no square root exists
-            BigInteger S = 0, Q = p - 1;
+            //if ((n % p) == 0) return 0; //single root case if p is prime
+            int S = 0;
+            BigInteger Q = p - 1;
             while (Q.IsEven) {
-                S += 1; Q /= 2;
+                S++; Q >>= 1;
             }
             if (S == 1) {
-                BigInteger r = BigInteger.ModPow(n, (p + 1) / 4, p);
+                BigInteger r = BigInteger.ModPow(n, (p + 1) >> 2, p);
                 return BigInteger.Remainder(r * r, p) == n ? r : 0;
             }
             BigInteger z;
-            do { z = Crypto.GetNextRandomBig(rng, p); } while (z <= 1 || BigInteger.ModPow(z, (p - 1) / 2, p) != p - 1); //Euler's criterion for quadratic non-residue (== -1)
-            BigInteger M = S, c = BigInteger.ModPow(z, Q, p), t = BigInteger.ModPow(n, Q, p), R = BigInteger.ModPow(n, (Q + 1) / 2, p);
+            do { z = Crypto.GetNextRandomBig(rng, p); } while (z <= 1 || BigInteger.ModPow(z, (p - 1) >> 1, p) != p - 1); //Euler's criterion for quadratic non-residue (== -1)
+            int M = S;
+            BigInteger c = BigInteger.ModPow(z, Q, p), t = BigInteger.ModPow(n, Q, p), R = BigInteger.ModPow(n, (Q + 1) >> 1, p);
             while (true) {
-                if (t == 0) return 0;
+                if (t == 0 || M == 0) return 0;
                 if (t == 1) return R;
-                BigInteger i = 0, tt = t;
-                if (M == 0) return 0;
+                int i = 0; BigInteger tt = t;
                 do {
                     i++;
                     tt = BigInteger.Remainder(tt * tt, p);
                 } while (i < M && tt != 1);
                 if (i == M) return 0; //no solution to the congruence exists
-                BigInteger b = BigInteger.ModPow(c, BigInteger.ModPow(2, (int)M - (int)i - 1, p - 1), p);
+                BigInteger b = BigInteger.ModPow(c, BigInteger.ModPow(2, M - i - 1, p - 1), p);
                 M = i; c = BigInteger.Remainder(b * b, p); t = BigInteger.Remainder(t * c, p); R = BigInteger.Remainder(R * b, p);
             }
         }
@@ -3636,7 +3653,7 @@ namespace ELTECSharp
         }
         static int[] getPrimes(int n) //sieve of Eratosthenes
         {
-            bool[] A = new bool[(int)n - 2+1];
+            bool[] A = new bool[n - 2+1];
             int mx = (int)Sqrt(new BigInteger(n));
             for (int i = 2; i <= mx; i++) {
                 if (!A[i - 2]) {
@@ -3791,6 +3808,7 @@ namespace ELTECSharp
             int uBitLength = 0, vBitLength = 0;
             BigInteger pieceMask = (BigInteger.One << (n + 2)) - 1;
             int threen5 = 3 * n + 5;
+            //build u and v from a and b allocating 3n+5 bits in u and v per n+2 bits from a and b respectively
             for (int i = 0; i < numPiecesA && i << (n - 1) < num1bits; i++) {
                 u |= ((num1 >> (i << (n - 1))) & pieceMask) << uBitLength;
                 uBitLength += threen5;
@@ -3817,9 +3835,8 @@ namespace ELTECSharp
             for (int i = 0; i < gammai.Length - 3 * halfNumPcs; i++)
                 zi[i] = (zi[i] - gammai[i + 3 * halfNumPcs]) & pieceMask;
 
-            //build u and v from a and b allocating 3n+5 bits in u and v per n+2 bits from a and b respectively
             BigInteger[] ai = new BigInteger[halfNumPcs], bi = new BigInteger[halfNumPcs];
-            BigInteger fullPieceMask = (BigInteger.One << pieceBits);// - 1;
+            BigInteger fullPieceMask = (BigInteger.One << pieceBits) - 1;
             for (int i = 0; i < halfNumPcs; i++) {
                 ai[i] = (num1 >> (i << (n - 1))) & fullPieceMask;
                 bi[i] = (num2 >> (i << (n - 1))) & fullPieceMask;
@@ -3944,7 +3961,7 @@ namespace ELTECSharp
                 return new BigInteger(res);
             }
             if (num1 <= uint.MaxValue || num2 <= uint.MaxValue ||
-                num1bits < 4096 && num2bits < 4096) return num1 * num2; //experimentally determined threshold 8192 is next best
+                num1bits < 4096 || num2bits < 4096) return num1 * num2; //experimentally determined threshold 8192 is next best
             //if (num1bits >= 1728 * 64 && num2bits >= 1728 * 64)
                 //return mulSchonhageStrassen(num1, num2, num1bits, num2bits);
             return mulKaratsuba(num1, num2, num1bits, num2bits);
@@ -3975,7 +3992,7 @@ namespace ELTECSharp
                 else Bpack |= B[i] << ((blen - i - 1) * packSize);
             }
             //BigInteger Cpack = Apack * Bpack; //should use Schonhage-Strassen here
-            BigInteger Cpack = bigMul(Apack, Bpack);
+            BigInteger Cpack = doBigMul(Apack, Bpack, packSize * alen, packSize * blen);
             BigInteger[] p = new BigInteger[alen + blen - 1];
             BigInteger packMask = (BigInteger.One << packSize) - 1;
             for (int i = 0; i < alen + blen - 1; i++) {
@@ -3986,6 +4003,7 @@ namespace ELTECSharp
         static BigInteger[] mulPolyRing(BigInteger[] A, BigInteger[] B, BigInteger GF)
         {
             int alen = A.Length, blen = B.Length;
+            //if (GetBitSize(GF) * Math.Min(alen, blen) > 16384) return mulPolyRingKronecker(A, B, GF);
             if (alen == 0) return A; if (blen == 0) return B;
             BigInteger[] p = new BigInteger[alen + blen - 1];
             for (int i = 0; i < blen; i++) {
@@ -4268,12 +4286,12 @@ namespace ELTECSharp
             }
             return result;
         }
-        static Tuple<BigInteger[], BigInteger[]> scaleECDivPoly(Tuple<BigInteger[], BigInteger[]> x, BigInteger k, BigInteger GF, List<BigInteger[]> divpolys, BigInteger[] divpoly, BigInteger[] f)
+        static Tuple<BigInteger[], BigInteger[]> scaleECDivPoly(Tuple<BigInteger[], BigInteger[]> x, int k, BigInteger GF, List<BigInteger[]> divpolys, BigInteger[] divpoly, BigInteger[] f)
         {
             BigInteger[] ysub = mulPolyRing(f, new BigInteger[] { 4 }, GF); //2*y or 4*y^2 really
-            BigInteger[] num = mulPolyRing(mulPolyRing(divpolys[(int)k + 1], divpolys[(int)k - 1], GF), new BigInteger[] { -1 }, GF);
-            BigInteger[] ynum = divpolys[2 * (int)k]; //this is even so need to divide out a y...
-            BigInteger[] denom = mulPolyRing(divpolys[(int)k], divpolys[(int)k], GF);
+            BigInteger[] num = mulPolyRing(mulPolyRing(divpolys[k + 1], divpolys[k - 1], GF), new BigInteger[] { -1 }, GF);
+            BigInteger[] ynum = divpolys[2 * k]; //this is even so need to divide out a y...
+            BigInteger[] denom = mulPolyRing(divpolys[k], divpolys[k], GF);
             BigInteger[] ydenom = mulPolyRing(mulPolyRing(denom, denom, GF), new BigInteger[] { 2 }, GF);
             if ((k & 1) != 0) {
                 num = divmodPolyRing(num, ysub, GF).Item1;
@@ -4317,11 +4335,11 @@ namespace ELTECSharp
             }
             return divPolys;
         }
-        static BigInteger getSchoofRemainder(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, BigInteger l, List<BigInteger[]> divPolys, BigInteger[] f)
+        static BigInteger getSchoofRemainder(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, int l, List<BigInteger[]> divPolys, BigInteger[] f)
         {
             divPolys = getDivPolys(divPolys, l * 2, Ea, Eb, f, GF); //l * 2 required for fast variant of point multiplication algorithm
             BigInteger tl = BigInteger.Zero;
-            BigInteger[] divpoly = divPolys[(int)l]; //even ones need to be divided by 2*y
+            BigInteger[] divpoly = divPolys[l]; //even ones need to be divided by 2*y
             if (l == 2)
             {
                 SortedList<BigInteger, BigInteger> xp = new SortedList<BigInteger, BigInteger>();
@@ -4408,7 +4426,7 @@ namespace ELTECSharp
                       //but easier to just use Legendre symbol is -1 and prove non-residue = GF ^ ((l - 1) / 2) (mod l)
                       //if (BigInteger.ModPow(GF, (l - 1) / 2, l) == -1) tl = 0;
                       //if (pl != BigInteger.Zero && BigInteger.GreatestCommonDivisor(GF, l) != BigInteger.One) tl = 0;
-                        BigInteger w = TonelliShanks(rng, posRemainder(GF, l), l); //since we need result anyway might as well compute unless non-residue very common and much faster other methods
+                        int w = (int)TonelliShanks(rng, posRemainder(GF, l), l); //since we need result anyway might as well compute unless non-residue very common and much faster other methods
                         if (w == BigInteger.Zero) tl = 0; //no square root, or one square root if posRemainder(GF, l) == 0 but zero either way...
                         else
                         {
@@ -4435,7 +4453,7 @@ namespace ELTECSharp
             BigInteger sqrtGF = Sqrt(16 * GF);
             BigInteger sqrtp4 = sqrtGF + (sqrtGF * sqrtGF < 16 * GF ? 1 : 0); //64-bit square root, can bump this up by one if less than lower bound if that is needed
             //getPrimes(1024);
-            BigInteger l = 2;
+            int l = 2;
             BigInteger prodS = BigInteger.One;
             //need a random point on the EC
             /*BigInteger x, ysquared, y;
@@ -4463,7 +4481,7 @@ namespace ELTECSharp
                 BigInteger b = l * modInverse(l, prodS);
                 prodS *= l;
                 t = posRemainder(a * tl + b * t, prodS);
-                l = nextPrime(l);
+                l = (int)nextPrime(l);
             }
             //GetBitSize(GF) == int(Math.Ceiling(BigInteger.Log(GF, 2))); //128-bit field
             //BigInteger t = BigInteger.Zero;
@@ -5149,7 +5167,7 @@ namespace ELTECSharp
             BigInteger sqrtGF = Sqrt(16 * GF);
             BigInteger sqrtp4 = sqrtGF + (sqrtGF * sqrtGF < 16 * GF ? 1 : 0); //64-bit square root, can bump this up by one if less than lower bound if that is needed
             //getPrimes(1024);
-            BigInteger M = BigInteger.One, l = 2;
+            BigInteger M = BigInteger.One; int l = 2;
             BigInteger prodS = BigInteger.One;
             BigInteger prodA = BigInteger.One;
             BigInteger[] f = new BigInteger[] { 1, 0, Ea, Eb }; //Eb, Ea, 0, 1
@@ -5165,9 +5183,9 @@ namespace ELTECSharp
                 BigInteger tl = BigInteger.Zero;
                 if (l <= 9) tl = getSchoofRemainder(Ea, Eb, GF, rng, l, divPolys, f);
                 else {
-                    //List<List<Tuple<BigInteger, int>>> modPoly = getModularPoly((int)l);
+                    //List<List<Tuple<BigInteger, int>>> modPoly = getModularPoly(l);
                     //modPoly = modPoly.Select((val) => val.Select((innerval) => new Tuple<BigInteger, int>(posRemainder(innerval.Item1, GF), innerval.Item2)).ToList()).ToList();
-                    List<List<Tuple<BigInteger, int>>> modPoly = getModularPolyGF((int)l, GF);
+                    List<List<Tuple<BigInteger, int>>> modPoly = getModularPolyGF(l, GF);
                     BigInteger[] modPolyJ = new BigInteger[modPoly.Count()];
                     for (int i = 0; i < modPoly.Count(); i++) {
                         BigInteger sum = BigInteger.Zero;
@@ -5189,7 +5207,7 @@ namespace ELTECSharp
                     BigInteger[] xprem = modexpPolyRing(new BigInteger[] { BigInteger.One, BigInteger.Zero }, GF, modPolyJ, GF);
                     BigInteger[] gcdres = gcdPolyRing(addPolyRing(xprem, mulPolyRing(new BigInteger[] { 1, 0 }, new BigInteger[] { -1 }, GF), GF), modPolyJ, GF);
                     if (gcdres.Length - 1 == l + 1) {
-                        l = nextPrime(l); continue; //pathological case with degree l + 1
+                        l = (int)nextPrime(l); continue; //pathological case with degree l + 1
                     }
                     Console.WriteLine((gcdres.Length == 1 ? "Atkin" : "Elkies") + " " + l);
                     if (gcdres.Length - 1 == 0) { //Atkin prime with degree 0
@@ -5207,19 +5225,19 @@ namespace ELTECSharp
                             BigInteger jj = (l + 1) / r;
                             if ((jj & 1) == 0 && (v == 0 && (k % l) != 0)) continue;
                             if ((jj & 1) == 1 && v != 0) continue;
-                            BigInteger kk = r, m = 0;
+                            BigInteger kk = r; int m = 0;
                             bool first = true;
                             while (true) {
                                 if ((kk & 1) != 0) {
-                                    if (first) C = u[(int)m];
-                                    else C = substitutePolyRing(u[(int)m], C, modPolyJ, GF);
+                                    if (first) C = u[m];
+                                    else C = substitutePolyRing(u[m], C, modPolyJ, GF);
                                     first = false;
                                 }
                                 kk >>= 1;
                                 if (kk == 0) break;
                                 m++;
                                 if (m > lim) {
-                                    u[(int)m] = substitutePolyRing(u[(int)m - 1], u[(int)m - 1], modPolyJ, GF);
+                                    u[m] = substitutePolyRing(u[m - 1], u[m - 1], modPolyJ, GF);
                                 }
                             }
                             if (C.SequenceEqual(new BigInteger[] { 1, 0 })) break;
@@ -5266,7 +5284,7 @@ namespace ELTECSharp
                             //can save T for match sort algorithm...
                             Ap.Add(new Tuple<List<BigInteger>, BigInteger>(T, l));
                             prodA *= l;
-                            l = nextPrime(l); continue;
+                            l = (int)nextPrime(l); continue;
                         } else tl = T[0];
                     } else {
                         //mueller 0 200 -o mueller.raw
@@ -5340,41 +5358,41 @@ namespace ELTECSharp
                             btilde = posRemainder(-2 * BigInteger.ModPow(l, 6, GF) * E6bl, GF);
                             p1 = posRemainder(-l * E2bs * modInverse(2, GF), GF);
                         }
-                        BigInteger ld = (l - 1) / 2;
-                        BigInteger ld1 = (l - 3) / 2;
-                        BigInteger[] cf = getCk((int)ld1, Ea, Eb, GF);
+                        int ld = (l - 1) / 2;
+                        int ld1 = (l - 3) / 2;
+                        BigInteger[] cf = getCk(ld1, Ea, Eb, GF);
 
-                        BigInteger[][] WP = new BigInteger[(int)ld + 1][];
+                        BigInteger[][] WP = new BigInteger[ld + 1][];
                         WP[0] = new BigInteger[] { BigInteger.Zero };
                         WP[1] = cf.Reverse().Concat(new BigInteger[] { BigInteger.One }).ToArray();
                         for (int v = 2; v <= ld; v++)
-                            WP[v] = reducePoly(mulPolyRing(WP[v - 1], WP[1], GF), 0, (int)ld + 1).Item2;
+                            WP[v] = reducePoly(mulPolyRing(WP[v - 1], WP[1], GF), 0, ld + 1).Item2;
                         //WPv have understood multiplier x^-v
-                        BigInteger[] cft = getCk((int)ld1, atilde, btilde, GF);
-                        BigInteger[] Y = Enumerable.Range(1, (int)ld1).Select((k) => posRemainder((l * cf[k] - cft[k]) * modInverse((2 * k + 1) * (2 * k + 2), GF), GF)).Reverse().Concat(new BigInteger[] { BigInteger.Zero, BigInteger.Zero }).ToArray();
+                        BigInteger[] cft = getCk(ld1, atilde, btilde, GF);
+                        BigInteger[] Y = Enumerable.Range(1, ld1).Select((k) => posRemainder((l * cf[k] - cft[k]) * modInverse((2 * k + 1) * (2 * k + 2), GF), GF)).Reverse().Concat(new BigInteger[] { BigInteger.Zero, BigInteger.Zero }).ToArray();
                         Y[Y.Length - 2] = posRemainder(Y[Y.Length - 2] - p1, GF);
                         BigInteger RF = BigInteger.One;
                         BigInteger[] H = new BigInteger[] { BigInteger.One }, X = new BigInteger[] { BigInteger.One };
-                        for (int r = 1; r <= (int)ld; r++) {
-                            X = reducePoly(mulPolyRing(X, Y, GF), 0, (int)ld + 1).Item2;
+                        for (int r = 1; r <= ld; r++) {
+                            X = reducePoly(mulPolyRing(X, Y, GF), 0, ld + 1).Item2;
                             RF *= r;
                             H = addPolyRing(H, mulPolyRing(X, new BigInteger[] { modInverse(RF, GF) }, GF), GF);
                         }
                         //H has understood multiplier x^-d
                         BigInteger ad = 1;
-                        BigInteger[] fl = new BigInteger[(int)ld + 1];
+                        BigInteger[] fl = new BigInteger[ld + 1];
                         fl[0] = ad;
-                        for (int v = (int)ld - 1; v >= 0; v--)
+                        for (int v = ld - 1; v >= 0; v--)
                         {
                             H = addPolyRing(H, mulPolyRing(WP[v + 1], new BigInteger[] { -ad }, GF), GF);
                             H = H.Take(H.Length - 1).ToArray();
                             ad = H.Length == 0 ? BigInteger.Zero : H.Last();
-                            fl[(int)ld - v] = ad;
+                            fl[ld - v] = ad;
                         }
                         //GetFactorOfDivisionPolynomialFactor(l, Ea, Eb, GF);
                         xprem = modexpPolyRing(new BigInteger[] { BigInteger.One, BigInteger.Zero }, GF, fl, GF);
                         BigInteger[] yprem = modexpPolyRing(f, (GF - 1) / 2, fl, GF);
-                        for (BigInteger lambda = BigInteger.One; lambda <= (l - 1) / 2; lambda++) {
+                        for (int lambda = 1; lambda <= (l - 1) / 2; lambda++) {
                             BigInteger tau = (lambda + modInverse(lambda, l) * GF) % l;
                             divPolys = getDivPolys(divPolys, lambda * 2, Ea, Eb, f, GF);
                             BigInteger k = (l + tau * tau - (4 * GF) % l) % l;
@@ -5400,7 +5418,7 @@ namespace ELTECSharp
                 BigInteger b = l * modInverse(l, prodS);
                 prodS *= l;
                 t = posRemainder(a * tl + b * t, prodS);
-                l = nextPrime(l);
+                l = (int)nextPrime(l);
             }
             if (Ap.Count() != 0) {
                 BigInteger x, y;
@@ -6359,7 +6377,7 @@ namespace ELTECSharp
             int curr = 0;
             BigInteger x;
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            goto p58;
+            //goto p58;
             for (int i = 2; i < 1 << 16; i++) {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(j, i, out Rem);
                 if (Rem == BigInteger.Zero) {
@@ -6403,8 +6421,8 @@ namespace ELTECSharp
             }
             Console.WriteLine("8.57 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX, rcum).ToByteArray()));
 
-            p58:
-            goto p59;
+            //p58:
+            //goto p59;
             //SET 8 CHALLENGE 58
             p = BigInteger.Parse("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623");
             q = BigInteger.Parse("335062023296420808191071248367701059461");
@@ -6482,7 +6500,7 @@ namespace ELTECSharp
             BigInteger Mprime = PollardKangaroo(0, (p - 1) / rcum, 23, Gprime, p, Yprime); //(p - 1) / rcum is 40 bits in this case, 23 could also be good
             Console.WriteLine("8.58 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX + Mprime * rcum, p - 1).ToByteArray()));
 
-            p59:
+            //p59:
             //SET 8 CHALLENGE 59
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
@@ -6490,8 +6508,8 @@ namespace ELTECSharp
             //BPOrd*(Gx, Gy) = (0, 1)
             //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
             //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
-            Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
-            //Ord = Schoof(Ea, Eb, GF, rng, Ord);
+            //Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
+            Ord = Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
             //goto p60;
@@ -6509,7 +6527,7 @@ namespace ELTECSharp
             //Ords[3] = Schoof(Ea, PickGys[3], GF, rng, Ords[3]);
             //Ords[1] = SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, Ords[1]);
             //Ords[2] = SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, Ords[2]);
-            Ords[3] = SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, Ords[3]);
+            //Ords[3] = SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, Ords[3]);
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
@@ -6624,7 +6642,7 @@ namespace ELTECSharp
             Console.WriteLine("8.59 Secret key recovered: " + RecX);
 
         //SET 8 CHALLENGE 60
-        p60:
+        //p60:
             //goto p61;
             Ea = 534; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
@@ -6782,7 +6800,7 @@ namespace ELTECSharp
             Console.WriteLine("8.60 Secret key recovered: " + (RecX + Mprime * rcum) + " " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
 
         //SET 8 CHALLENGE 61
-        p61:
+        //p61:
             BigInteger d;
             SHA1 hf = SHA1.Create();
             do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
@@ -6797,7 +6815,7 @@ namespace ELTECSharp
             GprimeEC = scaleEC(addEC(scaleEC(G, u1, EaOrig, GF), scaleEC(Q, u2, EaOrig, GF), EaOrig, GF), modInverse(tmp, BPOrd), EaOrig, GF);
             Tuple<BigInteger, BigInteger> Qprime = scaleEC(GprimeEC, dprime, EaOrig, GF);
             Console.WriteLine("Q and Q' verify: " + verifyECDSA(hm, res, Q, BPOrd, G, EaOrig, GF) + " " + verifyECDSA(hm, res, Qprime, BPOrd, GprimeEC, EaOrig, GF));
-            goto p62;
+            //goto p62;
             //RSA
             //sign: s=pad(m)^d mod N
             BigInteger _p;
@@ -6931,8 +6949,8 @@ namespace ELTECSharp
             Console.WriteLine("8.61");
 
         //SET 8 CHALLENGE 62
-        p62:
-            goto p63;
+        //p62:
+            //goto p63;
             List<List<Tuple<BigInteger, BigInteger>>> Result = LLL(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(3, 1), new Tuple<BigInteger, BigInteger>(5, 1), new Tuple<BigInteger, BigInteger>(6, 1) }},
@@ -6988,7 +7006,7 @@ namespace ELTECSharp
             Console.WriteLine("8.62 d recovered: " + (d == dprime));
 
         //SET 8 CHALLENGE 63
-        p63:
+        //p63:
             //BouncyCastle
             //BCryptEncrypt https://docs.microsoft.com/en-us/windows/desktop/api/bcrypt/nf-bcrypt-bcryptencrypt
             //https://archive.codeplex.com/?p=clrsecurity
@@ -7003,7 +7021,7 @@ namespace ELTECSharp
             //https://tools.ietf.org/html/rfc7714#section-16.1.1
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
             BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
-            goto p64;
+            //goto p64;
             //authData = new byte[] { 0x80, 0x40, 0xf1, 0x7b, 0x80, 0x41, 0xf8, 0xd3, 0x55, 0x01, 0xa0, 0xb2 };
             //m = new byte[] { 0x47, 0x61, 0x6c, 0x6c, 0x69, 0x61, 0x20, 0x65, 0x73, 0x74, 0x20, 0x6f, 0x6d, 0x6e, 0x69, 0x73,
             //    0x20, 0x64, 0x69, 0x76, 0x69, 0x73, 0x61, 0x20, 0x69, 0x6e, 0x20, 0x70, 0x61, 0x72, 0x74, 0x65,
@@ -7146,7 +7164,7 @@ namespace ELTECSharp
             Console.WriteLine("8.63");
 
             //SET 8 CHALLENGE 64
-            p64:
+            //p64:
             //https://csrc.nist.gov/csrc/media/projects/block-cipher-techniques/documents/bcm/comments/cwc-gcm/ferguson2.pdf
             //messages of 2^17 blocks which are 128 bits each
             int nSize = 17; //too slow for now with 17 ~ 7 minutes for crypt_gcm and calc_gcm_tag, probably need GCM MAC library
@@ -7471,7 +7489,7 @@ namespace ELTECSharp
 
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            goto p66;
+            //goto p66;
             Tuple<byte[], BigInteger> cyphtag;
             byte[] cyphDataVerify;
             byte[] cyphData;
@@ -7836,7 +7854,7 @@ namespace ELTECSharp
             Console.WriteLine("Key found: " + keyrecv);
             //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
             Console.WriteLine("9.65");
-        p66:
+        //p66:
             //start with code from #59, addEC/scaleEC to inject fault
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
@@ -7916,7 +7934,7 @@ namespace ELTECSharp
         }
         static void Main(string[] args)
         {
-            testMul();
+            //testMul();
             //Set1();
             //Set2();
             //Set3();
