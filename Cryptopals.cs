@@ -2591,7 +2591,7 @@ namespace ELTECSharp
         static int GetBitSizeSlow(BigInteger num)
         {
             int s = 0;
-            while ((BigInteger.One << s) <= num) s = s + 1;
+            while ((BigInteger.One << s) <= num) s++;
             //if (s != GetBitSizeBinSearch(num)) throw new ArgumentException();
             return s;
         }
@@ -2610,7 +2610,25 @@ namespace ELTECSharp
             int topbits = (int)typeof(BigInteger).GetMethod("BitLengthOfUInt", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(num, new object[] { bits[uintLength - 1] });
             return (uintLength - 1) * sizeof(uint) * 8 + topbits;
         }
-        static int GetBitSize(BigInteger num)
+        static int GetBitSize(BigInteger num) //power of 2 search high, then binary search
+        {
+            if (num.IsZero) return 0;
+            int lo = 0, hi = 1;
+            while ((BigInteger.One << hi) <= num) { lo = hi; hi <<= 1; }
+            return GetBitSizeBinSearch(num, lo, hi);
+        }
+        static int GetBitSizeBinSearch(BigInteger num, int lo, int hi)
+        {
+            int mid = (hi + lo) >> 1;
+            while (lo <= hi)
+            {
+                if ((BigInteger.One << mid) <= num) lo = mid + 1;
+                else hi = mid - 1;
+                mid = (hi + lo) >> 1;
+            }
+            return mid + 1;
+        }
+        static int GetBitSizeRecurseBinSearch(BigInteger num)
         { //instead of 0, 1, 2, 3, 4... use 0, 1, 3, 7, 15, etc
             int s = 0, t = 1, oldt = 1;
             if (t <= 0) return 0;
@@ -2619,6 +2637,7 @@ namespace ELTECSharp
                 else if (t == 1) break;
                 else { s += oldt; t = 1; }
             }
+            //if (s + 1 != GetBitSizeBinSearch(num)) throw new ArgumentException();
             return s + 1;
         }
         static BigInteger GetRandomBitSize(RandomNumberGenerator rng, int BitSize, BigInteger Max)
@@ -3803,8 +3822,8 @@ namespace ELTECSharp
             int pieceBits = 1 << (n - 1);
             int numPiecesA = (num1bits + pieceSize) >> pieceLog;
             int numPiecesB = (num2bits + pieceSize) >> pieceLog;
-            BigInteger u = 0;
-            BigInteger v = 0;
+            BigInteger u = BigInteger.Zero;
+            BigInteger v = BigInteger.Zero;
             int uBitLength = 0, vBitLength = 0;
             BigInteger pieceMask = (BigInteger.One << (n + 2)) - 1;
             int threen5 = 3 * n + 5;
@@ -3838,8 +3857,9 @@ namespace ELTECSharp
             BigInteger[] ai = new BigInteger[halfNumPcs], bi = new BigInteger[halfNumPcs];
             BigInteger fullPieceMask = (BigInteger.One << pieceBits) - 1;
             for (int i = 0; i < halfNumPcs; i++) {
-                ai[i] = (num1 >> (i << (n - 1))) & fullPieceMask;
-                bi[i] = (num2 >> (i << (n - 1))) & fullPieceMask;
+                int shiftl = i << (n - 1);
+                if (num1bits > shiftl) ai[i] = (num1 >> shiftl) & fullPieceMask;
+                if (num2bits > shiftl) bi[i] = (num2 >> shiftl) & fullPieceMask;
             }
             ai = dft(ai, m, n);
             bi = dft(bi, m, n);
@@ -3861,36 +3881,68 @@ namespace ELTECSharp
                 c[i] = (c[i] & halfMask) - (c[i] >> nbits);
                 if (c[i] < 0) c[i] += adjHalf;
             }
-            BigInteger z = 0;
+            BigInteger z = BigInteger.Zero, hipart = BigInteger.Zero; //, z2 = BigInteger.Zero;
             for (int i = 0; i < halfNumPcs; i++) {
                 BigInteger eta = i >= zi.Length ? 0 : zi[i];
-                if (eta.IsZero && c[i].IsZero) continue;
+                if (eta.IsZero && c[i].IsZero) {
+                    z |= hipart << (i << (n - 1));
+                    hipart = BigInteger.Zero;
+                    continue;
+                }
                 eta = (eta - c[i]) & pieceMask;
                 int shift = i << (n - 1);
-                if (eta.IsZero) z += c[i] << shift;
-                else z += ((c[i] + eta) << shift) + (eta << (shift + nbits));
+                //if (eta.IsZero) z2 += c[i] << shift;
+                //else z2 += ((c[i] + eta) << shift) | (eta << (shift + nbits));
+                if (i == halfNumPcs - 1) {
+                    z |= ((c[i] + eta + hipart) << shift) | (eta << (shift + nbits));
+                } else if (eta.IsZero) {
+                    BigInteger part = c[i] + hipart;
+                    z |= (part & ((BigInteger.One << pieceBits) - 1)) << shift;
+                    hipart = part >> pieceBits;
+                } else {
+                    BigInteger part = c[i] + eta + hipart;
+                    z |= (part & ((BigInteger.One << pieceBits) - 1)) << shift;
+                    hipart = (part >> pieceBits) | (eta << (nbits - pieceBits));
+                }
+                //if (z != (z2 & ((BigInteger.One << ((i + 1) << (n - 1))) - 1))) throw new ArgumentException();
             }
             nbits = 1 << m;
             halfMask = (BigInteger.One << nbits) - 1;
             adjHalf = halfMask + 2; //(BigInteger.One << nbits) + 1;
             z = (z & halfMask) - (z >> nbits);
-            if (z < 0) z += adjHalf;
+            if (z < BigInteger.Zero) z += adjHalf;
             return z;
 
         }
-
+        static BigInteger takeBitsBigInteger(BigInteger num, int bits)
+        {
+            if (bits == 0) return BigInteger.Zero;
+            byte[] bytes = num.ToByteArray();
+            int blen = bytes.Length;
+            int bytesWanted = (bits + 7) >> 3;
+            if (blen == 0 || blen < bytesWanted) return num;
+            bits = bits & 7;
+            byte[] taken = new byte[bytesWanted + (bits == 0 && (bytes[bytesWanted-1] & 0x80) != 0 ? 1 : 0)]; //need extra 0 byte in case would become negative
+            Array.Copy(bytes, 0, taken, 0, bytesWanted);
+            if (bits != 0) taken[bytesWanted - 1] &= (byte)((1 << bits) - 1);
+            return new BigInteger(taken);
+        }
         static BigInteger mulKaratsuba(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
         {
             //if (num1 < 2 || num2 < 2) return num1 * num2;
-            while ((BigInteger.One << (num1bits-1)) > num1) num1bits--;
-            while ((BigInteger.One << (num2bits-1)) > num2) num2bits--;
+            //while ((BigInteger.One << (num1bits-1)) > num1) num1bits--;
+            //while ((BigInteger.One << (num2bits-1)) > num2) num2bits--;
+            //num1bits = GetBitSizeBinSearch(num1, 0, num1bits);
+            //num2bits = GetBitSizeBinSearch(num2, 0, num2bits);
             //if (num1bits != GetBitSize(num1)) throw new ArgumentException();
             //if (num2bits != GetBitSize(num2)) throw new ArgumentException();
             int m = Math.Min(num1bits, num2bits);
             int m2 = m >> 1;
             BigInteger m2shift = BigInteger.One << m2;
             BigInteger low1, low2, high1, high2;
+            //low1 = takeBitsBigInteger(num1, m2);
             low1 = num1 & (m2shift - 1);
+            //low2 = takeBitsBigInteger(num2, m2);
             low2 = num2 & (m2shift - 1);
             high1 = num1 >> m2;
             high2 = num2 >> m2;
@@ -3898,12 +3950,17 @@ namespace ELTECSharp
             BigInteger lowhigh1 = low1 + high1, lowhigh2 = low2 + high2;
             BigInteger z1 = doBigMul(lowhigh1, lowhigh2, num1bits - m2 + 1, num2bits - m2 + 1);
             BigInteger z2 = doBigMul(high1, high2, num1bits - m2, num2bits - m2);
-            return (z2 << (m2 << 1)) + ((z1 - z2 - z0) << m2) + z0;
+            return (z2 << (m2 << 1)) + (((z1 - z0 - z2) << m2) + z0);
         }
         static void testMul()
         {
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             System.Diagnostics.Stopwatch s = new System.Diagnostics.Stopwatch();
+            /*for (int i = 0; i < 1 << 16; i++) {
+                for (int j = 0; j <= 16; j++) {
+                    if (takeBitsBigInteger(i, j) != new BigInteger(i & ((1 << j) - 1))) throw new ArgumentException();
+                }
+            }*/
             /*for (int n = 10; n < 32; n++) {
                 BigInteger a;
                 do
@@ -3984,19 +4041,23 @@ namespace ELTECSharp
             //evaluate at 2^(2*GetBitSize(GF)+UpperBound(log2(n)))
             BigInteger Apack = BigInteger.Zero, Bpack = BigInteger.Zero;
             for (int i = 0; i < alen; i++) {
-                if (A[i] < 0) Apack += posRemainder(A[i], GF) << ((alen - i - 1) * packSize);
+                if (A[i] < 0) Apack |= posRemainder(A[i], GF) << ((alen - i - 1) * packSize);
                 else Apack |= A[i] << ((alen - i - 1) * packSize);
             }
             for (int i = 0; i < blen; i++) {
-                if (B[i] < 0) Bpack += posRemainder(B[i], GF) << ((blen - i - 1) * packSize);
+                if (B[i] < 0) Bpack |= posRemainder(B[i], GF) << ((blen - i - 1) * packSize);
                 else Bpack |= B[i] << ((blen - i - 1) * packSize);
             }
             //BigInteger Cpack = Apack * Bpack; //should use Schonhage-Strassen here
             BigInteger Cpack = doBigMul(Apack, Bpack, packSize * alen, packSize * blen);
             BigInteger[] p = new BigInteger[alen + blen - 1];
             BigInteger packMask = (BigInteger.One << packSize) - 1;
-            for (int i = 0; i < alen + blen - 1; i++) {
-                p[i] = posRemainder((Cpack >> ((alen + blen - 1 - i - 1) * packSize)) & packMask, GF);
+            //for (int i = 0; i < alen + blen - 1; i++) {
+                //p[i] = posRemainder((Cpack >> ((alen + blen - 1 - i - 1) * packSize)) & packMask, GF);
+            //}
+            for (int i = alen + blen - 1 - 1; i >= 0; i--) {                
+                p[i] = posRemainder(Cpack & packMask, GF);
+                Cpack >>= packSize;
             }
             return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
         }
@@ -6508,7 +6569,7 @@ namespace ELTECSharp
             //BPOrd*(Gx, Gy) = (0, 1)
             //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
             //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
-            //Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
+            Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
             Ord = Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
