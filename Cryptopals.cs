@@ -2605,16 +2605,31 @@ namespace ELTECSharp
                 int sign = (int)typeof(BigInteger).GetProperty("_Sign", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
                 bits = new uint[] { (uint)(sign < 0 ? sign & int.MaxValue : sign) };
             }
-            int uintLength = (int)typeof(BigInteger).GetMethod("Length", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(num,
+            int uintLength = (int)typeof(BigInteger).GetMethod("Length", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(null,
                 new object[] { bits });
             int topbits = (int)typeof(BigInteger).GetMethod("BitLengthOfUInt", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(num, new object[] { bits[uintLength - 1] });
             return (uintLength - 1) * sizeof(uint) * 8 + topbits;
         }
-        static int GetBitSize(BigInteger num) //power of 2 search high, then binary search
+        static int GetBitSize(BigInteger num)
+        {
+            byte[] bytes = num.ToByteArray();
+            int size = bytes.Length;
+            if (size == 0) return 0;
+            int v = bytes[size - 1]; // 8-bit value to find the log2 of 
+            if (v == 0) return (size - 1) * 8;
+            int r; // result of log2(v) will go here
+            int shift;
+            r = (v > 0xF) ? 4 : 0; v >>= r;
+            shift = (v > 0x3) ? 2 : 0; v >>= shift; r |= shift;
+            r |= (v >> 1);
+            return (size - 1) * 8 + r + 1;
+        }
+        static int GetBitSizeHiSearch(BigInteger num) //power of 2 search high, then binary search
         {
             if (num.IsZero) return 0;
             int lo = 0, hi = 1;
             while ((BigInteger.One << hi) <= num) { lo = hi; hi <<= 1; }
+            //if (GetBitSizeCopy(num) != GetBitSizeBinSearch(num, lo, hi)) throw new ArgumentException();
             return GetBitSizeBinSearch(num, lo, hi);
         }
         static int GetBitSizeBinSearch(BigInteger num, int lo, int hi)
@@ -3956,6 +3971,34 @@ namespace ELTECSharp
         {
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             System.Diagnostics.Stopwatch s = new System.Diagnostics.Stopwatch();
+            /*for (int n = 10; n < 24; n++) {
+                BigInteger num = GetRandomBitSize(rng, 1 << n, BigInteger.One << (1 << n));
+                //s.Start();
+                //int n1 = GetBitSizeSlow(num);
+                //s.Stop();
+                //Console.WriteLine(n1 + " - " + s.ElapsedMilliseconds);
+                //s.Reset();
+                s.Start();
+                int n2 = GetBitSizeHiSearch(num);
+                s.Stop();
+                Console.WriteLine(n2 + " - " + s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
+                int n3 = GetBitSizeRecurseBinSearch(num);
+                s.Stop();
+                Console.WriteLine(n3 + " - " + s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
+                int n4 = GetBitSizeReflection(num);
+                s.Stop();
+                Console.WriteLine(n4 + " - " + s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
+                int n5 = GetBitSize(num);
+                s.Stop();
+                Console.WriteLine(n5 + " - " + s.ElapsedMilliseconds);
+                s.Reset();
+            }*/
             /*for (int i = 0; i < 1 << 16; i++) {
                 for (int j = 0; j <= 16; j++) {
                     if (takeBitsBigInteger(i, j) != new BigInteger(i & ((1 << j) - 1))) throw new ArgumentException();
