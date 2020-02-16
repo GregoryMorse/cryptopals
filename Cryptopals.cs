@@ -3713,7 +3713,7 @@ namespace ELTECSharp
                     if (c[coffs] >= GF) c[coffs] -= GF;
                 } else c[coffs] = posRemainder(a[aoffs] + b[boffs], GF);
             }
-            return clen == 0 || c[0] != BigInteger.Zero ? c : c.Skip(c.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray(); ;
+            return clen == 0 || c[0] != BigInteger.Zero ? c : c.SkipWhile((BigInteger cr) => cr == BigInteger.Zero).ToArray(); ;
         }
         static SortedList<BigInteger, BigInteger> addPolyRingSparse(SortedList<BigInteger, BigInteger> a, SortedList<BigInteger, BigInteger> b, BigInteger GF)
         {
@@ -3781,9 +3781,9 @@ namespace ELTECSharp
                         BigInteger d = ((A[idx + slen] & xmask) << x) | (A[idx + slen] >> (twotonp1 - x));
                         A[idx + slen] = A[idx];
                         A[idx] += d;
-                        if ((A[idx] & testMask) != 0) A[idx] = (A[idx] & testMaskm1) + 1;
+                        if ((A[idx] & testMask) != BigInteger.Zero) A[idx] = (A[idx] & testMaskm1) + 1;
                         A[idx + slen] += ((d & subMask) << twoton) | (d >> twoton);
-                        if ((A[idx + slen] & testMask) != 0) A[idx + slen] = (A[idx + slen] & testMaskm1) + 1;
+                        if ((A[idx + slen] & testMask) != BigInteger.Zero) A[idx + slen] = (A[idx + slen] & testMaskm1) + 1;
                         idx++;
                     }
                 }
@@ -3811,10 +3811,11 @@ namespace ELTECSharp
                     for (int k = slen-1; k >= 0; k--) {
                         BigInteger c = A[idx];
                         A[idx] += A[idx2];
-                        if ((A[idx] & testMask) != 0) A[idx] = (A[idx] & testMaskm1) + 1;
-                        A[idx] = (A[idx] >> 1) | ((A[idx] & 1) << (twotonp1 - 1));
+                        if ((A[idx] & testMask) != BigInteger.Zero) A[idx] = (A[idx] & testMaskm1) + 1;
+                        if (A[idx].IsEven) A[idx] = (A[idx] >> 1);
+                        else A[idx] = (A[idx] >> 1) | (BigInteger.One << (twotonp1 - 1));
                         c += ((A[idx2] & subMask) << twoton) | (A[idx2] >> twoton);
-                        if ((c & testMask) != 0) c = (c & testMaskm1) + 1;
+                        if ((c & testMask) != BigInteger.Zero) c = (c & testMaskm1) + 1;
                         A[idx2] = (c >> x) | ((c & xmask) << (twotonp1 - x));
                         idx++; idx2++;
                     }
@@ -3843,23 +3844,32 @@ namespace ELTECSharp
             BigInteger pieceMask = (BigInteger.One << (n + 2)) - 1;
             int threen5 = 3 * n + 5;
             //build u and v from a and b allocating 3n+5 bits in u and v per n+2 bits from a and b respectively
-            for (int i = 0; i < numPiecesA && i << (n - 1) < num1bits; i++) {
-                u |= ((num1 >> (i << (n - 1))) & pieceMask) << uBitLength;
-                uBitLength += threen5;
-            }
-            for (int i = 0; i < numPiecesB && i << (n - 1) < num2bits; i++) {
-                v |= ((num2 >> (i << (n - 1))) & pieceMask) << vBitLength;
-                vBitLength += threen5;
-            }
+            //for (int i = 0; i < numPiecesA && (i << (n - 1)) < num1bits; i++) {
+            //u |= ((num1 >> (i << (n - 1))) & pieceMask) << uBitLength;
+            //uBitLength += threen5;
+            //}
+            //for (int i = 0; i < numPiecesB && (i << (n - 1)) < num2bits; i++) {
+            //v |= ((num2 >> (i << (n - 1))) & pieceMask) << vBitLength;
+            //vBitLength += threen5;
+            //}
+            //if (u != combineBigIntegers(multiSplitBigInteger(num1, pieceBits, numPiecesA).Select((BigInteger nm) => nm & pieceMask).ToArray(), threen5)) throw new ArgumentException();
+            //if (v != combineBigIntegers(multiSplitBigInteger(num2, pieceBits, numPiecesB).Select((BigInteger nm) => nm & pieceMask).ToArray(), threen5)) throw new ArgumentException();
+            numPiecesA = Math.Min(numPiecesA, ((num1bits >> (n - 1)) + 1));
+            numPiecesB = Math.Min(numPiecesB, ((num2bits >> (n - 1)) + 1));
+            u = combineBigIntegers(multiSplitBigInteger(num1, pieceBits, numPiecesA).Select((BigInteger nm) => nm & pieceMask).ToArray(), threen5);
+            v = combineBigIntegers(multiSplitBigInteger(num2, pieceBits, numPiecesB).Select((BigInteger nm) => nm & pieceMask).ToArray(), threen5);
+            uBitLength = threen5 * numPiecesA;
+            vBitLength = threen5 * numPiecesB;
             //BigInteger gamma = u * v;
             BigInteger gamma = doBigMul(u, v, uBitLength, vBitLength);
             int halfNumPcs = numPieces >> 1;
             int numPiecesG = (GetBitSize(gamma) + threen5 - 1) / threen5;
-            BigInteger[] gammai = new BigInteger[numPiecesG];
-            BigInteger threen5mask = (BigInteger.One << threen5) - 1;
-            for (int i = 0; i < numPiecesG; i++) {
-                gammai[i] = (gamma >> (i * threen5)) & threen5mask;
-            }
+            //BigInteger[] gammai = new BigInteger[numPiecesG];
+            //BigInteger threen5mask = (BigInteger.One << threen5) - 1;
+            //for (int i = 0; i < numPiecesG; i++) {
+                //gammai[i] = (gamma >> (i * threen5)) & threen5mask;
+            //}
+            BigInteger[] gammai = multiSplitBigInteger(gamma, threen5, numPiecesG);
             BigInteger[] zi = new BigInteger[numPiecesG];
             Array.Copy(gammai, 0, zi, 0, numPiecesG);
             for (int i = 0; i < gammai.Length - halfNumPcs; i++)
@@ -3869,19 +3879,23 @@ namespace ELTECSharp
             for (int i = 0; i < gammai.Length - 3 * halfNumPcs; i++)
                 zi[i] = (zi[i] - gammai[i + 3 * halfNumPcs]) & pieceMask;
 
-            BigInteger[] ai = new BigInteger[halfNumPcs], bi = new BigInteger[halfNumPcs];
-            BigInteger fullPieceMask = (BigInteger.One << pieceBits) - 1;
-            for (int i = 0; i < halfNumPcs; i++) {
-                int shiftl = i << (n - 1);
-                if (num1bits > shiftl) ai[i] = (num1 >> shiftl) & fullPieceMask;
-                if (num2bits > shiftl) bi[i] = (num2 >> shiftl) & fullPieceMask;
-            }
+            //BigInteger[] ai = new BigInteger[halfNumPcs], bi = new BigInteger[halfNumPcs];
+            //BigInteger fullPieceMask = (BigInteger.One << pieceBits) - 1;
+            //for (int i = 0; i < halfNumPcs; i++) {
+            //    int shiftl = i << (n - 1);
+            //    if (num1bits > shiftl) ai[i] = (num1 >> shiftl) & fullPieceMask;
+            //    if (num2bits > shiftl) bi[i] = (num2 >> shiftl) & fullPieceMask;
+            //}
+            BigInteger[] ai = multiSplitBigInteger(num1, pieceBits, halfNumPcs);
+            BigInteger[] bi = multiSplitBigInteger(num2, pieceBits, halfNumPcs);
+            //if (!ai.SequenceEqual(multiSplitBigInteger(num1, pieceBits, halfNumPcs))) throw new ArgumentException();
+            //if (!bi.SequenceEqual(multiSplitBigInteger(num2, pieceBits, halfNumPcs))) throw new ArgumentException();
             ai = dft(ai, m, n);
             bi = dft(bi, m, n);
             int nbits = 1 << n;
             BigInteger halfMask = (BigInteger.One << nbits) - 1;
             BigInteger adjHalf = halfMask + 2; // (BigInteger.One << nbits) + 1;
-            for (int i = 0; i < bi.Length; i++) {
+            for (int i = 0; i < halfNumPcs; i++) {
                 ai[i] = (ai[i] & halfMask) - (ai[i] >> nbits);
                 if (ai[i] < 0) ai[i] += adjHalf;
                 bi[i] = (bi[i] & halfMask) - (bi[i] >> nbits);
@@ -3897,10 +3911,13 @@ namespace ELTECSharp
                 if (c[i] < 0) c[i] += adjHalf;
             }
             BigInteger z = BigInteger.Zero, hipart = BigInteger.Zero; //, z2 = BigInteger.Zero;
+            BigInteger pieceBitMask = (BigInteger.One << pieceBits) - 1;
+            BigInteger[] zs = new BigInteger[halfNumPcs + 1];
             for (int i = 0; i < halfNumPcs; i++) {
                 BigInteger eta = i >= zi.Length ? 0 : zi[i];
                 if (eta.IsZero && c[i].IsZero) {
-                    z |= hipart << (i << (n - 1));
+                    zs[i] = hipart;
+                    //z |= hipart << (i << (n - 1));
                     hipart = BigInteger.Zero;
                     continue;
                 }
@@ -3909,18 +3926,24 @@ namespace ELTECSharp
                 //if (eta.IsZero) z2 += c[i] << shift;
                 //else z2 += ((c[i] + eta) << shift) | (eta << (shift + nbits));
                 if (i == halfNumPcs - 1) {
-                    z |= ((c[i] + eta + hipart) << shift) | (eta << (shift + nbits));
+                    zs[i] = c[i] + eta + hipart;
+                    zs[i + 1] = eta;
+                    //z |= ((c[i] + eta + hipart) << shift) | (eta << (shift + nbits));
                 } else if (eta.IsZero) {
                     BigInteger part = c[i] + hipart;
-                    z |= (part & ((BigInteger.One << pieceBits) - 1)) << shift;
+                    zs[i] = part & pieceBitMask;
+                    //z |= (part & pieceBitMask) << shift;
                     hipart = part >> pieceBits;
                 } else {
                     BigInteger part = c[i] + eta + hipart;
-                    z |= (part & ((BigInteger.One << pieceBits) - 1)) << shift;
+                    zs[i] = part & pieceBitMask;
+                    //z |= (part & pieceBitMask) << shift;
                     hipart = (part >> pieceBits) | (eta << (nbits - pieceBits));
                 }
                 //if (z != (z2 & ((BigInteger.One << ((i + 1) << (n - 1))) - 1))) throw new ArgumentException();
             }
+            //if (z != combineBigIntegers(zs, pieceBits)) throw new ArgumentException();
+            z = combineBigIntegers(zs, pieceBits);
             nbits = 1 << m;
             halfMask = (BigInteger.One << nbits) - 1;
             adjHalf = halfMask + 2; //(BigInteger.One << nbits) + 1;
@@ -3929,7 +3952,66 @@ namespace ELTECSharp
             return z;
 
         }
-        static BigInteger takeBitsBigInteger(BigInteger num, int bits)
+        static BigInteger combineBigIntegers(BigInteger[] nums, int bits)
+        {
+            int nlen = nums.Length;
+            
+            byte[] b = new byte[((nums.Length * bits + 7) >> 3) + (((nums.Length * bits) & 7) == 0 ? 1 : 0)]; //+1 for avoiding negatives
+            int curBit = 0;
+            for (int i = 0; i < nlen; i++) {
+                int curByte = curBit >> 3, bit = curBit & 7;
+                if (bit != 0) {
+                    byte[] src = (nums[i] << bit).ToByteArray();
+                    b[curByte] |= src[0];
+                    Array.Copy(src, 1, b, curByte + 1, src.Length - 1);
+                } else {
+                    byte[] src = nums[i].ToByteArray();
+                    Array.Copy(src, 0, b, curByte, src.Length);
+                }
+                curBit += bits;
+            }
+            return new BigInteger(b);
+        }
+        static BigInteger[] multiSplitBigInteger(BigInteger num, int bits, int size)
+        {
+            BigInteger[] c = new BigInteger[size];
+            if (bits == 0) return c; //impossible split size
+            byte[] bytes = num.ToByteArray();
+            int blen = bytes.Length;
+            if (blen == 0) return c;
+            int curbits = 0, count = 0, startByte = 0;
+            while (count < size) {
+                int lastByte = (curbits + bits + 7) >> 3;
+                int rembits = (curbits + bits) & 7;
+                if (blen < lastByte) { lastByte = blen; rembits = 0; }
+                byte[] taken = new byte[lastByte - startByte + ((bytes[lastByte - 1] & 0x80) != 0 ? 1 : 0)];
+                Array.Copy(bytes, startByte, taken, 0, lastByte - startByte);
+                if (rembits != 0) taken[lastByte - startByte - 1] &= (byte)((1 << rembits) - 1);
+                if ((curbits & 7) != 0) c[count] = new BigInteger(taken) >> (curbits & 7);
+                else c[count] = new BigInteger(taken);
+                if (blen < (curbits + bits + 7) >> 3) break;
+                startByte = lastByte - (rembits != 0 ? 1 : 0); curbits += bits; count++;
+            }
+            return c;
+        }
+        static ValueTuple<BigInteger, BigInteger> splitBigInteger(BigInteger num, int bits) //replacement for num >> bits
+        {
+            if (bits == 0) return new ValueTuple<BigInteger, BigInteger>(num, BigInteger.Zero);
+            byte[] bytes = num.ToByteArray();
+            int blen = bytes.Length;
+            int bytesWanted = (bits + 7) >> 3;
+            if (blen == 0 || blen < bytesWanted) return new ValueTuple<BigInteger, BigInteger>(BigInteger.Zero, num);
+            bits = bits & 7;
+            byte[] taken = new byte[bytesWanted + (bits == 0 && (bytes[bytesWanted - 1] & 0x80) != 0 ? 1 : 0)]; //need extra 0 byte in case would become negative
+            Array.Copy(bytes, 0, taken, 0, bytesWanted);
+            if (bits != 0) taken[bytesWanted - 1] &= (byte)((1 << bits) - 1);
+            bytesWanted = bytesWanted - (bits == 0 ? 0 : 1);
+            byte[] upper = new byte[blen - bytesWanted];
+            Array.Copy(bytes, bytesWanted, upper, 0, blen - bytesWanted);
+            if (bits != 0) return new ValueTuple<BigInteger, BigInteger>(new BigInteger(upper) >> bits, new BigInteger(taken));
+            else return new ValueTuple<BigInteger, BigInteger>(new BigInteger(upper), new BigInteger(taken));
+        }
+        static BigInteger takeBitsBigInteger(BigInteger num, int bits) //replacement for num & ((BigInteger.One << bits) - 1)
         {
             if (bits == 0) return BigInteger.Zero;
             byte[] bytes = num.ToByteArray();
@@ -3953,8 +4035,10 @@ namespace ELTECSharp
             //if (num2bits != GetBitSize(num2)) throw new ArgumentException();
             int m = Math.Min(num1bits, num2bits);
             int m2 = m >> 1;
-            BigInteger m2shift = BigInteger.One << m2;
             BigInteger low1, low2, high1, high2;
+            //(high1, low1) = splitBigInteger(num1, m2);
+            //(high2, low2) = splitBigInteger(num2, m2);
+            BigInteger m2shift = BigInteger.One << m2;
             //low1 = takeBitsBigInteger(num1, m2);
             low1 = num1 & (m2shift - 1);
             //low2 = takeBitsBigInteger(num2, m2);
@@ -3965,12 +4049,44 @@ namespace ELTECSharp
             BigInteger lowhigh1 = low1 + high1, lowhigh2 = low2 + high2;
             BigInteger z1 = doBigMul(lowhigh1, lowhigh2, num1bits - m2 + 1, num2bits - m2 + 1);
             BigInteger z2 = doBigMul(high1, high2, num1bits - m2, num2bits - m2);
-            return (z2 << (m2 << 1)) + (((z1 - z0 - z2) << m2) + z0);
+            return ((z2 << (m2 << 1)) | z0) + ((z1 - z0 - z2) << m2);
         }
         static void testMul()
         {
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             System.Diagnostics.Stopwatch s = new System.Diagnostics.Stopwatch();
+            /*for (int m = 0; m < 32; m++) {
+                BigInteger num = GetRandomBitSize(rng, 65536, BigInteger.One << 65536);
+                s.Start();
+                for (int n = 0; n < 100000; n++)
+                {
+                    BigInteger takeNum = num & ((BigInteger.One << (32768 + m)) - 1);
+                    //BigInteger highNum = num >> (32768 + m);
+                }
+                s.Stop();
+                Console.WriteLine(s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
+                BigInteger A = ((BigInteger.One << (32768 + m)) - 1);
+                for (int n = 0; n < 100000; n++) {
+                    BigInteger takeNum = num & A;
+                    //BigInteger highNum = num >> (32768 + m);
+                }
+                s.Stop();
+                Console.WriteLine(s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
+                for (int n = 0; n < 100000; n++) {
+                    BigInteger takeNum = takeBitsBigInteger(num, 32768 + m);
+                    //BigInteger highNum, takeNum;
+                    //(highNum, takeNum) = splitBigInteger(num, 32768 + m);
+                }
+                s.Stop();
+                Console.WriteLine(s.ElapsedMilliseconds);
+                s.Reset();
+                if ((num & ((BigInteger.One << (32768 + m)) - 1)) != takeBitsBigInteger(num, 32768 + m)) throw new ArgumentException();
+                if ((num >> (32768 + m)) != splitBigInteger(num, 32768 + m).Item1) throw new ArgumentException();
+            }*/
             /*for (int n = 10; n < 24; n++) {
                 BigInteger num = GetRandomBitSize(rng, 1 << n, BigInteger.One << (1 << n));
                 //s.Start();
@@ -4083,31 +4199,37 @@ namespace ELTECSharp
             int packSize = (GetBitSize(GF) << 1) + GetBitSize(Math.Max(alen, blen)); //coefficients are bounded by 2^(2*GetBitSize(GF))*n where n is degree+1 of A, B
             //evaluate at 2^(2*GetBitSize(GF)+UpperBound(log2(n)))
             BigInteger Apack = BigInteger.Zero, Bpack = BigInteger.Zero;
-            for (int i = 0; i < alen; i++) {
-                if (A[i] < 0) Apack |= posRemainder(A[i], GF) << ((alen - i - 1) * packSize);
-                else Apack |= A[i] << ((alen - i - 1) * packSize);
-            }
-            for (int i = 0; i < blen; i++) {
-                if (B[i] < 0) Bpack |= posRemainder(B[i], GF) << ((blen - i - 1) * packSize);
-                else Bpack |= B[i] << ((blen - i - 1) * packSize);
-            }
+            //for (int i = 0; i < alen; i++) {
+            //    if (A[i] < 0) Apack |= posRemainder(A[i], GF) << ((alen - i - 1) * packSize);
+            //    else Apack |= A[i] << ((alen - i - 1) * packSize);
+            //}
+            //for (int i = 0; i < blen; i++) {
+            //    if (B[i] < 0) Bpack |= posRemainder(B[i], GF) << ((blen - i - 1) * packSize);
+            //    else Bpack |= B[i] << ((blen - i - 1) * packSize);
+            //}
+            //if (Apack != combineBigIntegers(A.Select((BigInteger nm) => nm < 0 ? posRemainder(nm, GF) : nm).Reverse().ToArray(), packSize)) throw new ArgumentException();
+            //if (Bpack != combineBigIntegers(B.Select((BigInteger nm) => nm < 0 ? posRemainder(nm, GF) : nm).Reverse().ToArray(), packSize)) throw new ArgumentException();
+            Apack = combineBigIntegers(A.Select((BigInteger nm) => nm < 0 ? posRemainder(nm, GF) : nm).Reverse().ToArray(), packSize);
+            Bpack = combineBigIntegers(B.Select((BigInteger nm) => nm < 0 ? posRemainder(nm, GF) : nm).Reverse().ToArray(), packSize);
             //BigInteger Cpack = Apack * Bpack; //should use Schonhage-Strassen here
             BigInteger Cpack = doBigMul(Apack, Bpack, packSize * alen, packSize * blen);
-            BigInteger[] p = new BigInteger[alen + blen - 1];
-            BigInteger packMask = (BigInteger.One << packSize) - 1;
+            //BigInteger[] p = new BigInteger[alen + blen - 1];
+            //BigInteger packMask = (BigInteger.One << packSize) - 1;
             //for (int i = 0; i < alen + blen - 1; i++) {
-                //p[i] = posRemainder((Cpack >> ((alen + blen - 1 - i - 1) * packSize)) & packMask, GF);
+            //p[i] = posRemainder((Cpack >> ((alen + blen - 1 - i - 1) * packSize)) & packMask, GF);
             //}
-            for (int i = alen + blen - 1 - 1; i >= 0; i--) {                
-                p[i] = posRemainder(Cpack & packMask, GF);
-                Cpack >>= packSize;
-            }
-            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            IEnumerable<BigInteger> p = multiSplitBigInteger(Cpack, packSize, alen + blen - 1).Select((BigInteger nm) => posRemainder(nm, GF)).Reverse();
+            //for (int i = alen + blen - 1 - 1; i >= 0; i--) {                
+            //    p[i] = posRemainder(Cpack & packMask, GF);
+            //    Cpack >>= packSize;
+            //}
+            //if (!p.SequenceEqual(ps)) throw new ArgumentException();
+            return p.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         static BigInteger[] mulPolyRing(BigInteger[] A, BigInteger[] B, BigInteger GF)
         {
             int alen = A.Length, blen = B.Length;
-            //if (GetBitSize(GF) * Math.Min(alen, blen) > 16384) return mulPolyRingKronecker(A, B, GF);
+            if (GetBitSize(GF) * Math.Min(alen, blen) > 16384) return mulPolyRingKronecker(A, B, GF);
             if (alen == 0) return A; if (blen == 0) return B;
             BigInteger[] p = new BigInteger[alen + blen - 1];
             for (int i = 0; i < blen; i++) {
@@ -4129,11 +4251,11 @@ namespace ELTECSharp
             //    if (A[0] != BigInteger.Zero) p = posRemainder(p + B, GF);
             //    A = A.Skip(1).ToArray(); B = B.Concat(new BigInteger[] { BigInteger.Zero }).ToArray();
             //}
-            //if (!mulPolyRingKronecker(A, B, GF).SequenceEqual(p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).Select((x) => posRemainder(x, GF)).ToArray())) {
+            //if (!mulPolyRingKronecker(A, B, GF).SequenceEqual(p.SkipWhile((BigInteger c) => c == BigInteger.Zero).Select((x) => posRemainder(x, GF)).ToArray())) {
             //throw new ArgumentException();
             //}
-            //return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
-            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).Select((x) => posRemainder(x, GF)).ToArray();
+            //return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
+            return p.SkipWhile((BigInteger c) => c == BigInteger.Zero).Select((x) => posRemainder(x, GF)).ToArray();
         }
         static SortedList<BigInteger, BigInteger> mulPolyRingSparse(BigInteger[] A, SortedList<BigInteger, BigInteger> B, BigInteger GF)
         {
@@ -4170,10 +4292,11 @@ namespace ELTECSharp
                 int aoffs = alen - d - 1;
                 q[aoffs] = posRemainder(r[0] * binv, GF);
                 if (q[aoffs] == BigInteger.Zero) break;
-                r = addPolyRing(r, mulPolyRing(bneg, q.Skip(aoffs).ToArray(), GF), GF);
+                //r = addPolyRing(r, mulPolyRing(bneg, q.Skip(aoffs).ToArray(), GF), GF);
+                r = addPolyRing(r, mulPolyRing(bneg, new BigInteger[] { q[aoffs] }, GF).Concat(q.Skip(aoffs + 1)).ToArray(), GF);
                 rlen = r.Length;
             }
-            return new Tuple<BigInteger[], BigInteger[]>(q.Skip(q.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(), r);
+            return new Tuple<BigInteger[], BigInteger[]>(q.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray(), r);
         }
         static Tuple<SortedList<BigInteger, BigInteger>, BigInteger[]> divmodPolyRingSparse(SortedList<BigInteger, BigInteger> A, BigInteger[] B, BigInteger GF)
         {
@@ -4236,7 +4359,7 @@ namespace ELTECSharp
                 }
                 remainder[m - 1 - k] = posRemainder(remainder[m - 1 - k] + outersum, GF); //make monic with posRemainder(t[0] * outersum, GF)
             }
-            return remainder.Skip(remainder.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return remainder.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         //https://github.com/sagemath/sage/blob/master/src/sage/libs/ntl/ntlwrap_impl.h
         //https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/polynomial_quotient_ring_element.py
@@ -4262,7 +4385,7 @@ namespace ELTECSharp
                 result = mulPolyRing(result, new BigInteger[] { elem.Value }, GF);
                 remainder = addPolyRing(result, remainder, GF);
             }
-            return remainder.Skip(remainder.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return remainder.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         static BigInteger[] substitutePolyRing(BigInteger[] A, BigInteger[] B, BigInteger[] divpoly, BigInteger GF)
         {
@@ -4635,7 +4758,7 @@ namespace ELTECSharp
                 else if (i >= blen) c[coffs] = a[aoffs];
                 else c[coffs] = a[aoffs] + b[boffs];
             }
-            return clen == 0 || c[0] != BigInteger.Zero ? c : c.Skip(c.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray(); ;
+            return clen == 0 || c[0] != BigInteger.Zero ? c : c.SkipWhile((BigInteger cr) => cr == BigInteger.Zero).ToArray(); ;
         }
         static BigInteger[] mulPoly(BigInteger[] A, BigInteger[] B)
         {
@@ -4650,7 +4773,7 @@ namespace ELTECSharp
                     p[ijoffs] += A[j] * B[i];
                 }
             }
-            return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         static BigInteger[] mulPolyPow(BigInteger[] A, BigInteger[] B, int psN)
         {
@@ -4667,7 +4790,7 @@ namespace ELTECSharp
                     p[ijoffs] += A[j] * B[i];
                 }
             }
-            return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return p.Length == 0 || p[0] != BigInteger.Zero ? p : p.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         static BigInteger[] modexpPoly(BigInteger[] X, BigInteger m)
         {
@@ -4718,7 +4841,7 @@ namespace ELTECSharp
                 r = addPoly(r, mulPoly(bneg, q.Skip(aoffs).ToArray()));
                 rlen = r.Length;
             }
-            return new Tuple<BigInteger[], BigInteger[]>(q.Skip(q.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(), r);
+            return new Tuple<BigInteger[], BigInteger[]>(q.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray(), r);
         }
         static BigInteger[,] gaussianElimZZ(BigInteger[,] x)
         {
@@ -4813,7 +4936,7 @@ namespace ELTECSharp
             //v = mulPoly(new BigInteger[] { modInverse(i[0], GF) }, v);
             v = divmodPoly(v, n).Item2;
             //if (v < 0) v = (v + n) % n;*/
-            return v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return v.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         static BigInteger[] modInversePolyPow(BigInteger[] a, BigInteger[] n, int pow)
         {
@@ -4836,10 +4959,10 @@ namespace ELTECSharp
             {
                 v[v.Length - 1 - i * pow] = M[i, M.GetLength(1) - 1];
             }
-            //if (!modInversePoly(a, n).SequenceEqual(v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray())) {
+            //if (!modInversePoly(a, n).SequenceEqual(v.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray())) {
             //    throw new ArgumentException();
             //}
-            return v.Skip(v.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return v.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         static Tuple<int, BigInteger[]> reducePoly(BigInteger[] a, int offs, int psN)
         {
@@ -4851,7 +4974,7 @@ namespace ELTECSharp
             }
             if (a.Length - offs > psN) {
                 a = a.Skip(a.Length - offs - psN).ToArray(); // mod x^psN
-                a = a.Skip(a.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray();
+                a = a.SkipWhile((BigInteger cz) => cz == BigInteger.Zero).ToArray();
             }
             return new Tuple<int, BigInteger[]>(offs, a);
         }
@@ -4884,7 +5007,7 @@ namespace ELTECSharp
                 if (z.Length - 1 + zf < k) break;
                 w[w.Length - 1 - offset - k] = l * z[z.Length - 1 + zf - k];
             }
-            return new Tuple<int, BigInteger[]>(offset, w.Skip(w.TakeWhile((BigInteger cz) => cz == BigInteger.Zero).Count()).ToArray());
+            return new Tuple<int, BigInteger[]>(offset, w.SkipWhile((BigInteger cz) => cz == BigInteger.Zero).ToArray());
         }
         //https://sage.math.leidenuniv.nl/src/modular/ssmod/ssmod.py
         //https://github.com/miracl/MIRACL/blob/master/source/curve/mueller.cpp
@@ -5051,7 +5174,7 @@ namespace ELTECSharp
                     else p[ijoffs] += A[j] * B[i];
                 }
             }
-            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).Select((x) => posRemainder(x, GF)).ToArray();
+            return p.SkipWhile((BigInteger c) => c == BigInteger.Zero).Select((x) => posRemainder(x, GF)).ToArray();
         }
         static List<List<Tuple<BigInteger, int>>> getModularPolyGF(int l, BigInteger GF)
         {
@@ -5202,7 +5325,7 @@ namespace ELTECSharp
             for (int i = 0; i < modPoly.Count(); i++) {
                 dy.Add(modPoly[i].Where((Tuple<BigInteger, int> val) => val.Item2 != 0).Select((Tuple<BigInteger, int> val) => new Tuple<BigInteger, int>(val.Item1 * val.Item2, val.Item2 - 1)).ToList());
             }
-            return dy.Skip(dy.TakeWhile((l) => l.Count == 0).Count()).ToList();
+            return dy.SkipWhile((l) => l.Count == 0).ToList();
         }
         static BigInteger evalDiffEq(List<List<Tuple<BigInteger, int>>> diffeq, BigInteger x, BigInteger y, BigInteger GF)
         {
@@ -6086,7 +6209,7 @@ namespace ELTECSharp
                 else if (i >= b.Length) c[c.Length - 1 - i] = a[a.Length - 1 - i];
                 else c[c.Length - 1 - i] = addGF2(a[a.Length - 1 - i], b[b.Length - 1 - i]);
             }
-            return c.Skip(c.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray(); ;
+            return c.SkipWhile((BigInteger cr) => cr == BigInteger.Zero).ToArray(); ;
         }
         static BigInteger[] mulGFE2k(BigInteger[] A, BigInteger[] B)
         {
@@ -6102,7 +6225,7 @@ namespace ELTECSharp
             //    if (A[0] != BigInteger.Zero) p = addGFE2k(p, B);
             //    A = A.Skip(1).ToArray(); B = B.Concat(new BigInteger[] { BigInteger.Zero }).ToArray();
             //}
-            return p.Skip(p.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray();
+            return p.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray();
         }
         //https://en.wikipedia.org/wiki/Polynomial_long_division#Pseudo-code
         static Tuple<BigInteger[], BigInteger[]> divmodGFE2k(BigInteger[] A, BigInteger[] B)
@@ -6114,7 +6237,7 @@ namespace ELTECSharp
                 if (q[A.Length - d - 1] == BigInteger.Zero) break;
                 r = addGFE2k(r, mulGFE2k(q.Skip(A.Length - d - 1).ToArray(), B));
             }
-            return new Tuple<BigInteger[], BigInteger[]>(q.Skip(q.TakeWhile((BigInteger c) => c == BigInteger.Zero).Count()).ToArray(), r);
+            return new Tuple<BigInteger[], BigInteger[]>(q.SkipWhile((BigInteger c) => c == BigInteger.Zero).ToArray(), r);
         }
         static BigInteger [] modinvGFE2k(BigInteger[] a, BigInteger[] n) //should now be working but untested - final adjustment difference in polynomials was not present
         {
@@ -6168,7 +6291,7 @@ namespace ELTECSharp
             for (i = 0; i < f.Length - 1; i++) {
                 fprime[i + 1] = ((i + 1) & 1) != 0 ? addGF2(f[i], f[i]) : f[i]; //formal derivative f', not using multiplication in the ring but addition
             }
-            BigInteger[] c = gcdGFE2k(f, fprime.Skip(fprime.TakeWhile((BigInteger cr) => cr == BigInteger.Zero).Count()).ToArray()), w = divmodGFE2k(f, c).Item1;
+            BigInteger[] c = gcdGFE2k(f, fprime.SkipWhile((BigInteger cr) => cr == BigInteger.Zero).ToArray()), w = divmodGFE2k(f, c).Item1;
             i = 0; //Step 1: Identify all factors in w
             while (w.Length != 1 || w[0] != BigInteger.One) {
                 BigInteger[] y = gcdGFE2k(w, c);
@@ -6481,7 +6604,7 @@ namespace ELTECSharp
             int curr = 0;
             BigInteger x;
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            //goto p58;
+            goto p58;
             for (int i = 2; i < 1 << 16; i++) {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(j, i, out Rem);
                 if (Rem == BigInteger.Zero) {
@@ -6525,8 +6648,8 @@ namespace ELTECSharp
             }
             Console.WriteLine("8.57 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX, rcum).ToByteArray()));
 
-            //p58:
-            //goto p59;
+            p58:
+            goto p59;
             //SET 8 CHALLENGE 58
             p = BigInteger.Parse("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623");
             q = BigInteger.Parse("335062023296420808191071248367701059461");
@@ -6604,7 +6727,7 @@ namespace ELTECSharp
             BigInteger Mprime = PollardKangaroo(0, (p - 1) / rcum, 23, Gprime, p, Yprime); //(p - 1) / rcum is 40 bits in this case, 23 could also be good
             Console.WriteLine("8.58 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX + Mprime * rcum, p - 1).ToByteArray()));
 
-            //p59:
+            p59:
             //SET 8 CHALLENGE 59
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
@@ -6612,7 +6735,7 @@ namespace ELTECSharp
             //BPOrd*(Gx, Gy) = (0, 1)
             //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
             //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
-            Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
+            //Ord = SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord);
             Ord = Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
