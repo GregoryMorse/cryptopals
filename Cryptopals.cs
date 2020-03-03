@@ -1542,25 +1542,60 @@ namespace ELTECSharp
             mt.Initialize((uint)seed);
             return FixedXOR(Enumerable.Range(0, (input.Length >> 2) + (input.Length % 4 == 0 ? 0 : 1)).Select((i) => BitConverter.GetBytes(mt.Extract())).SelectMany((d) => d).Take(input.Length).ToArray(), input);
         }
-        static void Set1()
+        static void RunSet(int setNum, Tuple<Func<bool>, int>[] curSet)
+        {
+            bool bPassAll = true;
+            foreach (dynamic s in curSet) {
+                bool bRes = s.Item1();
+                if (!bRes) bPassAll = false;
+                Console.WriteLine((bRes ? "Passed" : "Failed") + " challenge " + setNum.ToString() + "." + s.Item2.ToString());
+            }
+            if (bPassAll) Console.WriteLine("All challenges passed in set " + setNum.ToString());
+        }
+        static Tuple<Func<bool>, int>[] Set1 = {
+            new Tuple<Func<bool>, int>(Challenge1, 1),
+            new Tuple<Func<bool>, int>(Challenge2, 2),
+            new Tuple<Func<bool>, int>(Challenge3, 3),
+            new Tuple<Func<bool>, int>(Challenge4, 4),
+            new Tuple<Func<bool>, int>(Challenge5, 5),
+            new Tuple<Func<bool>, int>(Challenge6, 6),
+            new Tuple<Func<bool>, int>(Challenge7, 7),
+            new Tuple<Func<bool>, int>(Challenge8, 8)};
+        static bool Challenge1()
         {
             //SET 1 CHALLENGE 1
-            Console.WriteLine("1.1 Decoded hex equals decoded base64: " +
-                (Convert.ToBase64String(HexDecode(
-"49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
-)) == "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"));
-
+            string passResult = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBs" +
+                                "aWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
+            string str = "49276d206b696c6c696e6720796f757220627261696e206c" +
+                         "696b65206120706f69736f6e6f7573206d757368726f6f6d";
+            return Convert.ToBase64String(HexDecode(str)) == passResult;
+        }
+        static bool Challenge2()
+        {
             //SET 1 CHALLENGE 2
-            Console.WriteLine("1.2 Two values XOR equal third: " + (HexEncode(FixedXOR(
-                                HexDecode("1c0111001f010100061a024b53535009181c"),
-                                HexDecode("686974207468652062756c6c277320657965"))) ==
-                                                        "746865206b696420646f6e277420706c6179"));
-
+            string passResult = "746865206b696420646f6e277420706c6179";
+            string str1 = "1c0111001f010100061a024b53535009181c";
+            string str2 = "686974207468652062756c6c277320657965";
+            return HexEncode(FixedXOR(HexDecode(str1), HexDecode(str2))) == passResult;
+        }
+        static bool Challenge3()
+        {
             //SET 1 CHALLENGE 3
-            byte[] b = HexDecode("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736");
-            Console.WriteLine("1.3 Recovered text: " + System.Text.Encoding.ASCII.GetString(FixedXOR(b, Enumerable.Repeat((byte)GetLeastXORCharacterScore(b).index, b.Length).ToArray())));
-
+            byte passKey = 88;
+            string passString = "Cooking MC's like a pound of bacon"; //Vanilla Ice - Ice Ice Baby
+            string str = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
+            byte[] b = HexDecode(str);
+            byte key = (byte)GetLeastXORCharacterScore(b).index;
+            string res = System.Text.Encoding.ASCII.GetString(
+                            FixedXOR(b, Enumerable.Repeat(key, b.Length).ToArray()));
+            return key == passKey && res == passString;
+        }
+        static bool Challenge4()
+        {
             //SET 1 CHALLENGE 4
+            int passLine = 170;
+            byte passKey = 53;
+            string passString = "Now that the party is jumping\n";
             dynamic maxItem = new { index = 0, score = 0 }; //assume 0 is starting maximum is fine in this scenario regardless
             byte[][] lines = Enumerable.Select(System.IO.File.ReadAllLines("../../4.txt"), s => HexDecode(s)).ToArray();
             for (int i = 0; i < lines.Length; i++)
@@ -1569,44 +1604,144 @@ namespace ELTECSharp
                 //Console.WriteLine(val.score.ToString() + " " + System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], Enumerable.Repeat((byte)val.index, lines[i].Length).ToArray())));
                 if (val.score > maxItem.score) { maxItem = new { origindex = i, index = val.index, score = val.score }; }
             }
-            Console.WriteLine("1.4 Recovered line text: " + System.Text.Encoding.ASCII.GetString(FixedXOR(lines[maxItem.origindex], Enumerable.Repeat((byte)maxItem.index, b.Length).ToArray())));
-
+            string res = System.Text.Encoding.ASCII.GetString(
+                FixedXOR(lines[maxItem.origindex], Enumerable.Repeat((byte)maxItem.index, lines[maxItem.origindex].Length).ToArray()));
+            return maxItem.origindex == passLine && maxItem.index == passKey && res == passString;
+        }
+        static bool Challenge5()
+        {
             //SET 1 CHALLENGE 5
-            b = System.Text.Encoding.ASCII.GetBytes("Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal");
-            Console.WriteLine("1.5 XOR encryption is correct: " + (HexEncode(FixedXOR(b, Enumerable.Repeat(System.Text.Encoding.ASCII.GetBytes("ICE"), b.Length / 3 + 1).SelectMany(d => d).Take(b.Length).ToArray())) ==
-                "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"));
-
+            string passResult = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272" +
+                "a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+            string str = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+            string key = "ICE";
+            byte[] b = System.Text.Encoding.ASCII.GetBytes(str);
+            return HexEncode(FixedXOR(b, Enumerable.Repeat(System.Text.Encoding.ASCII.GetBytes(key), b.Length / 3 + 1).SelectMany(d => d).Take(b.Length).ToArray())) == passResult;
+        }
+        static string Challenge6and7pass()
+        {
+            return //Vanilla Ice - Play That Funky Music
+            "I'm back and I'm ringin' the bell \n" +
+            "A rockin' on the mike while the fly girls yell \n" +
+            "In ecstasy in the back of me \n" +
+            "Well that's my DJ Deshay cuttin' all them Z's \n" +
+            "Hittin' hard and the girlies goin' crazy \n" +
+            "Vanilla's on the mike, man I'm not lazy. \n\n" +
+            "I'm lettin' my drug kick in \n" +
+            "It controls my mouth and I begin \n" +
+            "To just let it flow, let my concepts go \n" +
+            "My posse's to the side yellin', Go Vanilla Go! \n\n" +
+            "Smooth 'cause that's the way I will be \n" +
+            "And if you don't give a damn, then \n" +
+            "Why you starin' at me \n" +
+            "So get off 'cause I control the stage \n" +
+            "There's no dissin' allowed \n" +
+            "I'm in my own phase \n" +
+            "The girlies sa y they love me and that is ok \n" +
+            "And I can dance better than any kid n' play \n\n" +
+            "Stage 2 -- Yea the one ya' wanna listen to \n" +
+            "It's off my head so let the beat play through \n" +
+            "So I can funk it up and make it sound good \n" +
+            "1-2-3 Yo -- Knock on some wood \n" +
+            "For good luck, I like my rhymes atrocious \n" +
+            "Supercalafragilisticexpialidocious \n" +
+            "I'm an effect and that you can bet \n" +
+            "I can take a fly girl and make her wet. \n\n" +
+            "I'm like Samson -- Samson to Delilah \n" +
+            "There's no denyin', You can try to hang \n" +
+            "But you'll keep tryin' to get my style \n" +
+            "Over and over, practice makes perfect \n" +
+            "But not if you're a loafer. \n\n" +
+            "You'll get nowhere, no place, no time, no girls \n" +
+            "Soon -- Oh my God, homebody, you probably eat \n" +
+            "Spaghetti with a spoon! Come on and say it! \n\n" +
+            "VIP. Vanilla Ice yep, yep, I'm comin' hard like a rhino \n" +
+            "Intoxicating so you stagger like a wino \n" +
+            "So punks stop trying and girl stop cryin' \n" +
+            "Vanilla Ice is sellin' and you people are buyin' \n" +
+            "'Cause why the freaks are jockin' like Crazy Glue \n" +
+            "Movin' and groovin' trying to sing along \n" +
+            "All through the ghetto groovin' this here song \n" +
+            "Now you're amazed by the VIP posse. \n\n" +
+            "Steppin' so hard like a German Nazi \n" +
+            "Startled by the bases hittin' ground \n" +
+            "There's no trippin' on mine, I'm just gettin' down \n" +
+            "Sparkamatic, I'm hangin' tight like a fanatic \n" +
+            "You trapped me once and I thought that \n" +
+            "You might have it \n" +
+            "So step down and lend me your ear \n" +
+            "'89 in my time! You, '90 is my year. \n\n" +
+            "You're weakenin' fast, YO! and I can tell it \n" +
+            "Your body's gettin' hot, so, so I can smell it \n" +
+            "So don't be mad and don't be sad \n" +
+            "'Cause the lyrics belong to ICE, You can call me Dad \n" +
+            "You're pitchin' a fit, so step back and endure \n" +
+            "Let the witch doctor, Ice, do the dance to cure \n" +
+            "So come up close and don't be square \n" +
+            "You wanna battle me -- Anytime, anywhere \n\n" +
+            "You thought that I was weak, Boy, you're dead wrong \n" +
+            "So come on, everybody and sing this song \n\n" +
+            "Say -- Play that funky music Say, go white boy, go white boy go \n" +
+            "play that funky music Go white boy, go white boy, go \n" +
+            "Lay down and boogie and play that funky music till you die. \n\n" +
+            "Play that funky music Come on, Come on, let me hear \n" +
+            "Play that funky music white boy you say it, say it \n" +
+            "Play that funky music A little louder now \n" +
+            "Play that funky music, white boy Come on, Come on, Come on \n" +
+            "Play that funky music \n";
+        }
+        static bool Challenge6()
+        {
             //SET 1 CHALLENGE 6
-            Console.WriteLine("1.6 Hamming distance correct: " + (HammingDistance(System.Text.Encoding.ASCII.GetBytes("this is a test"), System.Text.Encoding.ASCII.GetBytes("wokka wokka!!!")) == 37));
-            b = Enumerable.Select(System.IO.File.ReadAllLines("../../6.txt"), s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
+            int passKeyLen = 29;
+            byte[] passKey = System.Text.Encoding.ASCII.GetBytes("Terminator X: Bring the noise");
+            string passResult = Challenge6and7pass();
+            if (HammingDistance(System.Text.Encoding.ASCII.GetBytes("this is a test"), System.Text.Encoding.ASCII.GetBytes("wokka wokka!!!")) != 37) return false;
+            byte[] b = Enumerable.Select(System.IO.File.ReadAllLines("../../6.txt"), s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
             dynamic minItem = new { keysize = 2, hamming = double.MaxValue };
             foreach (dynamic val in Enumerable.Range(2, 39).Select(j => new
             {
                 keysize = j, //hamming all neighboring pieces except for the last one if its not a multiple - this is slower but maximal accuracy! must use double for divisions...
+                //1 / (ciphLen / i - 1) / i == (i / (ciphLen - i)) / i == 1 / (ciphLen - i)
                 hamming = (double)Enumerable.Range(0, b.Length / j - 1).Select(l =>
                         HammingDistance(b.Skip(l * j).Take(j).ToArray(),
-                        b.Skip((l + 1) * j).Take(j).ToArray())).Sum() / ((double)b.Length / (double)j - 1.0) / (double)j
+                        b.Skip((l + 1) * j).Take(j).ToArray())).Sum() / ((double)b.Length - (double)j)
             }))
             {
                 if (val.hamming < minItem.hamming) { minItem = val; }
             }
-            Console.WriteLine(System.Text.Encoding.ASCII.GetString(FixedXOR(b,
-                Enumerable.Repeat(Enumerable.Range(0, (int)minItem.keysize).Select(j =>
-                    (byte)GetLeastXORCharacterScore(b.Where((c, i) => i % (int)minItem.keysize == j).ToArray()).index),
-                    b.Length / (int)minItem.keysize + 1).SelectMany(d => d).Take(b.Length).ToArray())));
-
+            byte[] key = Enumerable.Range(0, (int)minItem.keysize).Select(j =>
+                    (byte)GetLeastXORCharacterScore(b.Where((c, i) => i % (int)minItem.keysize == j).ToArray()).index).ToArray();
+            return minItem.keysize == passKeyLen && key.SequenceEqual(passKey) &&
+                System.Text.Encoding.ASCII.GetString(FixedXOR(b, Enumerable.Repeat(key,
+                    b.Length / (int)minItem.keysize + 1).SelectMany(d => d).Take(b.Length).ToArray())) == passResult;
+        }
+        static bool Challenge7()
+        {
             //SET 1 CHALLENGE 7
-            b = System.IO.File.ReadAllLines("../../7.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
+            string passResult = Challenge6and7pass() + "\x04\x04\x04\x04";
+            byte[] b = System.IO.File.ReadAllLines("../../7.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
             byte[] o = decrypt_ecb(System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), b);
-            Console.WriteLine("1.7 Recovered plaintext: " + System.Text.Encoding.ASCII.GetString(o));
-
+            return System.Text.Encoding.ASCII.GetString(o) == passResult;
+        }
+        static bool Challenge8()
+        {
             //SET 1 CHALLENGE 8
-            lines = System.IO.File.ReadAllLines("../../8.txt").Select(s => HexDecode(s)).ToArray();
+            string[] passResult = {"d880619740a8a19b7840a8a31c810a3d08649af70dc06f4f" +
+                "d5d2d69c744cd283e2dd052f6b641dbf9d11b0348542bb57" +
+                "08649af70dc06f4fd5d2d69c744cd2839475c9dfdbc1d465" +
+                "97949d9c7e82bf5a08649af70dc06f4fd5d2d69c744cd283" +
+                "97a93eab8d6aecd566489154789a6b0308649af70dc06f4f" +
+                "d5d2d69c744cd283d403180c98c8f6db1f2a3f9c4040deb0" +
+                "ab51b29933f2c123c58386b06fba186a"};
+            byte[][] lines = System.IO.File.ReadAllLines("../../8.txt").Select(s => HexDecode(s)).ToArray();
+            List<byte[]> ecbLines = new List<byte[]>();
             foreach (byte[] l in lines) {
                 if (isecbmode(l)) {
-                    Console.WriteLine("1.8 Detected AES ECB mode: " + HexEncode(l));
+                    ecbLines.Add(l);
                 }
             }
+            return ecbLines.Select((x) => HexEncode(x)).SequenceEqual(passResult);
         }
         static void Set2()
         {
@@ -3761,7 +3896,16 @@ namespace ELTECSharp
             //if (res != d) throw new ArgumentException();
             return d;
         }
-        static BigInteger[] dft(BigInteger[] A, int m, int n)
+        static uint reverseBits(uint v)
+        {
+            v = ((v >> 1) & 0x55555555) | ((v & 0x55555555) << 1);
+            v = ((v >> 2) & 0x33333333) | ((v & 0x33333333) << 2);
+            v = ((v >> 4) & 0x0F0F0F0F) | ((v & 0x0F0F0F0F) << 4);
+            v = ((v >> 8) & 0x00FF00FF) | ((v & 0x00FF00FF) << 8);
+            return (v >> 16) | (v << 16);
+            //return BitConverter.ToUInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * (UInt64)0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0);
+        }
+        static BigInteger[] dft(BigInteger[] A, int m, int n, BigInteger subMask)
         {
             bool even = (m & 1) == 0;
             int len = A.Length;
@@ -3769,21 +3913,23 @@ namespace ELTECSharp
             int twoton = 1 << n;
             int twotonp1 = 1 << (n + 1);
             BigInteger testMask = BigInteger.One << twotonp1;
-            BigInteger testMaskm1 = testMask - 1;
-            BigInteger subMask = (BigInteger.One << twoton) - 1;
+            BigInteger testMaskm1 = testMask - BigInteger.One;
+            Dictionary<int, BigInteger> xmasks = new Dictionary<int, BigInteger>();
+            //BigInteger subMask = (BigInteger.One << twoton) - BigInteger.One;
             for (int slen = len >> 1; slen > 0; slen >>= 1) {
                 for (int j = 0; j < len; j += (slen << 1)) {
                     int idx = j;
-                    int x = (int)((BitConverter.ToUInt32(BitConverter.GetBytes(idx+len).Select((b) => (byte)(((b * (UInt64)0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v)) >> (32 - 1 - n));
+                    int x = (int)((reverseBits((uint)(idx + len)) << (n - v)) >> (32 - 1 - n));
                     if (even) x >>= 1;
-                    BigInteger xmask = (BigInteger.One << (twotonp1 - x)) - 1;
+                    if (!xmasks.ContainsKey(twotonp1 - x)) xmasks.Add(twotonp1 - x, getBitMaskBigInteger(twotonp1 - x));
+                    BigInteger xmask = xmasks[twotonp1 - x]; // (BigInteger.One << (twotonp1 - x)) - BigInteger.One;
                     for (int k = slen - 1; k >= 0; k--) {
-                        BigInteger d = ((A[idx + slen] & xmask) << x) | (A[idx + slen] >> (twotonp1 - x));
+                        BigInteger d = ((A[idx + slen] & xmask) << x) | (A[idx + slen] >> (twotonp1 - x)); //rotation based on gamma
                         A[idx + slen] = A[idx];
                         A[idx] += d;
-                        if ((A[idx] & testMask) != BigInteger.Zero) A[idx] = (A[idx] & testMaskm1) + 1;
-                        A[idx + slen] += ((d & subMask) << twoton) | (d >> twoton);
-                        if ((A[idx + slen] & testMask) != BigInteger.Zero) A[idx + slen] = (A[idx + slen] & testMaskm1) + 1;
+                        if ((A[idx] & testMask) != BigInteger.Zero) A[idx] = (A[idx] & testMaskm1) + BigInteger.One;
+                        A[idx + slen] += ((d & subMask) << twoton) | (d >> twoton); //even rotation
+                        if ((A[idx + slen] & testMask) != BigInteger.Zero) A[idx + slen] = (A[idx + slen] & testMaskm1) + BigInteger.One;
                         idx++;
                     }
                 }
@@ -3791,7 +3937,7 @@ namespace ELTECSharp
             }
             return A;
         }
-        static BigInteger[] idft(BigInteger[] A, int m, int n)
+        static BigInteger[] idft(BigInteger[] A, int m, int n, BigInteger subMask)
         {
             bool even = (m & 1) == 0;
             int len = A.Length;
@@ -3799,24 +3945,25 @@ namespace ELTECSharp
             int twoton = 1 << n;
             int twotonp1 = 1 << (n + 1);
             BigInteger testMask = BigInteger.One << twotonp1;
-            BigInteger testMaskm1 = testMask - 1;
-            BigInteger subMask = (BigInteger.One << twoton) - 1;
+            BigInteger testMaskm1 = testMask - BigInteger.One;
+            //if (testMaskm1 != getBitMaskBigInteger(twotonp1)) throw new ArgumentException();
+            //BigInteger subMask = (BigInteger.One << twoton) - BigInteger.One;
             for (int slen = 1; slen <= (len >> 1); slen <<= 1) {
                 for (int j = 0; j < len; j += (slen << 1)) {
                     int idx = j;
                     int idx2 = idx + slen;
-                    int x = (int)((BitConverter.ToUInt32(BitConverter.GetBytes(idx).Select((b) => (byte)(((b * (UInt64)0x80200802U) & 0x0884422110U) * 0x0101010101U >> 32)).Reverse().ToArray(), 0) << (n - v)) >> (32 - n));
+                    int x = (int)((reverseBits((uint)(idx)) << (n - v)) >> (32 - n));
                     x += (1 << (n - v - (even ? 0 : 1))) + 1;
-                    BigInteger xmask = (BigInteger.One << x) - 1;
+                    BigInteger xmask = getBitMaskBigInteger(x); //(BigInteger.One << x) - BigInteger.One;
                     for (int k = slen-1; k >= 0; k--) {
                         BigInteger c = A[idx];
                         A[idx] += A[idx2];
-                        if ((A[idx] & testMask) != BigInteger.Zero) A[idx] = (A[idx] & testMaskm1) + 1;
+                        if ((A[idx] & testMask) != BigInteger.Zero) A[idx] = (A[idx] & testMaskm1) + BigInteger.One; //1 bit rotation
                         if (A[idx].IsEven) A[idx] = (A[idx] >> 1);
                         else A[idx] = (A[idx] >> 1) | (BigInteger.One << (twotonp1 - 1));
-                        c += ((A[idx2] & subMask) << twoton) | (A[idx2] >> twoton);
-                        if ((c & testMask) != BigInteger.Zero) c = (c & testMaskm1) + 1;
-                        A[idx2] = (c >> x) | ((c & xmask) << (twotonp1 - x));
+                        c += ((A[idx2] & subMask) << twoton) | (A[idx2] >> twoton); //even rotation
+                        if ((c & testMask) != BigInteger.Zero) c = (c & testMaskm1) + BigInteger.One;
+                        A[idx2] = (c >> x) | ((c & xmask) << (twotonp1 - x)); //rotation based on gamma
                         idx++; idx2++;
                     }
                 }
@@ -3841,7 +3988,7 @@ namespace ELTECSharp
             BigInteger u = BigInteger.Zero;
             BigInteger v = BigInteger.Zero;
             int uBitLength = 0, vBitLength = 0;
-            BigInteger pieceMask = (BigInteger.One << (n + 2)) - 1;
+            BigInteger pieceMask = (BigInteger.One << (n + 2)) - BigInteger.One;
             int threen5 = 3 * n + 5;
             //build u and v from a and b allocating 3n+5 bits in u and v per n+2 bits from a and b respectively
             //for (int i = 0; i < numPiecesA && (i << (n - 1)) < num1bits; i++) {
@@ -3862,14 +4009,16 @@ namespace ELTECSharp
             vBitLength = threen5 * numPiecesB;
             //BigInteger gamma = u * v;
             BigInteger gamma = doBigMul(u, v, uBitLength, vBitLength);
+            u = BigInteger.Zero; v = BigInteger.Zero;
             int halfNumPcs = numPieces >> 1;
             int numPiecesG = (GetBitSize(gamma) + threen5 - 1) / threen5;
             //BigInteger[] gammai = new BigInteger[numPiecesG];
-            //BigInteger threen5mask = (BigInteger.One << threen5) - 1;
+            //BigInteger threen5mask = (BigInteger.One << threen5) - BigInteger.One;
             //for (int i = 0; i < numPiecesG; i++) {
-                //gammai[i] = (gamma >> (i * threen5)) & threen5mask;
+            //gammai[i] = (gamma >> (i * threen5)) & threen5mask;
             //}
             BigInteger[] gammai = multiSplitBigInteger(gamma, threen5, numPiecesG);
+            gamma = BigInteger.Zero;
             BigInteger[] zi = new BigInteger[numPiecesG];
             Array.Copy(gammai, 0, zi, 0, numPiecesG);
             for (int i = 0; i < gammai.Length - halfNumPcs; i++)
@@ -3890,29 +4039,30 @@ namespace ELTECSharp
             BigInteger[] bi = multiSplitBigInteger(num2, pieceBits, halfNumPcs);
             //if (!ai.SequenceEqual(multiSplitBigInteger(num1, pieceBits, halfNumPcs))) throw new ArgumentException();
             //if (!bi.SequenceEqual(multiSplitBigInteger(num2, pieceBits, halfNumPcs))) throw new ArgumentException();
-            ai = dft(ai, m, n);
-            bi = dft(bi, m, n);
             int nbits = 1 << n;
-            BigInteger halfMask = (BigInteger.One << nbits) - 1;
-            BigInteger adjHalf = halfMask + 2; // (BigInteger.One << nbits) + 1;
+            BigInteger halfMask = (BigInteger.One << nbits) - BigInteger.One;
+            ai = dft(ai, m, n, halfMask);
+            bi = dft(bi, m, n, halfMask);
+            BigInteger adjHalf = halfMask + 2; // (BigInteger.One << nbits) + BigInteger.One;
             for (int i = 0; i < halfNumPcs; i++) {
                 ai[i] = (ai[i] & halfMask) - (ai[i] >> nbits);
-                if (ai[i] < 0) ai[i] += adjHalf;
+                if (ai[i] < BigInteger.Zero) ai[i] += adjHalf;
                 bi[i] = (bi[i] & halfMask) - (bi[i] >> nbits);
-                if (bi[i] < 0) bi[i] += adjHalf;
+                if (bi[i] < BigInteger.Zero) bi[i] += adjHalf;
             }
             BigInteger[] c = new BigInteger[halfNumPcs];
             for (int i = 0; i < halfNumPcs; i++)
-                c[i] = doBigMul(ai[i] & halfMask, bi[i] & halfMask, nbits, nbits);
-                //c[i] = (ai[i] & halfMask) * (bi[i] & halfMask);
-            c = idft(c, m, n);
+                c[i] = doBigMul(ai[i], bi[i], nbits, nbits);
+            //c[i] = ai[i] * bi[i];
+            ai = null; bi = null;
+            c = idft(c, m, n, halfMask);
             for (int i = 0; i < c.Length; i++) {
                 c[i] = (c[i] & halfMask) - (c[i] >> nbits);
-                if (c[i] < 0) c[i] += adjHalf;
+                if (c[i] < BigInteger.Zero) c[i] += adjHalf;
             }
             BigInteger z = BigInteger.Zero, hipart = BigInteger.Zero; //, z2 = BigInteger.Zero;
-            BigInteger pieceBitMask = (BigInteger.One << pieceBits) - 1;
-            BigInteger[] zs = new BigInteger[halfNumPcs + 1];
+            BigInteger pieceBitMask = (BigInteger.One << pieceBits) - BigInteger.One;
+            BigInteger[] zs = new BigInteger[halfNumPcs];
             for (int i = 0; i < halfNumPcs; i++) {
                 BigInteger eta = i >= zi.Length ? 0 : zi[i];
                 if (eta.IsZero && c[i].IsZero) {
@@ -3927,7 +4077,7 @@ namespace ELTECSharp
                 //else z2 += ((c[i] + eta) << shift) | (eta << (shift + nbits));
                 if (i == halfNumPcs - 1) {
                     zs[i] = c[i] + eta + hipart;
-                    zs[i + 1] = eta;
+                    //zs[i + 1] = eta; //technically this cannot occur
                     //z |= ((c[i] + eta + hipart) << shift) | (eta << (shift + nbits));
                 } else if (eta.IsZero) {
                     BigInteger part = c[i] + hipart;
@@ -3943,14 +4093,25 @@ namespace ELTECSharp
                 //if (z != (z2 & ((BigInteger.One << ((i + 1) << (n - 1))) - 1))) throw new ArgumentException();
             }
             //if (z != combineBigIntegers(zs, pieceBits)) throw new ArgumentException();
-            z = combineBigIntegers(zs, pieceBits);
-            nbits = 1 << m;
-            halfMask = (BigInteger.One << nbits) - 1;
-            adjHalf = halfMask + 2; //(BigInteger.One << nbits) + 1;
-            z = (z & halfMask) - (z >> nbits);
-            if (z < BigInteger.Zero) z += adjHalf;
+            //z = combineBigIntegers(zs, pieceBits);
+            //nbits = 1 << m;
+            //halfMask = (BigInteger.One << nbits) - BigInteger.One;
+            //adjHalf = halfMask + 2; //(BigInteger.One << nbits) + BigInteger.One;
+            //z = (z & halfMask) - (z >> nbits);
+            //if (z < BigInteger.Zero) z += adjHalf;
+            z = combineBigIntegers(zs.Take(halfNumPcs >> 2).ToArray(), pieceBits) - combineBigIntegers(zs.Skip(halfNumPcs >> 2).ToArray(), pieceBits);
+            if (z < BigInteger.Zero) z += (BigInteger.One << nbits) + BigInteger.One;
             return z;
 
+        }
+        static BigInteger getBitMaskBigInteger(int bits)
+        {
+            //byte[] bytes = Enumerable.Repeat<byte>(255, (bits + 7) >> 3).Concat(new byte[] { 0 }).ToArray();
+            //if ((bits & 7) != 0) bytes[bytes.Length - 2] &= (byte)((1 << (bits & 7)) - 1);
+            byte[] bytes = new byte[((bits + 7) >> 3) + 1];
+            bytes[bytes.Length - 2] = ((bits & 7) == 0) ? (byte)255 : (byte)(255 & ((1 << (bits & 7)) - 1));
+            for (int i = bytes.Length - 3; i >= 0; i--) bytes[i] = 255;
+            return new BigInteger(bytes);
         }
         static BigInteger combineBigIntegers(BigInteger[] nums, int bits)
         {
@@ -4024,6 +4185,54 @@ namespace ELTECSharp
             if (bits != 0) taken[bytesWanted - 1] &= (byte)((1 << bits) - 1);
             return new BigInteger(taken);
         }
+
+        static BigInteger mulKaratsubaFast(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
+        {
+            return mulKaratsubaFastImpl(multiSplitBigInteger(num1, 4096, (num1bits + 4095) / 4096),
+                multiSplitBigInteger(num2, 4096, (num2bits + 4095) / 4096));
+        }
+        static BigInteger[] addBigIntArrays(BigInteger[] num1, BigInteger[] num2)
+        {
+            int l1 = num1.Length, l2 = num2.Length;
+            BigInteger[] c = new BigInteger[Math.Max(l1, l2) + 1];
+            BigInteger carry = 0, carryMask = ((BigInteger.One << 4096) - 1);
+            int i;
+            for (i = 0; i < Math.Min(l1, l2); i++) {
+                c[i] = num1[i] + num2[i] + carry;
+                carry = c[i] >> 4096;
+                if (carry != BigInteger.Zero) c[i] &= carryMask;
+            }
+            if (l1 > l2) {
+                Array.Copy(num1, i, c, i, l1 - i);
+            } else if (l2 > l1) {
+                Array.Copy(num2, i, c, i, l2 - i);
+            }
+            while (carry != BigInteger.Zero) {
+                c[i] += carry;
+                carry = c[i] >> 4096;
+                if (carry != BigInteger.Zero) c[i] &= carryMask;
+                i++;
+            }
+            return c.Last() == BigInteger.Zero ? c.Take(c.Length - 1).ToArray() : c;
+        }
+        static BigInteger mulKaratsubaFastImpl(BigInteger[] num1, BigInteger[] num2)
+        {
+            int l1 = num1.Length, l2 = num2.Length;
+            if (l1 == 0 || l2 == 0) return BigInteger.Zero;
+            else if (l1 == 1) return doBigMul(num1[0], combineBigIntegers(num2, 4096), 4096, l2 * 4096);
+            else if (l2 == 1) return doBigMul(combineBigIntegers(num1, 4096), num2[0], l1 * 4096, 4096);
+            int m = Math.Min(l1, l2);
+            int m2 = m >> 1;
+            BigInteger[] low1 = new BigInteger[m2], low2 = new BigInteger[m2];
+            Array.Copy(num1, 0, low1, 0, m2); Array.Copy(num2, 0, low2, 0, m2);
+            BigInteger[] high1 = new BigInteger[l1 - m2], high2 = new BigInteger[l2 - m2];
+            Array.Copy(num1, m2, high1, 0, l1 - m2); Array.Copy(num2, m2, high2, 0, l2 - m2);
+            BigInteger z0 = mulKaratsubaFastImpl(low1, low2);
+            BigInteger z1 = mulKaratsubaFastImpl(addBigIntArrays(low1, high1), addBigIntArrays(low2, high2));
+            BigInteger z2 = mulKaratsubaFastImpl(high1, high2);
+            m2 *= 4096;
+            return ((z2 << (m2 << 1)) | z0) + ((z1 - z0 - z2) << m2);
+        }
         static BigInteger mulKaratsuba(BigInteger num1, BigInteger num2, int num1bits, int num2bits)
         {
             //if (num1 < 2 || num2 < 2) return num1 * num2;
@@ -4038,11 +4247,11 @@ namespace ELTECSharp
             BigInteger low1, low2, high1, high2;
             //(high1, low1) = splitBigInteger(num1, m2);
             //(high2, low2) = splitBigInteger(num2, m2);
-            BigInteger m2shift = BigInteger.One << m2;
+            BigInteger m2shift = (BigInteger.One << m2) - BigInteger.One;
             //low1 = takeBitsBigInteger(num1, m2);
-            low1 = num1 & (m2shift - 1);
+            low1 = num1 & m2shift;
             //low2 = takeBitsBigInteger(num2, m2);
-            low2 = num2 & (m2shift - 1);
+            low2 = num2 & m2shift;
             high1 = num1 >> m2;
             high2 = num2 >> m2;
             BigInteger z0 = doBigMul(low1, low2, m2, m2);
@@ -4156,6 +4365,11 @@ namespace ELTECSharp
                 Console.WriteLine("BigInteger*:        " + s.ElapsedMilliseconds);
                 s.Reset();*/
                 s.Start();
+                BigInteger ckf = mulKaratsubaFast(a, b, GetBitSize(a), GetBitSize(b));
+                s.Stop();
+                Console.WriteLine("KaratsubaFast:      " + s.ElapsedMilliseconds);
+                s.Reset();
+                s.Start();
                 BigInteger ck = bigMul(a, b);
                 s.Stop();
                 Console.WriteLine("BigMul:             " + s.ElapsedMilliseconds);
@@ -4166,7 +4380,8 @@ namespace ELTECSharp
                 Console.WriteLine("Schonhage-Strassen: " + s.ElapsedMilliseconds);
                 s.Reset();
                 //if (c != ck) throw new ArgumentException();
-                if (ck != cs) throw new ArgumentException();
+                //if (ck != cs) throw new ArgumentException();
+                if (ckf != ck) throw new ArgumentException();
             }
         }
         //static int thresh;
@@ -4177,7 +4392,7 @@ namespace ELTECSharp
                 return new BigInteger(res);
             }
             if (num1 <= uint.MaxValue || num2 <= uint.MaxValue ||
-                num1bits < 4096 || num2bits < 4096) return num1 * num2; //experimentally determined threshold 8192 is next best
+                num1bits <= 4096 || num2bits <= 4096) return num1 * num2; //experimentally determined threshold 8192 is next best
             //if (num1bits >= 1728 * 64 && num2bits >= 1728 * 64)
                 //return mulSchonhageStrassen(num1, num2, num1bits, num2bits);
             return mulKaratsuba(num1, num2, num1bits, num2bits);
@@ -8162,7 +8377,7 @@ namespace ELTECSharp
         static void Main(string[] args)
         {
             //testMul();
-            //Set1();
+            RunSet(1, Set1);
             //Set2();
             //Set3();
             //Set4();
