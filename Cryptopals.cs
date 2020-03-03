@@ -11,8 +11,10 @@ using System.Security.Cryptography;
 //BouncyCastle has an implementation
 //.NET Core 3.0 might have an implementation
 using System.Text;
+using static Cryptopals.Utility;
+using static Cryptopals.sets;
 
-namespace ELTECSharp
+namespace Cryptopals
 {
     public class MD4 : HashAlgorithm
     {
@@ -1109,39 +1111,6 @@ namespace ELTECSharp
         public int Computed;                             /* Is the digest computed?         */
         public int Corrupted;                            /* Is the message digest corrupted? */
     }
-    public class ByteArrayComparer : EqualityComparer<byte[]>
-    {
-        public override bool Equals(byte[] left, byte[] right)
-        {
-            if (left == null || right == null) {
-                return left == right;
-            }
-            if (ReferenceEquals(left, right)) {
-                return true;
-            }
-            if (left.Length != right.Length) {
-                return false;
-            }
-            return left.SequenceEqual(right);
-        }
-        public override int GetHashCode(byte[] obj)
-        {
-            if (obj == null) {
-                throw new ArgumentNullException("obj");
-            }
-            //shortcut which works well for crypto data since hash function must be fast
-            if (obj.Length >= 4) {
-                return BitConverter.ToInt32(obj, 0);
-            }
-            // Length occupies at most 2 bits. Might as well store them in the high order byte
-            int value = obj.Length;
-            foreach (var b in obj) {
-                value <<= 8;
-                value += b;
-            }
-            return value;
-        }
-    }
     public class MersenneTwister
     {
         public uint [] x = new uint[624];
@@ -1222,7 +1191,7 @@ namespace ELTECSharp
             return ((def & 0xFFFFDF8C) << 15) ^ def ^ ((((def & 0xFFFFDF8Cu) << 15) ^ def) >> 18);
         }
     }
-    class Crypto
+    public class Crypto
     {
         static private int GetNextRandom(RandomNumberGenerator rnd, int Maximum)
         {
@@ -1250,32 +1219,7 @@ namespace ELTECSharp
             } while (Maximum <= ret);
             return ret;
         }
-        static private string HexEncode(byte[] input)
-        {
-            return string.Join(string.Empty, input.Select(d => d.ToString("x2")));
-        }
-        static private byte[] HexDecode(string input)
-        {
-            return Enumerable.Range(0, input.Length / 2)
-                .Select(i => byte.Parse(input.Substring(i * 2, 2),
-                    System.Globalization.NumberStyles.AllowHexSpecifier)).ToArray();
-        }
-        static private byte[] FixedXOR(byte[] a, byte[] b)
-        {
-            return a.Select((d, i) => (byte)(d ^ b[i])).ToArray();
-        }
-        static private int CharacterScore(byte[] s)
-        {
-            //http://academic.regis.edu/jseibert/Crypto/Frequency.pdf a-z/A-Z
-            double[] freq = { .082, .015, .028, .043, .127, .022, .020, .061, .070, .002, .008, .040, .024,
-                              .067, .075, .019, .001, .060, .063, .091, .028, .010, .023, .001, .020, .001};
-            ILookup<byte, byte> j = s.ToLookup(c => c); //group them by frequency
-            //30% weight for space or a couple false positives with high weighted letters can win
-            //a negative weight for bad characters would make it even better...
-            return (int)(((j.Contains((byte)' ') ? .3 * j[(byte)' '].Count() : 0) +
-                freq.Select((d, i) => d * ((j.Contains((byte)('a' + i)) ? j[(byte)('a' + i)].Count() : 0) +
-                                            (j.Contains((byte)('A' + i)) ? j[(byte)('A' + i)].Count() : 0))).Sum()) * 100);
-        }
+
         //http://norvig.com/mayzner.html
         static private dynamic GetLeastXORBigramScore(byte[] s, byte[] t)
         {
@@ -1345,26 +1289,7 @@ namespace ELTECSharp
             }
             return char1f.OrderBy((c) => c.score).Last();
         }
-        static private dynamic GetLeastXORCharacterScore(byte[] s)
-        {
-            dynamic maxItem = new { index = 0, score = 0 }; //assume 0 is starting maximum is fine in this scenario regardless
-            foreach (dynamic val in Enumerable.Range(0, 256).Select(i =>
-                new { index = (byte)i, score = CharacterScore(FixedXOR(s, Enumerable.Repeat((byte)i, s.Length).ToArray())) }))
-            {
-                //Console.WriteLine(val.score.ToString() + " " + System.Text.Encoding.ASCII.GetString(FixedXOR(s, Enumerable.Repeat((byte)val.index, s.Length).ToArray())));
-                if (val.score > maxItem.score) { maxItem = val; }
-            }
-            return maxItem;
-        }
-        static private int HammingDistance(byte[] a, byte[] b)
-        {
-            return a.Select((d, i) => {
-                int c;
-                byte v = (byte)(d ^ b[i]); //Counting bits set, Brian Kernighan's way
-                for (c = 0; v != 0; c++) { v &= (byte)(v - 1); }
-                return c;
-            }).Sum();
-        }
+
         static private byte[] PKCS7Pad(byte[] input, int blocksize)
         {
             return Enumerable.Concat(input, Enumerable.Repeat((byte)(blocksize - (input.Length % blocksize)), blocksize - (input.Length % blocksize))).ToArray();
@@ -1390,27 +1315,7 @@ namespace ELTECSharp
             }
             return o;
         }
-        static private byte[] decrypt_ecb(byte[] key, byte[] input)
-        {
-            System.Security.Cryptography.AesManaged aes128 = new System.Security.Cryptography.AesManaged();
-            //System.Security.Cryptography.RijndaelManaged aes128 = new System.Security.Cryptography.RijndaelManaged();
-            aes128.Key = key;
-            aes128.Mode = System.Security.Cryptography.CipherMode.ECB;
-            aes128.Padding = System.Security.Cryptography.PaddingMode.None; //critical or cannot do one block at a time...
-            byte[] o = new byte[input.Length];
-            int offset = 0; //could use a MemoryStream and CryptoStream to make this automated and robust...
-            //but the block aspect is encapsulated away which is to be a highlight
-            System.Security.Cryptography.ICryptoTransform transform = aes128.CreateDecryptor();
-            while (offset < input.Length) {
-                if (offset + aes128.BlockSize / 8 <= input.Length) {
-                    offset += transform.TransformBlock(input, offset, aes128.BlockSize / 8, o, offset);
-                } else {
-                    transform.TransformFinalBlock(input, offset, input.Length - offset).CopyTo(o, offset);
-                    break;
-                }
-            }
-            return o;
-        }
+
         static private byte[] encrypt_cbc(byte[] iv, byte[] key, byte[] input)
         {
             byte[] o = new byte[input.Length];
@@ -1494,20 +1399,6 @@ namespace ELTECSharp
                 return encrypt_cbc(iv, key, data);
             }
         }
-        static private bool isecbmode(byte[] data)
-        {
-            HashSet<byte[]> dict = new HashSet<byte[]>(new ByteArrayComparer());
-            for (int i = 0; i < data.Length / 16; i++)
-            {
-                byte[] n = data.Skip(i * 16).Take(16).ToArray();
-                if (dict.Contains(n)) {
-                    return true; //detected
-                } else {
-                    dict.Add(n);
-                }
-            };
-            return false;
-        }
         static private Dictionary<string, string> parsecookie(string input)
         {
             Dictionary<string, string> dict = new Dictionary<string, string>();
@@ -1542,26 +1433,7 @@ namespace ELTECSharp
             mt.Initialize((uint)seed);
             return FixedXOR(Enumerable.Range(0, (input.Length >> 2) + (input.Length % 4 == 0 ? 0 : 1)).Select((i) => BitConverter.GetBytes(mt.Extract())).SelectMany((d) => d).Take(input.Length).ToArray(), input);
         }
-        static void RunSet(int setNum, Tuple<Func<bool>, int>[] curSet)
-        {
-            bool bPassAll = true;
-            foreach (dynamic s in curSet) {
-                bool bRes = s.Item1();
-                if (!bRes) bPassAll = false;
-                Console.WriteLine((bRes ? "Passed" : "Failed") + " challenge " + setNum.ToString() + "." + s.Item2.ToString());
-            }
-            if (bPassAll) Console.WriteLine("All challenges passed in set " + setNum.ToString());
-        }
-        static Tuple<Func<bool>, int>[] Set1 = {
-            new Tuple<Func<bool>, int>(Challenge1, 1),
-            new Tuple<Func<bool>, int>(Challenge2, 2),
-            new Tuple<Func<bool>, int>(Challenge3, 3),
-            new Tuple<Func<bool>, int>(Challenge4, 4),
-            new Tuple<Func<bool>, int>(Challenge5, 5),
-            new Tuple<Func<bool>, int>(Challenge6, 6),
-            new Tuple<Func<bool>, int>(Challenge7, 7),
-            new Tuple<Func<bool>, int>(Challenge8, 8)};
-        static bool Challenge1()
+        static public bool Challenge1()
         {
             //SET 1 CHALLENGE 1
             string passResult = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBs" +
@@ -1570,7 +1442,7 @@ namespace ELTECSharp
                          "696b65206120706f69736f6e6f7573206d757368726f6f6d";
             return Convert.ToBase64String(HexDecode(str)) == passResult;
         }
-        static bool Challenge2()
+        static public bool Challenge2()
         {
             //SET 1 CHALLENGE 2
             string passResult = "746865206b696420646f6e277420706c6179";
@@ -1578,7 +1450,7 @@ namespace ELTECSharp
             string str2 = "686974207468652062756c6c277320657965";
             return HexEncode(FixedXOR(HexDecode(str1), HexDecode(str2))) == passResult;
         }
-        static bool Challenge3()
+        static public bool Challenge3()
         {
             //SET 1 CHALLENGE 3
             byte passKey = 88;
@@ -1590,33 +1462,40 @@ namespace ELTECSharp
                             FixedXOR(b, Enumerable.Repeat(key, b.Length).ToArray()));
             return key == passKey && res == passString;
         }
-        static bool Challenge4()
+        static public bool Challenge4()
         {
             //SET 1 CHALLENGE 4
             int passLine = 170;
             byte passKey = 53;
             string passString = "Now that the party is jumping\n";
-            dynamic maxItem = new { index = 0, score = 0 }; //assume 0 is starting maximum is fine in this scenario regardless
-            byte[][] lines = Enumerable.Select(System.IO.File.ReadAllLines("../../4.txt"), s => HexDecode(s)).ToArray();
+            //assume 0 is starting maximum is fine in this scenario regardless
+            dynamic maxItem = new { index = 0, score = 0 };
+            byte[][] lines = Enumerable.Select(ReadChallengeFile("4.txt"),
+                                               s => HexDecode(s)).ToArray();
             for (int i = 0; i < lines.Length; i++)
             {
                 dynamic val = GetLeastXORCharacterScore(lines[i]);
-                //Console.WriteLine(val.score.ToString() + " " + System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], Enumerable.Repeat((byte)val.index, lines[i].Length).ToArray())));
-                if (val.score > maxItem.score) { maxItem = new { origindex = i, index = val.index, score = val.score }; }
+                if (val.score > maxItem.score) {
+                    maxItem = new { origindex = i, index = val.index, score = val.score }; }
             }
             string res = System.Text.Encoding.ASCII.GetString(
-                FixedXOR(lines[maxItem.origindex], Enumerable.Repeat((byte)maxItem.index, lines[maxItem.origindex].Length).ToArray()));
+                FixedXOR(lines[maxItem.origindex],
+                         Enumerable.Repeat((byte)maxItem.index,
+                                           lines[maxItem.origindex].Length).ToArray()));
             return maxItem.origindex == passLine && maxItem.index == passKey && res == passString;
         }
-        static bool Challenge5()
+        static public bool Challenge5()
         {
             //SET 1 CHALLENGE 5
-            string passResult = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272" +
+            string passResult =
+                "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272" +
                 "a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
-            string str = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+            string str = "Burning 'em, if you ain't quick and nimble\n" +
+                "I go crazy when I hear a cymbal";
             string key = "ICE";
             byte[] b = System.Text.Encoding.ASCII.GetBytes(str);
-            return HexEncode(FixedXOR(b, Enumerable.Repeat(System.Text.Encoding.ASCII.GetBytes(key), b.Length / 3 + 1).SelectMany(d => d).Take(b.Length).ToArray())) == passResult;
+            return HexEncode(FixedXOR(b, XORRepKey(b, System.Text.Encoding.ASCII.GetBytes(key))))
+                == passResult;
         }
         static string Challenge6and7pass()
         {
@@ -1690,41 +1569,49 @@ namespace ELTECSharp
             "Play that funky music, white boy Come on, Come on, Come on \n" +
             "Play that funky music \n";
         }
-        static bool Challenge6()
+        static public bool Challenge6()
         {
             //SET 1 CHALLENGE 6
             int passKeyLen = 29;
             byte[] passKey = System.Text.Encoding.ASCII.GetBytes("Terminator X: Bring the noise");
             string passResult = Challenge6and7pass();
-            if (HammingDistance(System.Text.Encoding.ASCII.GetBytes("this is a test"), System.Text.Encoding.ASCII.GetBytes("wokka wokka!!!")) != 37) return false;
-            byte[] b = Enumerable.Select(System.IO.File.ReadAllLines("../../6.txt"), s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
+            if (HammingDistance(System.Text.Encoding.ASCII.GetBytes("this is a test"),
+                                System.Text.Encoding.ASCII.GetBytes("wokka wokka!!!")) != 37)
+                return false;
+            byte[] b = Enumerable.Select(ReadChallengeFile("6.txt"),
+                                         s => Convert.FromBase64String(s))
+                .SelectMany(d => d).ToArray();
             dynamic minItem = new { keysize = 2, hamming = double.MaxValue };
             foreach (dynamic val in Enumerable.Range(2, 39).Select(j => new
             {
-                keysize = j, //hamming all neighboring pieces except for the last one if its not a multiple - this is slower but maximal accuracy! must use double for divisions...
+                //hamming all neighboring pieces except for the last one if its not a multiple
+                //this is slower but maximal accuracy! must use double for divisions...
+                keysize = j, 
                 //1 / (ciphLen / i - 1) / i == (i / (ciphLen - i)) / i == 1 / (ciphLen - i)
                 hamming = (double)Enumerable.Range(0, b.Length / j - 1).Select(l =>
                         HammingDistance(b.Skip(l * j).Take(j).ToArray(),
-                        b.Skip((l + 1) * j).Take(j).ToArray())).Sum() / ((double)b.Length - (double)j)
+                        b.Skip((l + 1) * j).Take(j).ToArray())).Sum()
+                        / ((double)b.Length - (double)j)
             }))
             {
                 if (val.hamming < minItem.hamming) { minItem = val; }
             }
             byte[] key = Enumerable.Range(0, (int)minItem.keysize).Select(j =>
-                    (byte)GetLeastXORCharacterScore(b.Where((c, i) => i % (int)minItem.keysize == j).ToArray()).index).ToArray();
+                    (byte)GetLeastXORCharacterScore(b.Where((c, i) =>
+                        i % (int)minItem.keysize == j).ToArray()).index).ToArray();
             return minItem.keysize == passKeyLen && key.SequenceEqual(passKey) &&
-                System.Text.Encoding.ASCII.GetString(FixedXOR(b, Enumerable.Repeat(key,
-                    b.Length / (int)minItem.keysize + 1).SelectMany(d => d).Take(b.Length).ToArray())) == passResult;
+                System.Text.Encoding.ASCII.GetString(FixedXOR(b, XORRepKey(b, key))) == passResult;
         }
-        static bool Challenge7()
+        static public bool Challenge7()
         {
             //SET 1 CHALLENGE 7
             string passResult = Challenge6and7pass() + "\x04\x04\x04\x04";
-            byte[] b = System.IO.File.ReadAllLines("../../7.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
+            byte[] b = ReadChallengeFile("7.txt").Select(s =>
+                Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
             byte[] o = decrypt_ecb(System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), b);
             return System.Text.Encoding.ASCII.GetString(o) == passResult;
         }
-        static bool Challenge8()
+        static public bool Challenge8()
         {
             //SET 1 CHALLENGE 8
             string[] passResult = {"d880619740a8a19b7840a8a31c810a3d08649af70dc06f4f" +
@@ -1734,15 +1621,18 @@ namespace ELTECSharp
                 "97a93eab8d6aecd566489154789a6b0308649af70dc06f4f" +
                 "d5d2d69c744cd283d403180c98c8f6db1f2a3f9c4040deb0" +
                 "ab51b29933f2c123c58386b06fba186a"};
-            byte[][] lines = System.IO.File.ReadAllLines("../../8.txt").Select(s => HexDecode(s)).ToArray();
+            byte[][] lines = ReadChallengeFile("8.txt").Select(s => HexDecode(s)).ToArray();
             List<byte[]> ecbLines = new List<byte[]>();
-            foreach (byte[] l in lines) {
-                if (isecbmode(l)) {
+            foreach (byte[] l in lines)
+            {
+                if (is_ecb_mode(l))
+                {
                     ecbLines.Add(l);
                 }
             }
             return ecbLines.Select((x) => HexEncode(x)).SequenceEqual(passResult);
         }
+
         static void Set2()
         {
             byte[] b;
@@ -1757,7 +1647,7 @@ namespace ELTECSharp
             Console.WriteLine("Is equal on re-encryption: " + (new ByteArrayComparer().Equals(b, encrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), o)))); //proved encryption is back to input
 
             //SET 2 CHALLENGE 11
-            Console.WriteLine("2.11 Is in ECB mode: " + isecbmode(encryption_oracle(o)));
+            Console.WriteLine("2.11 Is in ECB mode: " + is_ecb_mode(encryption_oracle(o)));
 
             //SET 2 CHALLENGE 12
             RandomNumberGenerator rnd = RandomNumberGenerator.Create();
@@ -1773,7 +1663,7 @@ namespace ELTECSharp
             int blocksize = encryption_oracle_with_key(key, o.Take(ct).ToArray(), b).Length - startlen;
             Console.WriteLine("2.12 block size: " + blocksize);
             //only 2 identical blocks needed since we are at the start of string now
-            Console.WriteLine("ECB mode check: " + isecbmode(encryption_oracle_with_key(key, o.Take(blocksize).Concat(o.Take(blocksize)).ToArray(), b)));
+            Console.WriteLine("ECB mode check: " + is_ecb_mode(encryption_oracle_with_key(key, o.Take(blocksize).Concat(o.Take(blocksize)).ToArray(), b)));
             int len = encryption_oracle_with_key(key, new byte[] { }, b).Length - ct;
             byte[] output = new byte[len];
             for (int i = 0; i < len; i++)
@@ -1818,7 +1708,7 @@ namespace ELTECSharp
             Console.WriteLine("2.14 block size: " + blocksize);
             //need 3 (or in keysize cases 2) identical blocks makes at least 2 aligned blocks when randomly prefixed
             output = encryption_oracle_with_key(key, r, o.Take(blocksize).Concat(o.Take(blocksize)).Concat(o.Take(blocksize)).ToArray(), b);
-            Console.WriteLine("ECB mode check: " + isecbmode(output));
+            Console.WriteLine("ECB mode check: " + is_ecb_mode(output));
             int startblock = 0; //determine startblock by finding first 2 duplicates
             while (!new ByteArrayComparer().Equals(output.Skip(startblock * blocksize).Take(blocksize).ToArray(),
                                                 output.Skip((startblock + 1) * blocksize).Take(blocksize).ToArray()))
@@ -6803,7 +6693,7 @@ namespace ELTECSharp
             return new Tuple<bool[,], bool[][,]>(Ad, Adn);
         }
 
-        static void Set8()
+        static public void Set8()
         {
             //SET 8 CHALLENGE 57
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
@@ -8373,21 +8263,6 @@ namespace ELTECSharp
                 knownKey |= BigInteger.One;
             Console.WriteLine("Secret key determined: " + knownKey);
             Console.WriteLine("9.66");
-        }
-        static void Main(string[] args)
-        {
-            //testMul();
-            RunSet(1, Set1);
-            //Set2();
-            //Set3();
-            //Set4();
-            //Set5();
-            //Set6();
-            //Set7();
-            Set8();
-            //Set9();
-
-            Console.ReadKey();
         }
     }
 }
