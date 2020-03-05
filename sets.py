@@ -9,12 +9,20 @@ import pathlib
 import importlib.util
 import os
 curDir = 'D:\\Source\\Repos\\cryptopals\\'
-spec = importlib.util.spec_from_file_location("utility", os.path.join(curDir, "utility.py"))
-util = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(util)
-spec = importlib.util.spec_from_file_location("1", os.path.join(curDir, "1.py"))
-set1 = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(set1)
+
+exec(open(os.path.join(curDir, 'utility.py')).read())
+exec(open(os.path.join(curDir, '1.py')).read())
+exec(open(os.path.join(curDir, '2.py')).read())
+
+#def loadImp(name):
+#  import imp
+#  imp.load_source(name, os.path.join(curDir, name = ".py"))
+
+#def loadMod(name):
+#  spec = importlib.util.spec_from_file_location(name, os.path.join(curDir, name + ".py"))
+#  mod = importlib.util.module_from_spec(spec)
+#  spec.loader.exec_module(mod)
+#  return mod
 
 def readChallengeFile(fileName):
   with open(os.path.join(curDir, fileName), "r") as f:
@@ -29,8 +37,15 @@ def runSet(setNum, curSet):
     print("%s challenge %s.%s" % ("Passed" if bRes else "Failed", setNum, s[1]))
   if bPassAll: print("All challenges passed in set %s" % setNum)
   
+#util, s1, s2 = loadMod("utility"), loadMod("1"), loadMod("2")
+
 set1 = [(challenge1, 1), (challenge2, 2), (challenge3, 3), (challenge4, 4),
         (challenge5, 5), (challenge6, 6), (challenge7, 7), (challenge8, 8)]
+        
+set2 = [(challenge9, 9),   (challenge10, 10), (challenge11, 11),
+        (challenge12, 12), (challenge13, 13), (challenge14, 14),
+        (challenge15, 15), (challenge16, 16)]
 
 testUtility()
-runSet(1, set1)
+#runSet(1, set1)
+runSet(2, set2)

@@ -35,17 +35,28 @@ namespace Cryptopals
             new Tuple<Func<bool>, int>(Challenge6, 6),
             new Tuple<Func<bool>, int>(Challenge7, 7),
             new Tuple<Func<bool>, int>(Challenge8, 8)};
+        static Tuple<Func<bool>, int>[] Set2 = {
+            new Tuple<Func<bool>, int>(Challenge9, 9),
+            new Tuple<Func<bool>, int>(Challenge10, 10),
+            new Tuple<Func<bool>, int>(Challenge11, 11),
+            new Tuple<Func<bool>, int>(Challenge12, 12),
+            new Tuple<Func<bool>, int>(Challenge13, 13),
+            new Tuple<Func<bool>, int>(Challenge14, 14),
+            new Tuple<Func<bool>, int>(Challenge15, 15),
+            new Tuple<Func<bool>, int>(Challenge16, 16)
+        };
         static void Main(string[] args)
         {
             //testMul();
-            RunSet(1, Set1);
+            //RunSet(1, Set1);
+            RunSet(2, Set2);
             //Set2();
             //Set3();
             //Set4();
             //Set5();
             //Set6();
             //Set7();
-            Set8();
+            //Set8();
             //Set9();
 
             Console.ReadKey();

@@ -111,16 +111,62 @@ def decrypt_ecb(key, cipherData):
   cipher = AES.new(key, AES.MODE_ECB)
   lastBlockSize = len(cipherData) & 15
   if lastBlockSize != 0:
-    cipherData = Padding(cipherData, 16) #padding style does not matter
-  plainText = cipher.decrypt(cipherData)
-  return plainText if lastBlockSize == 0 else plainText[:-(16-lastBlockSize)]
+    cipherData = Padding.pad(cipherData, 16) #padding style does not matter
+  return cipher.decrypt(cipherData)
 
 def is_ecb_mode(cipherData):
   l, s = len(cipherData), set()
-  for i in range(0, l, 16):
+  rem = l & 15
+  for i in range(0, l - rem, 16):
     if cipherData[i:i+16] in s: return True
     s.add(cipherData[i:i+16])
   return False
+
+def pkcs7pad(input, blockSize):
+  rem = blockSize - (len(input) % blockSize)
+  if rem == blockSize: return input
+  return input + bytes([rem] * rem)
+
+def encrypt_ecb(key, cipherData):
+  from Crypto.Cipher import AES
+  from Crypto.Util import Padding
+  cipher = AES.new(key, AES.MODE_ECB)
+  lastBlockSize = len(cipherData) & 15
+  if lastBlockSize != 0:
+    cipherData = Padding.pad(cipherData, 16) #padding style does not matter
+  return cipher.encrypt(cipherData)
+
+def decrypt_cbc(iv, key, cipherData):
+  l = len(cipherData)
+  out = bytearray(l)
+  rem = l & 15
+  for i in range(0, l - rem, 16):
+    out[i:i+16] = xorBins(decrypt_ecb(key, cipherData[i:i+16]),
+                          iv if i == 0 else cipherData[i-16:i])
+  if rem != 0:
+    out[l-rem:l] = xorBins(decrypt_ecb(key, cipherData[l-rem:l]),
+                           (iv if l < 16 else cipherData[l-rem-16:l-rem])[:rem])
+  return out
+
+def encrypt_cbc(iv, key, cipherData):
+  l = len(cipherData)
+  out = bytearray(l)
+  rem = l & 15
+  for i in range(0, l - rem, 16):
+    out[i:i+16] = encrypt_ecb(key, xorBins(cipherData[i:i+16],
+                                           iv if i == 0 else out[i-16:i]))
+  if rem != 0:
+    out[l-rem:l] = encrypt_ecb(key, xorBins(cipherData[l-rem:l],
+                                 (iv if l < 16 else out[l-rem-16:l-rem])[:rem]))
+  return out
+  
+def pkcs7strip(input, blockSize):
+  l = len(input)
+  if l == 0: return input
+  last = input[-1]
+  if last >= 1 and last <= blockSize and all([x == last for x in input[-last:]]):
+    return input[:l-last]
+  raise ValueError()
 
 def testUtility():
   def testHexPartToInt():

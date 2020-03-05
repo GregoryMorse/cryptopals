@@ -1193,19 +1193,6 @@ namespace Cryptopals
     }
     public class Crypto
     {
-        static private int GetNextRandom(RandomNumberGenerator rnd, int Maximum)
-        {
-            int i = GetBitSize(Maximum - 1);
-            byte[] tmp = new byte[(i + 7) >> 3];
-            int ret;
-            do
-            {
-                rnd.GetBytes(tmp);
-                if ((i % 8) != 0) tmp[0] &= (byte)((1 << (i % 8)) - 1);
-                ret = BitConverter.ToInt32(tmp.Concat(new byte[] { 0, 0, 0, 0 }).ToArray(), 0);
-            } while (Maximum <= ret);
-            return ret;
-        }
         static private BigInteger GetNextRandomBig(RandomNumberGenerator rnd, BigInteger Maximum)
         {
             int i = GetBitSize(Maximum - 1);
@@ -1289,79 +1276,6 @@ namespace Cryptopals
             }
             return char1f.OrderBy((c) => c.score).Last();
         }
-
-        static private byte[] PKCS7Pad(byte[] input, int blocksize)
-        {
-            return Enumerable.Concat(input, Enumerable.Repeat((byte)(blocksize - (input.Length % blocksize)), blocksize - (input.Length % blocksize))).ToArray();
-        }
-        static private byte[] encrypt_ecb(byte[] key, byte[] input)
-        {
-            System.Security.Cryptography.AesManaged aes128 = new System.Security.Cryptography.AesManaged();
-            //System.Security.Cryptography.RijndaelManaged aes128 = new System.Security.Cryptography.RijndaelManaged();
-            aes128.Key = key;
-            aes128.Mode = System.Security.Cryptography.CipherMode.ECB;
-            aes128.Padding = System.Security.Cryptography.PaddingMode.None; //critical or cannot do one block at a time...
-            byte[] o = new byte[input.Length];
-            int offset = 0; //could use a MemoryStream and CryptoStream to make this automated and robust...
-            //but the block aspect is encapsulated away which is to be a highlight
-            System.Security.Cryptography.ICryptoTransform transform = aes128.CreateEncryptor();
-            while (offset < input.Length) {
-                if (offset + aes128.BlockSize / 8 <= input.Length) {
-                    offset += transform.TransformBlock(input, offset, aes128.BlockSize / 8, o, offset);
-                } else {
-                    transform.TransformFinalBlock(input, offset, input.Length - offset).CopyTo(o, offset);
-                    break;
-                }
-            }
-            return o;
-        }
-
-        static private byte[] encrypt_cbc(byte[] iv, byte[] key, byte[] input)
-        {
-            byte[] o = new byte[input.Length];
-            byte[] data = new byte[input.Length];
-            input.CopyTo(data, 0);
-            System.Security.Cryptography.AesManaged aes128 = new System.Security.Cryptography.AesManaged();
-            aes128.Key = key;
-            aes128.Mode = System.Security.Cryptography.CipherMode.ECB;
-            aes128.Padding = System.Security.Cryptography.PaddingMode.None; //critical or cannot do one block at a time...
-            int offset = 0;
-            System.Security.Cryptography.ICryptoTransform transform = aes128.CreateEncryptor();
-            while (offset < input.Length) {
-                if (offset + aes128.BlockSize / 8 <= input.Length) {
-                    FixedXOR(data.Skip(offset).Take(aes128.BlockSize / 8).ToArray(),
-                        (offset != 0) ? o.Skip(offset - aes128.BlockSize / 8).Take(aes128.BlockSize / 8).ToArray() : iv).CopyTo(data, offset);
-                    offset += transform.TransformBlock(data, offset, aes128.BlockSize / 8, o, offset);
-                } else {
-                    FixedXOR(data.Skip(offset).Take(input.Length - offset).ToArray(),
-                        (offset != 0) ? o.Skip(offset - aes128.BlockSize / 8).Take(input.Length - offset).ToArray() : iv).CopyTo(data, offset);
-                    transform.TransformFinalBlock(data, offset, input.Length - offset).CopyTo(o, offset);
-                }
-            }
-            return o;
-        }
-        static private byte[] decrypt_cbc(byte[] iv, byte[] key, byte[] input)
-        {
-            byte[] o = new byte[input.Length];
-            System.Security.Cryptography.AesManaged aes128 = new System.Security.Cryptography.AesManaged();
-            aes128.Key = key;
-            aes128.Mode = System.Security.Cryptography.CipherMode.ECB;
-            aes128.Padding = System.Security.Cryptography.PaddingMode.None; //critical or cannot do one block at a time...
-            int offset = 0;
-            System.Security.Cryptography.ICryptoTransform transform = aes128.CreateDecryptor();
-            while (offset < input.Length) {
-                if (offset + aes128.BlockSize / 8 <= input.Length) {
-                    offset += transform.TransformBlock(input, offset, aes128.BlockSize / 8, o, offset);
-                    FixedXOR(o.Skip(offset - aes128.BlockSize / 8).Take(aes128.BlockSize / 8).ToArray(),
-                        (offset != aes128.BlockSize / 8) ? input.Skip(offset - aes128.BlockSize / 8 * 2).Take(aes128.BlockSize / 8).ToArray() : iv).CopyTo(o, offset - aes128.BlockSize / 8);
-                } else {
-                    transform.TransformFinalBlock(input, offset, input.Length - offset).CopyTo(o, offset);
-                    FixedXOR(o.Skip(offset - aes128.BlockSize / 8).Take(input.Length - offset).ToArray(),
-                        (offset != aes128.BlockSize / 8) ? input.Skip(offset - aes128.BlockSize / 8 * 2).Take(input.Length - offset).ToArray() : iv).CopyTo(o, offset - aes128.BlockSize / 8);
-                }
-            }
-            return o;
-        }
         static private byte[] crypt_ctr(ulong nonce, byte[] key, byte[] input)
         {
             byte[] o = new byte[input.Length];
@@ -1370,62 +1284,6 @@ namespace Cryptopals
                 FixedXOR(input.Skip((int)ctr).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray(), encrypt_ecb(key, BitConverter.GetBytes(nonce).Concat(BitConverter.GetBytes(ctr / 16)).ToArray()).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray()).CopyTo(o, (int)ctr);
             }
             return o;
-        }
-        static private byte[] encryption_oracle_with_key_cbc(byte[] iv, byte[] key, byte[] prefix, byte[] input, byte[] extra)
-        {
-            return encrypt_cbc(iv, key, PKCS7Pad(Enumerable.Concat(Enumerable.Concat(prefix, input), extra).ToArray(), 16));
-        }
-        static private byte[] encryption_oracle_with_key(byte[] key, byte[] prefix, byte[] input, byte[] extra)
-        {
-            return encryption_oracle_with_key(key, Enumerable.Concat(prefix, input).ToArray(), extra);
-        }
-        static private byte[] encryption_oracle_with_key(byte[] key, byte[] input, byte[] extra)
-        {
-            return encrypt_ecb(key, PKCS7Pad(Enumerable.Concat(input, extra).ToArray(), 16));
-        }
-        static private byte[] encryption_oracle(byte[] input)
-        {
-            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
-            byte[] key = new byte[16];
-            rnd.GetBytes(key);
-            byte[] first = new byte[5 + GetNextRandom(rnd, 6)];
-            byte[] last = new byte[5 + GetNextRandom(rnd, 6)];
-            byte[] data = PKCS7Pad(Enumerable.Concat(first, input).Concat(last).ToArray(), 16);
-            if (GetNextRandom(rnd, 2) == 1) {
-                return encrypt_ecb(key, data);
-            } else {
-                byte[] iv = new byte[16];
-                rnd.GetBytes(iv);
-                return encrypt_cbc(iv, key, data);
-            }
-        }
-        static private Dictionary<string, string> parsecookie(string input)
-        {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            foreach (string kv in input.Split('&')) {
-                string[] kvs = kv.Split('=');
-                if (!dict.ContainsKey(kvs[0])) {
-                    dict.Add(kvs[0], kvs[1]);
-                } else {
-                    dict[kvs[0]] = kvs[1];
-                }
-            }
-            return dict;
-        }
-        static private string profile_for(string name)
-        {
-            dynamic obj = null;
-            if (name == "foo@bar.com") obj = new { email = "foo@bar.com", uid = 10, role = "user" };
-            else if (name == "admin@bar.com") obj = new { email = "admin@bar.com", uid = 11, role = "admin" };
-            return "email=" + ((string)obj.email).Replace("&", "%" + ((byte)'&').ToString("X2")).Replace("=", "%" + ((byte)'=').ToString("X2")) +
-                "&uid=" + obj.uid +
-                "&role=" + ((string)obj.role).Replace("&", "%" + ((byte)'&').ToString("X2")).Replace("=", "%" + ((byte)'=').ToString("X2"));
-        }
-        static private byte[] PKCS7Strip(byte[] inp)
-        {
-            //on even blocks a padding of a whole block is there so we can always properly strip
-            if (inp.Last() >= 1 && inp.Last() <= 16 && new ByteArrayComparer().Equals(inp.Skip(inp.Length - (int)inp.Last()).ToArray(), Enumerable.Repeat(inp.Last(), (int)inp.Last()).ToArray())) return inp.Take(inp.Length - (int)inp.Last()).ToArray();
-            throw new ArgumentException();
         }
         static private byte[] MTCipher(ushort seed, byte[] input)
         {
@@ -1633,141 +1491,285 @@ namespace Cryptopals
             return ecbLines.Select((x) => HexEncode(x)).SequenceEqual(passResult);
         }
 
-        static void Set2()
+        static public bool Challenge9()
         {
-            byte[] b;
-            byte[] o;
             //SET 2 CHALLENGE 9
-            Console.WriteLine("2.9 PKCS#7 padding correct: " + (System.Text.Encoding.ASCII.GetString(PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), 20)) == "YELLOW SUBMARINE\x04\x04\x04\x04"));
-
+            return System.Text.Encoding.ASCII.GetString(PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), 20)) == "YELLOW SUBMARINE\x04\x04\x04\x04";
+        }
+        static public bool Challenge10()
+        {
             //SET 2 CHALLENGE 10
-            b = System.IO.File.ReadAllLines("../../10.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
-            o = decrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), b);
-            Console.WriteLine("2.10 Text decrypted: " + System.Text.Encoding.ASCII.GetString(o));
-            Console.WriteLine("Is equal on re-encryption: " + (new ByteArrayComparer().Equals(b, encrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), o)))); //proved encryption is back to input
-
-            //SET 2 CHALLENGE 11
-            Console.WriteLine("2.11 Is in ECB mode: " + is_ecb_mode(encryption_oracle(o)));
-
-            //SET 2 CHALLENGE 12
+            byte[] passResult = PKCS7Pad(System.Text.Encoding.ASCII.GetBytes(Challenge6and7pass()), 16);
+            byte[] b = ReadChallengeFile("10.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
+            byte[] o = decrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), b);
+            //proved encryption is back to input
+            if (!b.SequenceEqual(encrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), o))) return false;
+            return o.SequenceEqual(passResult);
+        }
+        static private ValueTuple<bool, byte[]> encryption_oracle(byte[] input)
+        {
             RandomNumberGenerator rnd = RandomNumberGenerator.Create();
             byte[] key = new byte[16];
             rnd.GetBytes(key);
-            b = Convert.FromBase64String("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK");
-            int startlen = encryption_oracle_with_key(key, o.Take(0).ToArray(), b).Length;
+            byte[] first = new byte[5 + GetNextRandom(rnd, 6)];
+            byte[] last = new byte[5 + GetNextRandom(rnd, 6)];
+            byte[] data = PKCS7Pad(Enumerable.Concat(first, input).Concat(last).ToArray(), 16);
+            if (GetNextRandom(rnd, 2) == 1)
+            {
+                return (true, encrypt_ecb(key, data));
+            }
+            else
+            {
+                byte[] iv = new byte[16];
+                rnd.GetBytes(iv);
+                return (false, encrypt_cbc(iv, key, data));
+            }
+        }
+        static public bool Challenge11()
+        {
+            //SET 2 CHALLENGE 11
+            byte[] b = ReadChallengeFile("10.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
+            byte[] o = decrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), b);
+            //important note: if the plain text does not have a repeated 16-byte block starting
+            //between offsets 0 to 4 and 10 to 16 inclusive then this will not be a useful detector
+            //since 5+5=10 and (10+10)%16=4 
+            for (int i = 0; i < 1024; i++) {
+                (bool oracle_ecb, byte[] res) = encryption_oracle(o);
+                if (oracle_ecb != is_ecb_mode(res)) return false;
+            }
+            return true;
+        }
+        static private byte[] encryption_oracle_with_key(ValueTuple<byte[], byte[]> key_data, byte[] input)
+        {
+            return encrypt_ecb(key_data.Item1, PKCS7Pad(Enumerable.Concat(input, key_data.Item2).ToArray(), 16));
+        }
+        static public bool Challenge12()
+        {
+            //SET 2 CHALLENGE 12
+            string passResult = "Rollin' in my 5.0\n" + //Vanilla Ice - Ice Ice Baby
+                "With my rag-top down so my hair can blow\n" +
+                "The girlies on standby waving just to say hi\n" +
+                "Did you stop? No, I just drove by";
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            byte[] key = new byte[16];
+            rnd.GetBytes(key);
+            byte[] b = Convert.FromBase64String(
+                "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg" + 
+                "aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq" +
+                "dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg" +
+                "YnkK");
+
+            int startlen = encryption_oracle_with_key((key, b), new byte[] { }).Length;
             int ct = 1; //when output size increases, difference will be one block
-            while (startlen == encryption_oracle_with_key(key, o.Take(ct).ToArray(), b).Length)
+            while (startlen == encryption_oracle_with_key((key, b), Enumerable.Repeat<byte>(0, ct).ToArray()).Length)
             {
                 ct++;
             }
-            int blocksize = encryption_oracle_with_key(key, o.Take(ct).ToArray(), b).Length - startlen;
-            Console.WriteLine("2.12 block size: " + blocksize);
+            int blocksize = encryption_oracle_with_key((key, b), Enumerable.Repeat<byte>(0, ct).ToArray()).Length - startlen;
+            if (blocksize != 16) return false;
             //only 2 identical blocks needed since we are at the start of string now
-            Console.WriteLine("ECB mode check: " + is_ecb_mode(encryption_oracle_with_key(key, o.Take(blocksize).Concat(o.Take(blocksize)).ToArray(), b)));
-            int len = encryption_oracle_with_key(key, new byte[] { }, b).Length - ct;
+            if (!is_ecb_mode(encryption_oracle_with_key((key, b), Enumerable.Repeat<byte>(0, 32).ToArray()))) return false;
+            int len = startlen - ct;
             byte[] output = new byte[len];
             for (int i = 0; i < len; i++)
             {
-                byte[] sample = encryption_oracle_with_key(key, o.Take(blocksize - (1 + i) % blocksize).ToArray(), b).Skip(((1 + i) / blocksize) * blocksize).Take(blocksize).ToArray();
+                int start = ((1 + i) / blocksize) * blocksize;
+                byte[] prefix = Enumerable.Repeat<byte>(0, blocksize - (1 + i) % blocksize).ToArray();
+                byte[] sample = encryption_oracle_with_key((key, b), prefix).Skip(start).Take(blocksize).ToArray();
                 Dictionary<byte[], byte> dict = new Dictionary<byte[], byte>(new ByteArrayComparer());
                 //maintaining a dictionary is not really of any special benefit in this scenario
                 for (ct = 0; ct < 256; ct++)
                 { //alphanumeric and whitespace would be a shortcut
-                  //if (!dict.ContainsKey(encryption_oracle_with_key(key, o.Take(blocksize - (1 + i) % blocksize).Concat(output.Take(i)).Concat(new byte[] { (byte)ct }).ToArray(), b).Skip(((1 + i) / blocksize) * blocksize).Take(blocksize).ToArray())) {
-                    dict.Add(encryption_oracle_with_key(key, o.Take(blocksize - (1 + i) % blocksize).Concat(output.Take(i)).Concat(new byte[] { (byte)ct }).ToArray(), b).Skip(((1 + i) / blocksize) * blocksize).Take(blocksize).ToArray(), (byte)ct);
-                    //}
+                    byte[] ciph = encryption_oracle_with_key((key, b), prefix.Concat(output.Take(i)).Concat(new byte[] { (byte)ct }).ToArray()).Skip(start).Take(blocksize).ToArray();
+                    dict.Add(ciph, (byte)ct);
                 }
                 output[i] = (byte)dict[sample]; //no collision and key found is asserted or will crash
             }
-            Console.WriteLine("Recovered value: " + System.Text.Encoding.ASCII.GetString(output));
-
+            return System.Text.Encoding.ASCII.GetString(output) == passResult;
+        }
+        static private Dictionary<string, object> parsecookie(string input)
+        {
+            Dictionary<string, object> dict = new Dictionary<string, object>();
+            foreach (string kv in input.Split('&'))
+            {
+                string[] kvs = kv.Split('=');
+                if (kvs.Length != 2) return new Dictionary<string, object>();
+                string val = kvs[1].Trim();
+                if (val.All(x => Char.IsDigit(x))) dict[kvs[0]] = int.Parse(val);
+                else dict[kvs[0]] = val;
+            }
+            return dict;
+        }
+        static private string profile_for(string name)
+        {
+            name = name.Replace("&", "%" + ((byte)'&').ToString("X2")).Replace("=", "%" + ((byte)'=').ToString("X2"));
+            Dictionary<string, Tuple<int, string>> profileDict = new Dictionary<string, Tuple<int, string>>();
+            profileDict.Add("foo@bar.com", new Tuple<int, string>(10, "user"));
+            if (!profileDict.ContainsKey(name)) profileDict.Add(name, new Tuple<int, string>(10, "user"));
+            Dictionary<string, object> profile = new Dictionary<string, object>();
+            profile.Add("email", name);
+            profile.Add("uid", profileDict[name].Item1);
+            profile.Add("role", profileDict[name].Item2);
+            string[] encodeOrder = new string[] { "email", "uid", "role" };
+            string encode = string.Empty;
+            bool bFirst = true;
+            foreach (string s in encodeOrder) {
+                if (!bFirst) encode += "&";
+                else bFirst = false;
+                encode += s + "=" + profile[s];
+            }
+            return encode;
+        }
+        static private byte[] profile_for_enc(byte[] key, string name)
+        {
+            return encrypt_ecb(key, PKCS7Pad(Encoding.ASCII.GetBytes(profile_for(name)), 16));
+        }
+        static private Dictionary<string, object> profile_for_dec(byte[] key, byte[] data)
+        {
+            byte[] stripped;
+            try {
+                stripped = PKCS7Strip(decrypt_ecb(key, data));
+            } catch (ArgumentException) { return new Dictionary<string, object>(); }
+            return parsecookie(System.Text.Encoding.ASCII.GetString(stripped));
+        }
+        static public bool Challenge13()
+        {
             //SET 2 CHALLENGE 13
-            parsecookie("foo=bar&baz=qux&zap=zazzle");
-            Console.WriteLine("2.13 profile_for: " + profile_for("foo@bar.com") + " profile_for: " + profile_for("admin@bar.com"));
-            key = new byte[16];
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            Dictionary<string, object> d = parsecookie("foo=bar&baz=qux&zap=zazzle");
+            Dictionary<string, object> testDict = new Dictionary<string, object>();
+            testDict.Add("foo", "bar"); testDict.Add("baz", "qux"); testDict.Add("zap", "zazzle");
+            if (!d.SequenceEqual(testDict)) return false;
+            if (profile_for("foo@bar.com") != "email=foo@bar.com&uid=10&role=user") return false;
+            byte[] key = new byte[16];
             rnd.GetBytes(key);
-            b = encrypt_ecb(key, PKCS7Pad(Encoding.ASCII.GetBytes(profile_for("foo@bar.com")), 16));
-            parsecookie(System.Text.Encoding.ASCII.GetString(PKCS7Strip(decrypt_ecb(key, b))));
-            output = b.Take(16 * (("email=foo@bar.com&uid=10&".Length + 15) / 16)).Concat(encrypt_ecb(key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes(profile_for("admin@bar.com")), 16)).Skip(16 * (("email=foo@bar.com&uid=10&".Length) / 16))).ToArray();
-            Console.WriteLine("Decrypted cut and paste profile: " + System.Text.Encoding.ASCII.GetString(PKCS7Strip(decrypt_ecb(key, output))));
-            parsecookie(System.Text.Encoding.ASCII.GetString(decrypt_ecb(key, output)));
-
+            byte[] b = profile_for_enc(key, "foo@bar.com");
+            testDict.Clear(); testDict.Add("email", "foo@bar.com"); testDict.Add("uid", 10); testDict.Add("role", "user");
+            if (!profile_for_dec(key, b).SequenceEqual(testDict)) return false;
+            byte[] adminBytes = PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("admin"), 16);
+            //profile_for encrypted variation is the only one allowed to be used so must iterate through spacing of 16*16 combinations until admin achieved
+            //int adjust = (profile_for("foo@bar.com").IndexOf("&role=") + "&role=".Length & 15) - "email=".Length;
+            //byte[] fixEncode = profile_for_enc(key, System.Text.Encoding.ASCII.GetString(Enumerable.Repeat<byte>(0x20, 16 - "email=".Length).ToArray()) + System.Text.Encoding.ASCII.GetString(adminBytes) + "foo@bar.com" + System.Text.Encoding.ASCII.GetString(Enumerable.Repeat<byte>(0x20, 16 - adjust).ToArray()));
+            testDict["role"] = "admin";
+            //if we cannot exploit due to trim occurring, and it checks email address validity on decoding, then 16 emails would be needed to exploit this and additional loop to try them
+            //if we cannot exploit invalid emails on encoding as it is checked, then 256 email addresses need to be added including ones with PKCS7 encoding in them
+            //if not sure about 2nd block being the right one, would need to try all middle blocks
+            for (int i = 0; i < 16; i++) {
+                for (int j = 0; j < 16; j++) {
+                    byte[] fixEncode = profile_for_enc(key, System.Text.Encoding.ASCII.GetString(Enumerable.Repeat<byte>(0x20, i).ToArray()) + System.Text.Encoding.ASCII.GetString(adminBytes) + "foo@bar.com" + System.Text.Encoding.ASCII.GetString(Enumerable.Repeat<byte>(0x20, j).ToArray()));
+                    byte[] modEncode = fixEncode.Take(16).Concat(fixEncode.Skip(32).Take(fixEncode.Length - 48).Concat(fixEncode.Skip(16).Take(16))).ToArray();
+                    if (profile_for_dec(key, modEncode).SequenceEqual(testDict)) return true;
+                }
+            }
+            return false;
+        }
+        static private byte[] encryption_oracle_with_key(ValueTuple<byte[], byte[]> key_data, byte[] prefix, byte[] input)
+        {
+            return encryption_oracle_with_key(key_data, Enumerable.Concat(prefix, input).ToArray());
+        }
+        static public bool Challenge14()
+        {
             //SET 2 CHALLENGE 14
-            key = new byte[16];
+            string passResult = "Rollin' in my 5.0\n" + //Vanilla Ice - Ice Ice Baby
+                "With my rag-top down so my hair can blow\n" +
+                "The girlies on standby waving just to say hi\n" +
+                "Did you stop? No, I just drove by";
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            byte[] key = new byte[16];
             rnd.GetBytes(key);
-            byte[] r = new byte[GetNextRandom(rnd, 32)];
+            int randCount;
+            do { randCount = GetNextRandom(rnd, 32); } while (randCount == 0);
+            byte[] r = new byte[randCount];
             rnd.GetBytes(r);
-            b = Convert.FromBase64String("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK");
-            startlen = encryption_oracle_with_key(key, r, o.Take(0).ToArray(), b).Length;
-            ct = 1; //when output size increases, difference will be one block
-            while (startlen == encryption_oracle_with_key(key, r, o.Take(ct).ToArray(), b).Length)
+            byte[] b = Convert.FromBase64String(
+                "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg" +
+                "aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq" +
+                "dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg" +
+                "YnkK");
+
+            int startlen = encryption_oracle_with_key((key, b), r, new byte[] { }).Length;
+            int ct = 1; //when output size increases, difference will be one block
+            while (startlen == encryption_oracle_with_key((key, b), r, Enumerable.Repeat<byte>(0, ct).ToArray()).Length)
             {
                 ct++;
             }
-            blocksize = encryption_oracle_with_key(key, r, o.Take(ct).ToArray(), b).Length - startlen;
-            Console.WriteLine("2.14 block size: " + blocksize);
+            int blocksize = encryption_oracle_with_key((key, b), r, Enumerable.Repeat<byte>(0, ct).ToArray()).Length - startlen;
+            if (blocksize != 16) return false;
             //need 3 (or in keysize cases 2) identical blocks makes at least 2 aligned blocks when randomly prefixed
-            output = encryption_oracle_with_key(key, r, o.Take(blocksize).Concat(o.Take(blocksize)).Concat(o.Take(blocksize)).ToArray(), b);
-            Console.WriteLine("ECB mode check: " + is_ecb_mode(output));
+            byte[] output = encryption_oracle_with_key((key, b), r, Enumerable.Repeat<byte>(0, blocksize * 3).ToArray());
+            if (!is_ecb_mode(output)) return false;
             int startblock = 0; //determine startblock by finding first 2 duplicates
-            while (!new ByteArrayComparer().Equals(output.Skip(startblock * blocksize).Take(blocksize).ToArray(),
-                                                output.Skip((startblock + 1) * blocksize).Take(blocksize).ToArray()))
+            while (!output.Skip(startblock * blocksize).Take(blocksize).SequenceEqual(
+                                                output.Skip((startblock + 1) * blocksize).Take(blocksize)))
             {
                 startblock++;
             }
             int startinblock = 0; //determine where in the block it was started by scanning increasing controlled data in prior block
-            while (!new ByteArrayComparer().Equals(output.Skip((startblock - 1) * blocksize).Take(blocksize).ToArray(),
-                                                encryption_oracle_with_key(key, r, o.Take(startinblock).ToArray(), b).Skip((startblock - 1) * blocksize).Take(blocksize).ToArray()))
+            while (!output.Skip((startblock - 1) * blocksize).Take(blocksize).SequenceEqual(
+                                                encryption_oracle_with_key((key, b), r, Enumerable.Repeat<byte>(0, startinblock).ToArray()).Skip((startblock - 1) * blocksize).Take(blocksize)))
             {
                 startinblock++;
             }
-            if (startinblock != 0) { if (startinblock % blocksize != 0) startblock--; startinblock = 16 - startinblock; }
-            len = encryption_oracle_with_key(key, r, new byte[] { }, b).Length - ct - startblock * blocksize - startinblock;
+            if (startinblock != 0 && startinblock % blocksize != 0) {
+                startblock--; startinblock = 16 - startinblock;
+            }
+            int len = startlen - ct - startblock * blocksize - startinblock;
             output = new byte[len];
             for (int i = 0; i < len; i++)
             {
-                byte[] sample = encryption_oracle_with_key(key, r, o.Take(blocksize - (1 + i + startinblock) % blocksize).ToArray(), b).Skip((startblock + (1 + i + startinblock) / blocksize) * blocksize).Take(blocksize).ToArray();
+                int start = (startblock + (1 + i + startinblock) / blocksize) * blocksize;
+                byte[] prefix = Enumerable.Repeat<byte>(0, blocksize - (1 + i + startinblock) % blocksize).ToArray();
+                byte[] sample = encryption_oracle_with_key((key, b), r, prefix).Skip(start).Take(blocksize).ToArray();
                 Dictionary<byte[], byte> dict = new Dictionary<byte[], byte>(new ByteArrayComparer());
                 //maintaining a dictionary is not really of any special benefit in this scenario
                 for (ct = 0; ct < 256; ct++)
                 { //alphanumeric and whitespace would be a shortcut
-                  //if (!dict.ContainsKey(encryption_oracle_with_key(key, o.Take(blocksize - (1 + i + startinblock) % blocksize).Concat(output.Take(i)).Concat(new byte[] { (byte)ct }).ToArray(), b).Skip((startblock + (1 + i + startinblock) / blocksize) * blocksize).Take(blocksize).ToArray())) {
-                    dict.Add(encryption_oracle_with_key(key, r, o.Take(blocksize - (1 + i + startinblock) % blocksize).Concat(output.Take(i)).Concat(new byte[] { (byte)ct }).ToArray(), b).Skip((startblock + (1 + i + startinblock) / blocksize) * blocksize).Take(blocksize).ToArray(), (byte)ct);
-                    //}
+                    dict.Add(encryption_oracle_with_key((key, b), r, prefix.Concat(output.Take(i)).Concat(new byte[] { (byte)ct }).ToArray()).Skip(start).Take(blocksize).ToArray(), (byte)ct);
                 }
                 output[i] = (byte)dict[sample]; //no collision and key found is asserted or will crash
             }
-            Console.WriteLine("Recovered value: " + System.Text.Encoding.ASCII.GetString(output));
-
+            return System.Text.Encoding.ASCII.GetString(output) == passResult;
+        }
+        static public bool Challenge15()
+        {
             //SET 2 CHALLENGE 15
-            Console.WriteLine("2.15 Good padding: " + (Encoding.ASCII.GetString(PKCS7Strip(Encoding.ASCII.GetBytes("ICE ICE BABY\x04\x04\x04\x04"))) == "ICE ICE BABY"));
+            if (Encoding.ASCII.GetString(PKCS7Strip(Encoding.ASCII.GetBytes("ICE ICE BABY\x04\x04\x04\x04"))) != "ICE ICE BABY") return false;
             try
             {
                 PKCS7Strip(Encoding.ASCII.GetBytes("ICE ICE BABY\x05\x05\x05\x05"));
+                return false;
             }
-            catch
-            {
-                Console.WriteLine("Bad padding: ICE ICE BABY\x05\x05\x05\x05");
-            }
+            catch {}
             try
             {
                 PKCS7Strip(Encoding.ASCII.GetBytes("ICE ICE BABY\x01\x02\x03\x04"));
+                return false;
             }
             catch
             {
-                Console.WriteLine("Bad padding: ICE ICE BABY\x01\x02\x03\x04");
             }
-
+            return true;
+        }
+        static private byte[] encryption_oracle_with_key_cbc(byte[] iv, byte[] key, byte[] prefix, string input, byte[] extra)
+        {
+            input = input.Replace(";", "%" + ((byte)';').ToString("X2")).Replace("=", "%" + ((byte)'=').ToString("X2"));
+            return encrypt_cbc(iv, key, PKCS7Pad(Enumerable.Concat(Enumerable.Concat(prefix, System.Text.Encoding.ASCII.GetBytes(input)), extra).ToArray(), 16));
+        }
+        static public bool Challenge16()
+        {
             //SET 2 CHALLENGE 16
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            byte[] key = new byte[16];
             rnd.GetBytes(key);
             byte[] iv = new byte[16];
+            string o = System.Text.Encoding.ASCII.GetString(Enumerable.Repeat<byte>(0x20, 64).ToArray());
             rnd.GetBytes(iv);
-            b = encryption_oracle_with_key_cbc(iv, key, Encoding.ASCII.GetBytes("comment1=cooking%20MCs;userdata="), o, Encoding.ASCII.GetBytes(";comment2=%20like%20a%20pound%20of%20bacon"));
-            Console.WriteLine("2.16 Is random string admin: " + Encoding.ASCII.GetString(decrypt_cbc(iv, key, b)).Contains(";admin=true;"));
+            byte[] b = encryption_oracle_with_key_cbc(iv, key, Encoding.ASCII.GetBytes("comment1=cooking%20MCs;userdata="), o, Encoding.ASCII.GetBytes(";comment2=%20like%20a%20pound%20of%20bacon"));
+            if (Encoding.ASCII.GetString(PKCS7Strip(decrypt_cbc(iv, key, b))).Contains(";admin=true;")) return false;
             //first send a block with all 0's to let us determine the output of the next stage
             //output = decrypt_cbc(iv, key, Enumerable.Concat(Enumerable.Concat(b.Take(32), Enumerable.Repeat((byte)0, 16)), b.Skip(48)).ToArray());
             //Console.WriteLine(Encoding.ASCII.GetString(decrypt_cbc(iv, key, Enumerable.Concat(Enumerable.Concat(b.Take(32), FixedXOR(output.Skip(48).Take(16).ToArray(), Encoding.ASCII.GetBytes(";admin=true;    "))), b.Skip(48)).ToArray())).Contains(";admin=true;"));
-            Console.WriteLine("Is admin: " + Encoding.ASCII.GetString(decrypt_cbc(iv, key, Enumerable.Concat(Enumerable.Concat(b.Take(32), FixedXOR(o.Skip(16).Take(16).ToArray(), FixedXOR(b.Skip(32).Take(16).ToArray(), Encoding.ASCII.GetBytes(";admin=true;    ")))), b.Skip(48)).ToArray())).Contains(";admin=true;"));
+            return Encoding.ASCII.GetString(PKCS7Strip(decrypt_cbc(iv, key, Enumerable.Concat(Enumerable.Concat(b.Take(32), FixedXOR(System.Text.Encoding.ASCII.GetBytes(o.ToCharArray(), 16, 16), FixedXOR(b.Skip(32).Take(16).ToArray(), Encoding.ASCII.GetBytes(";admin=true;    ")))), b.Skip(48)).ToArray()))).Contains(";admin=true;");
         }
         static void Set3()
         {
@@ -2052,7 +2054,7 @@ namespace Cryptopals
             b = System.IO.File.ReadAllLines("../../10.txt").Select(s => Convert.FromBase64String(s)).SelectMany(d => d).ToArray();
             o = decrypt_cbc(Enumerable.Repeat((byte)0, 16).ToArray(), System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), b);
             rnd.GetBytes(key);
-            b = encryption_oracle_with_key_cbc(key, key, Encoding.ASCII.GetBytes("comment1=cooking%20MCs;userdata="), o, Encoding.ASCII.GetBytes(";comment2=%20like%20a%20pound%20of%20bacon"));
+            b = encryption_oracle_with_key_cbc(key, key, Encoding.ASCII.GetBytes("comment1=cooking%20MCs;userdata="), System.Text.Encoding.ASCII.GetString(o), Encoding.ASCII.GetBytes(";comment2=%20like%20a%20pound%20of%20bacon"));
             o = decrypt_cbc(key, key, b.Take(16).Concat(Enumerable.Repeat((byte)0, 16).Concat(b.Take(16))).ToArray());
             Console.WriteLine("4.27 IV and key found: " + (new ByteArrayComparer().Equals(key, FixedXOR(o.Take(16).ToArray(), o.Skip(32).Take(16).ToArray()))));
 
@@ -2612,73 +2614,6 @@ namespace Cryptopals
             r[r.Length - 1] &= (byte)((1 << (BitSize % 8)) - 1); //make sure it wont be interpreted as negative in little-endian order
             r[r.Length - 1 - (BitSize % 8 == 0 ? 1 : 0)] |= (byte)(1 << ((BitSize - 1) % 8)); //always set bitsize-th bit
             return new BigInteger(r);
-        }
-        static int GetBitSizeSlow(BigInteger num)
-        {
-            int s = 0;
-            while ((BigInteger.One << s) <= num) s++;
-            //if (s != GetBitSizeBinSearch(num)) throw new ArgumentException();
-            return s;
-        }
-        static int GetBitSizeReflection(BigInteger num)
-        {
-            //uint[] bits = (uint[])typeof(BigInteger).GetField("_bits", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
-            uint[] bits = (uint[])typeof(BigInteger).GetProperty("_Bits", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
-            if (bits == null)
-            {
-                //int sign = (int)typeof(BigInteger).GetField("_sign", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
-                int sign = (int)typeof(BigInteger).GetProperty("_Sign", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(num);
-                bits = new uint[] { (uint)(sign < 0 ? sign & int.MaxValue : sign) };
-            }
-            int uintLength = (int)typeof(BigInteger).GetMethod("Length", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(null,
-                new object[] { bits });
-            int topbits = (int)typeof(BigInteger).GetMethod("BitLengthOfUInt", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).Invoke(num, new object[] { bits[uintLength - 1] });
-            return (uintLength - 1) * sizeof(uint) * 8 + topbits;
-        }
-        static int GetBitSize(BigInteger num)
-        {
-            byte[] bytes = num.ToByteArray();
-            int size = bytes.Length;
-            if (size == 0) return 0;
-            int v = bytes[size - 1]; // 8-bit value to find the log2 of 
-            if (v == 0) return (size - 1) * 8;
-            int r; // result of log2(v) will go here
-            int shift;
-            r = (v > 0xF) ? 4 : 0; v >>= r;
-            shift = (v > 0x3) ? 2 : 0; v >>= shift; r |= shift;
-            r |= (v >> 1);
-            return (size - 1) * 8 + r + 1;
-        }
-        static int GetBitSizeHiSearch(BigInteger num) //power of 2 search high, then binary search
-        {
-            if (num.IsZero) return 0;
-            int lo = 0, hi = 1;
-            while ((BigInteger.One << hi) <= num) { lo = hi; hi <<= 1; }
-            //if (GetBitSizeCopy(num) != GetBitSizeBinSearch(num, lo, hi)) throw new ArgumentException();
-            return GetBitSizeBinSearch(num, lo, hi);
-        }
-        static int GetBitSizeBinSearch(BigInteger num, int lo, int hi)
-        {
-            int mid = (hi + lo) >> 1;
-            while (lo <= hi)
-            {
-                if ((BigInteger.One << mid) <= num) lo = mid + 1;
-                else hi = mid - 1;
-                mid = (hi + lo) >> 1;
-            }
-            return mid + 1;
-        }
-        static int GetBitSizeRecurseBinSearch(BigInteger num)
-        { //instead of 0, 1, 2, 3, 4... use 0, 1, 3, 7, 15, etc
-            int s = 0, t = 1, oldt = 1;
-            if (t <= 0) return 0;
-            while (true) {
-                if ((BigInteger.One << (s + t)) <= num) { oldt = t; t <<= 1; }
-                else if (t == 1) break;
-                else { s += oldt; t = 1; }
-            }
-            //if (s + 1 != GetBitSizeBinSearch(num)) throw new ArgumentException();
-            return s + 1;
         }
         static BigInteger GetRandomBitSize(RandomNumberGenerator rng, int BitSize, BigInteger Max)
         {
