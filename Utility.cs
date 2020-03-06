@@ -68,32 +68,33 @@ namespace Cryptopals
             return Enumerable.Repeat(b, a.Length / b.Length + 1)
                 .SelectMany(d => d).Take(a.Length).ToArray();
         }
-        static public int CharacterScore(byte[] s)
+        static public double CharacterScore(byte[] s, byte[] exclude, Dictionary<byte, double> freqs)
         {
-            //http://academic.regis.edu/jseibert/Crypto/Frequency.pdf a-z/A-Z
-            double[] freq = { .082, .015, .028, .043, .127, .022, .020, .061, .070, .002,
-                              .008, .040, .024, .067, .075, .019, .001, .060, .063, .091,
-                              .028, .010, .023, .001, .020, .001};
-            ILookup<byte, byte> j = s.ToLookup(c => c); //group them by frequency
-            //30% weight for space or a couple false positives with high weighted letters can win
-            //a negative weight for bad characters would make it even better...
-            return (int)(((j.Contains((byte)' ') ? .3 * j[(byte)' '].Count() : 0) +
-                freq.Select((d, i) =>
-                    d * ((j.Contains((byte)('a' + i)) ? j[(byte)('a' + i)].Count() : 0) +
-                         (j.Contains((byte)('A' + i)) ? j[(byte)('A' + i)].Count() : 0))).Sum())
-                * 100);
+            Dictionary<byte, int> j = s.ToLookup(c => c).ToDictionary(k => k.Key, v => v.Count()); //group them by frequency
+            //use unprintable characters as immediate exclusion except new line...
+            if (exclude.Select(i => j.ContainsKey(i)).Any(i => i)) return 0;
+            return freqs.Select(kv => j.ContainsKey(kv.Key) ? kv.Value * j[kv.Key] : 0).Sum() * 100;
         }
-        static public dynamic GetLeastXORCharacterScore(byte[] s)
+        static public Tuple<byte, double>[] GetLeastXORCharacterScore(byte[] s)
         {
-            //assume 0 is starting maximum is fine in this scenario regardless
-            dynamic maxItem = new { index = 0, score = 0 };
-            foreach (dynamic val in Enumerable.Range(0, 256).Select(i =>
-                new { index = (byte)i, score =
-                    CharacterScore(FixedXOR(s, Enumerable.Repeat((byte)i, s.Length).ToArray())) }))
-            {
-                if (val.score > maxItem.score) { maxItem = val; }
+            byte[] exclude = Enumerable.Range(0, 10).Concat(Enumerable.Range(11, 21)).Concat(Enumerable.Range(127, 129)).Select(i => (byte)i).Concat("$#<>[]{}+^*&%()~|".Select(i => (byte)i)).ToArray();
+            //average word length in English is 4.79 letters, so space frequency 1/4.79, assuming punctuation was considered as apart of the word
+            //http://www.viviancook.uk/Punctuation/PunctFigs.htm
+            Dictionary<byte, double> freqs = new Dictionary<byte, double> {
+                [(byte)'.'] = 0.0653, [(byte)','] = 0.0616, [(byte)';'] = 0.0032, [(byte)':'] = 0.0034, [(byte)'!'] = 0.0033,
+                [(byte)'?'] = 0.0056, [(byte)'\''] = 0.0243, [(byte)'"'] = 0.0267, [(byte)'-'] = 0.0153, [(byte)' '] = 1 / 4.79 };
+            //http://academic.regis.edu/jseibert/Crypto/Frequency.pdf a-z/A-Z
+            //https://en.wikipedia.org/wiki/Letter_frequency
+            double[] freq = { .08167, .01492, .02202, .04253, .12702, .02228, .02015, .06094, .06966, .00153,
+                              .01292, .04025, .02406, .06749, .07507, .01929, .00095, .05987, .06327, .09356,
+                              .02758, .00978, .02560, .00150, .01994, .00077};
+            for (int i = 0; i < freq.Length; i++) {
+                freqs.Add((byte)('A' + i), freq[i]);
+                freqs.Add((byte)('a' + i), freq[i]);
             }
-            return maxItem;
+            return Enumerable.Range(0, 256).Select(i =>
+                new Tuple<byte, double>((byte)i,
+                    CharacterScore(FixedXOR(s, Enumerable.Repeat((byte)i, s.Length).ToArray()), exclude, freqs))).Where(x => x.Item2 != 0).OrderByDescending(x => x.Item2).ToArray();
         }
         static public int CountBitsSet(byte v) //Counting bits set, Brian Kernighan's way
         {
@@ -156,7 +157,6 @@ namespace Cryptopals
         static public byte[] PKCS7Pad(byte[] input, int blocksize)
         {
             int rem = (blocksize - (input.Length % blocksize));
-            if (rem == blocksize) return input;
             return Enumerable.Concat(input, Enumerable.Repeat((byte)rem, rem)).ToArray();
         }
         static public byte[] encrypt_ecb(byte[] key, byte[] input)
@@ -325,6 +325,27 @@ namespace Cryptopals
             byte last = inp.Last();
             if (last >= 1 && last <= 16 && inp.Skip(inp.Length - (int)last).All(x => x == last)) return inp.Take(inp.Length - (int)last).ToArray();
             throw new ArgumentException();
+        }
+        static public bool PKCS7Check(byte[] inp)
+        {
+            if (inp.Length == 0) return true;
+            //on even blocks a padding of a whole block is there so we can always properly strip
+            byte last = inp.Last();
+            if (last >= 1 && last <= 16 && inp.Skip(inp.Length - (int)last).All(x => x == last)) return true;
+            return false;
+
+        }
+        static public byte[] crypt_ctr(ulong nonce, byte[] key, byte[] input)
+        {
+            int l = input.Length;
+            byte[] o = new byte[l];
+            for (ulong ctr = 0; (int)ctr < l; ctr += 16)
+            {
+                //BitConverter uses little endian order
+                int rem = Math.Min(l - (int)ctr, 16);
+                FixedXOR(input.Skip((int)ctr).Take(rem).ToArray(), encrypt_ecb(key, BitConverter.GetBytes(nonce).Concat(BitConverter.GetBytes(ctr >> 4)).ToArray()).Take(rem).ToArray()).CopyTo(o, (int)ctr);
+            }
+            return o;
         }
     }
 }

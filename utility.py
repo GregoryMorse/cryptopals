@@ -58,16 +58,18 @@ def xorBins(bin1, bin2):
   return bytes([bin1[i] ^ bin2[i] for i in range(l)])
 
 def characterScore(bin):
-  freq = (.082, .015, .028, .043, .127, .022, .020, .061, .070, .002,
-          .008, .040, .024, .067, .075, .019, .001, .060, .063, .091,
-          .028, .010, .023, .001, .020, .001) #a-z/A-Z
-  #30% weight for space or a false positives with high weighted letters can win
+  freqs = {'.':0.0653, ',':0.0616, ';':0.0032, ':':0.0034, '!':0.0033,
+           '?':0.0056, '\'': 0.0243, '"':0.0267, '-':0.0153, ' ':1/4.79}
+  freq = (.08167, .01492, .02202, .04253, .12702, .02228, .02015, .06094,
+          .06966, .00153, .01292, .04025, .02406, .06749, .07507, .01929,
+          .00095, .05987, .06327, .09356, .02758, .00978, .02560, .00150,
+          .01994, .00077) #a-z/A-Z
   #can improve by negative weight for certain bad characters...
   spaceFreq, d = 0.3, dict()
   for i in bin: #group by frequency
     if i in d: d[i] += 1
     else: d[i] = 1
-  return (spaceFreq * (d[ord(' ')] if ord(' ') in d else 0) +
+  return (sum([freqs[i] * (d[ord(i)] if ord(i) in d else 0) for i in freqs]) +
           sum([j * ((d[ord('a') + i] if (ord('a') + i) in d else 0) +
                     (d[ord('A') + i] if (ord('A') + i) in d else 0))
                     for i, j in enumerate(freq)])) * 100
@@ -124,7 +126,6 @@ def is_ecb_mode(cipherData):
 
 def pkcs7pad(input, blockSize):
   rem = blockSize - (len(input) % blockSize)
-  if rem == blockSize: return input
   return input + bytes([rem] * rem)
 
 def encrypt_ecb(key, cipherData):
@@ -167,6 +168,23 @@ def pkcs7strip(input, blockSize):
   if last >= 1 and last <= blockSize and all([x == last for x in input[-last:]]):
     return input[:l-last]
   raise ValueError()
+
+def pkcs7check(input, blockSize):
+  l = len(input)
+  if l == 0: return True
+  last = input[-1]
+  if last >= 1 and last <= blockSize and all([x == last for x in input[-last:]]):
+    return True
+  return False
+
+def crypt_ctr(nonce, key, input):
+  l = len(input)
+  o = bytearray(l)
+  for ctr in range(0, l, 16):
+    #uses little endian order
+    rem = min(l - ctr, 16)
+    o[ctr:ctr+16] = xorBins(input[ctr:ctr+rem], encrypt_ecb(key, nonce.to_bytes(8, byteorder='little') + (ctr >> 4).to_bytes(8, byteorder='little'))[:rem])
+  return o
 
 def testUtility():
   def testHexPartToInt():

@@ -13,6 +13,7 @@ curDir = 'D:\\Source\\Repos\\cryptopals\\'
 exec(open(os.path.join(curDir, 'utility.py')).read())
 exec(open(os.path.join(curDir, '1.py')).read())
 exec(open(os.path.join(curDir, '2.py')).read())
+exec(open(os.path.join(curDir, '3.py')).read())
 
 #def loadImp(name):
 #  import imp
@@ -46,6 +47,11 @@ set2 = [(challenge9, 9),   (challenge10, 10), (challenge11, 11),
         (challenge12, 12), (challenge13, 13), (challenge14, 14),
         (challenge15, 15), (challenge16, 16)]
 
+set3 = [(challenge17, 17), (challenge18, 18), (challenge19, 19),
+        (challenge20, 20), (challenge21, 21), (challenge22, 22),
+        (challenge23, 23), (challenge24, 24)]
+
 testUtility()
 #runSet(1, set1)
-runSet(2, set2)
+#runSet(2, set2)
+runSet(3, set3)

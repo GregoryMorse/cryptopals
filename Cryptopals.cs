@@ -1207,83 +1207,100 @@ namespace Cryptopals
             return ret;
         }
 
-        //http://norvig.com/mayzner.html
-        static private dynamic GetLeastXORBigramScore(byte[] s, byte[] t)
+        private delegate Tuple<byte, double>[] GetLeastXORBiTrigramScoreProto(byte[] o, byte[] p, byte[] r, byte[] s, byte[] t);
+        static private GetLeastXORBiTrigramScoreProto GetLeastXORBiTrigramScoreGen(Dictionary<string, double> lastWords)
         {
-            KeyValuePair<string, double>[] bigraphfreq = new KeyValuePair<string, double>[]
-            {   new KeyValuePair<string, double>("TH", 3.56),
-                new KeyValuePair<string, double>("HE", 3.07),
-                new KeyValuePair<string, double>("IN", 2.43),
-                new KeyValuePair<string, double>("ER", 2.05),
-                new KeyValuePair<string, double>("AN", 1.99),
-                new KeyValuePair<string, double>("RE", 1.85),
-                new KeyValuePair<string, double>("ON", 1.76),
-                new KeyValuePair<string, double>("AT", 1.49),
-                new KeyValuePair<string, double>("EN", 1.45),
-                new KeyValuePair<string, double>("ND", 1.35),
-                new KeyValuePair<string, double>("TI", 1.34),
-                new KeyValuePair<string, double>("ES", 1.34),
-                new KeyValuePair<string, double>("OR", 1.28),
-                new KeyValuePair<string, double>("TE", 1.20),
-                new KeyValuePair<string, double>("OF", 1.17),
-                new KeyValuePair<string, double>("ED", 1.17),
-                new KeyValuePair<string, double>("IS", 1.13),
-                new KeyValuePair<string, double>("IT", 1.12),
-                new KeyValuePair<string, double>("AL", 1.09),
-                new KeyValuePair<string, double>("AR", 1.07),
-                new KeyValuePair<string, double>("ST", 1.05),
-                new KeyValuePair<string, double>("TO", 1.04),
-                new KeyValuePair<string, double>("NT", 1.04),
-                new KeyValuePair<string, double>("NG", 0.95),
-                new KeyValuePair<string, double>("SE", 0.93),
-                new KeyValuePair<string, double>("HA", 0.93),
-                new KeyValuePair<string, double>("AS", 0.87),
-                new KeyValuePair<string, double>("OU", 0.87),
-                new KeyValuePair<string, double>("IO", 0.83),
-                new KeyValuePair<string, double>("LE", 0.83),
-                new KeyValuePair<string, double>("VE", 0.83),
-                new KeyValuePair<string, double>("CO", 0.79),
-                new KeyValuePair<string, double>("ME", 0.79),
-                new KeyValuePair<string, double>("DE", 0.76),
-                new KeyValuePair<string, double>("HI", 0.76),
-                new KeyValuePair<string, double>("RI", 0.73),
-                new KeyValuePair<string, double>("RO", 0.73),
-                new KeyValuePair<string, double>("IC", 0.70),
-                new KeyValuePair<string, double>("NE", 0.69),
-                new KeyValuePair<string, double>("EA", 0.69),
-                new KeyValuePair<string, double>("RA", 0.69),
-                new KeyValuePair<string, double>("CE", 0.65),
-                new KeyValuePair<string, double>("LI", 0.62),
-                new KeyValuePair<string, double>("CH", 0.60),
-                new KeyValuePair<string, double>("LL", 0.58),
-                new KeyValuePair<string, double>("BE", 0.58),
-                new KeyValuePair<string, double>("MA", 0.57),
-                new KeyValuePair<string, double>("SI", 0.55),
-                new KeyValuePair<string, double>("OM", 0.55),
-                new KeyValuePair<string, double>("UR", 0.54)};
-            dynamic[] char1f = Enumerable.Range(0, 256).Select(i =>
-               new { index = (byte)i, score = CharacterScore(FixedXOR(s, Enumerable.Repeat((byte)i, s.Length).ToArray())) }).OrderBy((m) => m.score).ToArray();
-            dynamic[] char2f = Enumerable.Range(0, 256).Select(i =>
-               new { index = (byte)i, score = CharacterScore(FixedXOR(t, Enumerable.Repeat((byte)i, t.Length).ToArray())) }).ToArray();
-            for (int top = 0; top < 16; top++) {
-                for (int i = 0; i < bigraphfreq.Length - 1; i++) {
-                    for (int m = 0; m < s.Length - 1; m++) {
-                        if ((char1f[top].index ^ s[m]) == bigraphfreq[i].Key[0] || (char1f[top].index ^ s[m]) == (bigraphfreq[i].Key[0] - 'A' + 'a')) {
-                            char1f[top].score += char2f.First((c) => c.index == (bigraphfreq[i].Key[1] ^ t[m]) || c.index == ((bigraphfreq[i].Key[1] - 'A' + 'a') ^ t[m])).score * bigraphfreq[i].Value * 26;
+            //http://norvig.com/mayzner.html
+            /*Dictionary<string, double> bigramfreq = new Dictionary<string, double>
+            {   ["TH"]= 3.56, ["HE"]= 3.07, ["IN"]= 2.43, ["ER"]= 2.05, ["AN"]= 1.99,
+                ["RE"]= 1.85, ["ON"]= 1.76, ["AT"]= 1.49, ["EN"]= 1.45, ["ND"]= 1.35,
+                ["TI"]= 1.34, ["ES"]= 1.34, ["OR"]= 1.28, ["TE"]= 1.20, ["OF"]= 1.17,
+                ["ED"]= 1.17, ["IS"]= 1.13, ["IT"]= 1.12, ["AL"]= 1.09, ["AR"]= 1.07,
+                ["ST"]= 1.05, ["TO"]= 1.04, ["NT"]= 1.04, ["NG"]= 0.95, ["SE"]= 0.93,
+                ["HA"]= 0.93, ["AS"]= 0.87, ["OU"]= 0.87, ["IO"]= 0.83, ["LE"]= 0.83,
+                ["VE"]= 0.83, ["CO"]= 0.79, ["ME"]= 0.79, ["DE"]= 0.76, ["HI"]= 0.76,
+                ["RI"]= 0.73, ["RO"]= 0.73, ["IC"]= 0.70, ["NE"]= 0.69, ["EA"]= 0.69,
+                ["RA"]= 0.69, ["CE"]= 0.65, ["LI"]= 0.62, ["CH"]= 0.60, ["LL"]= 0.58,
+                ["BE"]= 0.58, ["MA"]= 0.57, ["SI"]= 0.55, ["OM"]= 0.55, ["UR"]= 0.54};*/
+            Dictionary<char, double> punctfreqs = new Dictionary<char, double> {
+                ['.'] = 0.0653, [','] = 0.0616, [';'] = 0.0032, [':'] = 0.0034, ['!'] = 0.0033,
+                ['?'] = 0.0056, ['\''] = 0.0243, ['"'] = 0.0267, ['-'] = 0.0153, [' '] = 1 / 4.79 };
+            double[] freq = { .08167, .01492, .02202, .04253, .12702, .02228, .02015, .06094, .06966, .00153,
+                              .01292, .04025, .02406, .06749, .07507, .01929, .00095, .05987, .06327, .09356,
+                              .02758, .00978, .02560, .00150, .01994, .00077};
+            //practicalcryptography.com/cryptanalysis/text-characterisation/quadgrams/
+            double totalWords = ReadChallengeFile("english_bigrams.txt").Select(str => double.Parse(str.Split(' ')[1])).Sum() / 4.79;
+            Dictionary<string, double> bigramfreq = ReadChallengeFile("english_bigrams.txt").Select(str => 
+                { string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            Dictionary<string, double> trigramfreq = ReadChallengeFile("english_trigrams.txt").Select(str =>
+            { string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            Dictionary<string, double> quadgramfreq = ReadChallengeFile("english_quadgrams.txt").Select(str =>
+            { string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            //Dictionary<string, double> quintgramfreq = ReadChallengeFile("english_quintgrams.txt").Select(str =>
+            //{ string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            return (byte[] o, byte[] p, byte[] r, byte[] s, byte[] t) =>
+            {
+                Tuple<byte, double>[] freqs = GetLeastXORCharacterScore(t).Where(x => x.Item2 != 0).ToArray();
+                for (int top = 0; top < freqs.Length; top++)
+                {
+                    double score = 0;
+                    for (int i = 0; i < t.Length; i++)
+                    {
+                        char nextChar = (char)(freqs[top].Item1 ^ t[i]);
+                        if (t.Length <= 2)
+                        { //statistical break down is basically guaranteed at this point under too many circumstances so must use word list
+
+                            string str = new string(new char[] { (char)p[i], (char)r[i], (char)s[i], nextChar });
+                            if (lastWords.ContainsKey(str)) { score = lastWords[str]; break; }
                         }
+                        if (".,;:!? ".IndexOf((char)s[i]) != -1 && ".,;:!? ".IndexOf(nextChar) != -1 ||
+                            ".,;:!? ".IndexOf((char)r[i]) != -1 && ".,;:!? ".IndexOf(nextChar) != -1 ||
+                            char.IsLetter((char)s[i]) && char.IsNumber(nextChar) ||
+                            char.IsLetter((char)s[i]) && char.IsUpper(nextChar))
+                        {
+                            score = 0; break;
+                        }
+                        /*if (char.IsLetter((char)o[i]) && char.IsLetter((char)p[i]) && char.IsLetter((char)r[i]) && char.IsLetter((char)s[i]) && char.IsLetter(nextChar)) {
+                            string str = new string(new char[] { (char)o[i], (char)p[i], (char)r[i], (char)s[i], nextChar });
+                            if (!quintgramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += quintgramfreq[str.ToUpper()] / totalWords * 5 * 5 * 5 * 5 * 5;
+                        } else*/
+                        if (char.IsLetter((char)p[i]) && char.IsLetter((char)r[i]) && char.IsLetter((char)s[i]) && char.IsLetter(nextChar))
+                        {
+                            string str = new string(new char[] { (char)p[i], (char)r[i], (char)s[i], nextChar });
+                            //Console.WriteLine(str);
+                            if (!quadgramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += quadgramfreq[str.ToUpper()] / totalWords * 4 * 4 * 4  * 4;
+                        }
+                        else if (char.IsLetter((char)r[i]) && char.IsLetter((char)s[i]) && char.IsLetter(nextChar))
+                        {
+                            string str = new string(new char[] { (char)r[i], (char)s[i], nextChar });
+                            if (!trigramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += trigramfreq[str.ToUpper()] / totalWords * 3 * 3 * 3;
+                        }
+                        else if (char.IsLetter((char)s[i]) && char.IsLetter(nextChar))
+                        {
+                            string str = new string(new char[] { (char)s[i], nextChar });
+                            if (!bigramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += bigramfreq[str.ToUpper()] / totalWords * 2 * 2;
+                        }
+                        else if (".,;:!? ".IndexOf(nextChar) != -1)
+                        {
+                            score += punctfreqs[nextChar];
+                        }
+                        else if (".,;:!? ".IndexOf((char)s[i]) != -1 && char.IsLetter(nextChar))
+                        {
+                            score += char.IsUpper(nextChar) ? freq[nextChar - 'A'] : freq[nextChar - 'a'];
+                        }
+                        else { score = 0; break; }
+                        //if ((char1f[top].Item1 ^ s[m]) == bigraphfreq[i].Key[0] || (char1f[top].Item1 ^ s[m]) == (bigraphfreq[i].Key[0] - 'A' + 'a')) {
+                        //char1f[top] = new Tuple<byte, double>(char1f[top].Item1, char1f[top].Item2 + char2f.First((c) => c.Item1 == (bigraphfreq[i].Key[1] ^ t[m]) || c.Item1 == ((bigraphfreq[i].Key[1] - 'A' + 'a') ^ t[m])).Item2 * bigraphfreq[i].Value * 26);
+                        //}
                     }
+                    freqs[top] = new Tuple<byte, double>(freqs[top].Item1, score);
                 }
-            }
-            return char1f.OrderBy((c) => c.score).Last();
-        }
-        static private byte[] crypt_ctr(ulong nonce, byte[] key, byte[] input)
-        {
-            byte[] o = new byte[input.Length];
-            for (ulong ctr = 0; (int)ctr < input.Length; ctr += 16) {
-                //BitConverter uses little endian order
-                FixedXOR(input.Skip((int)ctr).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray(), encrypt_ecb(key, BitConverter.GetBytes(nonce).Concat(BitConverter.GetBytes(ctr / 16)).ToArray()).Take(Math.Min(input.Length - (int)ctr, 16)).ToArray()).CopyTo(o, (int)ctr);
-            }
-            return o;
+                return freqs.Where(x => x.Item2 != 0).OrderByDescending((c) => c.Item2).ToArray();
+            };
         }
         static private byte[] MTCipher(ushort seed, byte[] input)
         {
@@ -1315,7 +1332,7 @@ namespace Cryptopals
             string passString = "Cooking MC's like a pound of bacon"; //Vanilla Ice - Ice Ice Baby
             string str = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
             byte[] b = HexDecode(str);
-            byte key = (byte)GetLeastXORCharacterScore(b).index;
+            byte key = GetLeastXORCharacterScore(b).First().Item1;
             string res = System.Text.Encoding.ASCII.GetString(
                             FixedXOR(b, Enumerable.Repeat(key, b.Length).ToArray()));
             return key == passKey && res == passString;
@@ -1327,20 +1344,16 @@ namespace Cryptopals
             byte passKey = 53;
             string passString = "Now that the party is jumping\n";
             //assume 0 is starting maximum is fine in this scenario regardless
-            dynamic maxItem = new { index = 0, score = 0 };
             byte[][] lines = Enumerable.Select(ReadChallengeFile("4.txt"),
                                                s => HexDecode(s)).ToArray();
-            for (int i = 0; i < lines.Length; i++)
-            {
-                dynamic val = GetLeastXORCharacterScore(lines[i]);
-                if (val.score > maxItem.score) {
-                    maxItem = new { origindex = i, index = val.index, score = val.score }; }
-            }
+            Tuple<int, byte, double> maxItem = lines.Select((l, i) =>
+            { Tuple<byte, double> val = GetLeastXORCharacterScore(lines[i]).First(); return new Tuple<int, byte, double>(i, val.Item1, val.Item2); })
+                .OrderByDescending(x => x.Item3).First();
             string res = System.Text.Encoding.ASCII.GetString(
-                FixedXOR(lines[maxItem.origindex],
-                         Enumerable.Repeat((byte)maxItem.index,
-                                           lines[maxItem.origindex].Length).ToArray()));
-            return maxItem.origindex == passLine && maxItem.index == passKey && res == passString;
+                FixedXOR(lines[maxItem.Item1],
+                         Enumerable.Repeat(maxItem.Item2,
+                                           lines[maxItem.Item1].Length).ToArray()));
+            return maxItem.Item1 == passLine && maxItem.Item2 == passKey && res == passString;
         }
         static public bool Challenge5()
         {
@@ -1439,25 +1452,20 @@ namespace Cryptopals
             byte[] b = Enumerable.Select(ReadChallengeFile("6.txt"),
                                          s => Convert.FromBase64String(s))
                 .SelectMany(d => d).ToArray();
-            dynamic minItem = new { keysize = 2, hamming = double.MaxValue };
-            foreach (dynamic val in Enumerable.Range(2, 39).Select(j => new
-            {
+            Tuple<int, double> minItem = Enumerable.Range(2, 39).Select(j => new Tuple<int, double>(
                 //hamming all neighboring pieces except for the last one if its not a multiple
                 //this is slower but maximal accuracy! must use double for divisions...
-                keysize = j, 
+                j,
                 //1 / (ciphLen / i - 1) / i == (i / (ciphLen - i)) / i == 1 / (ciphLen - i)
-                hamming = (double)Enumerable.Range(0, b.Length / j - 1).Select(l =>
+                (double)Enumerable.Range(0, b.Length / j - 1).Select(l =>
                         HammingDistance(b.Skip(l * j).Take(j).ToArray(),
                         b.Skip((l + 1) * j).Take(j).ToArray())).Sum()
                         / ((double)b.Length - (double)j)
-            }))
-            {
-                if (val.hamming < minItem.hamming) { minItem = val; }
-            }
-            byte[] key = Enumerable.Range(0, (int)minItem.keysize).Select(j =>
+            )).OrderBy(x => x.Item2).First();
+            byte[] key = Enumerable.Range(0, (int)minItem.Item1).Select(j =>
                     (byte)GetLeastXORCharacterScore(b.Where((c, i) =>
-                        i % (int)minItem.keysize == j).ToArray()).index).ToArray();
-            return minItem.keysize == passKeyLen && key.SequenceEqual(passKey) &&
+                        i % (int)minItem.Item1 == j).ToArray()).First().Item1).ToArray();
+            return minItem.Item1 == passKeyLen && key.SequenceEqual(passKey) &&
                 System.Text.Encoding.ASCII.GetString(FixedXOR(b, XORRepKey(b, key))) == passResult;
         }
         static public bool Challenge7()
@@ -1549,7 +1557,7 @@ namespace Cryptopals
             string passResult = "Rollin' in my 5.0\n" + //Vanilla Ice - Ice Ice Baby
                 "With my rag-top down so my hair can blow\n" +
                 "The girlies on standby waving just to say hi\n" +
-                "Did you stop? No, I just drove by";
+                "Did you stop? No, I just drove by\n";
             RandomNumberGenerator rnd = RandomNumberGenerator.Create();
             byte[] key = new byte[16];
             rnd.GetBytes(key);
@@ -1673,7 +1681,7 @@ namespace Cryptopals
             string passResult = "Rollin' in my 5.0\n" + //Vanilla Ice - Ice Ice Baby
                 "With my rag-top down so my hair can blow\n" +
                 "The girlies on standby waving just to say hi\n" +
-                "Did you stop? No, I just drove by";
+                "Did you stop? No, I just drove by\n";
             RandomNumberGenerator rnd = RandomNumberGenerator.Create();
             byte[] key = new byte[16];
             rnd.GetBytes(key);
@@ -1771,18 +1779,17 @@ namespace Cryptopals
             //Console.WriteLine(Encoding.ASCII.GetString(decrypt_cbc(iv, key, Enumerable.Concat(Enumerable.Concat(b.Take(32), FixedXOR(output.Skip(48).Take(16).ToArray(), Encoding.ASCII.GetBytes(";admin=true;    "))), b.Skip(48)).ToArray())).Contains(";admin=true;"));
             return Encoding.ASCII.GetString(PKCS7Strip(decrypt_cbc(iv, key, Enumerable.Concat(Enumerable.Concat(b.Take(32), FixedXOR(System.Text.Encoding.ASCII.GetBytes(o.ToCharArray(), 16, 16), FixedXOR(b.Skip(32).Take(16).ToArray(), Encoding.ASCII.GetBytes(";admin=true;    ")))), b.Skip(48)).ToArray()))).Contains(";admin=true;");
         }
-        static void Set3()
+        static public bool Challenge17()
         {
+            //SET 3 CHALLENGE 17
             RandomNumberGenerator rnd = RandomNumberGenerator.Create();
             byte[] b;
             byte[] key = new byte[16];
             byte[] iv = new byte[16];
-            byte[][] lines;
             int ct;
+            byte[] output;
             int startinblock;
             int startblock;
-            byte[] output;
-            //SET 3 CHALLENGE 17
             string[] rndstrs;
             rndstrs = new string[] { "MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=",
                 "MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic=",
@@ -1800,7 +1807,7 @@ namespace Cryptopals
             ct = GetNextRandom(rnd, rndstrs.Length);
             b = encrypt_cbc(iv, key, PKCS7Pad(Encoding.ASCII.GetBytes(rndstrs[ct]), 16));
             output = decrypt_cbc(iv, key, b);
-            Console.WriteLine("3.17 Random string encrypts: " + (Encoding.ASCII.GetString(PKCS7Strip(output)) == rndstrs[ct]));
+            if (Encoding.ASCII.GetString(PKCS7Strip(output)) != rndstrs[ct]) return false;
             //now decrypt b with only PKCS7Strip indirectly invoking decrypt_cbc
             //the problem with the last block is that two values for the original pad or new pad could both work
             //must prepend IV to determine first block - how to get IV in general? must have at least a single valid cypher encryption plaintext/cyphertext pair
@@ -1813,7 +1820,7 @@ namespace Cryptopals
                     for (int j = 15; j > startinblock; j--) { b[(startblock - 1) * 16 + j] ^= (byte)(data[j] ^ (16 - startinblock)); }
                     for (int i = 255; i >= 0; i--)
                     { //avoid problem of original padding on last block by searching backward...
-                        try
+                        /*try //try-catch too slow at least with debugger displaying exceptions
                         {
                             b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock));
                             PKCS7Strip(decrypt_cbc(iv, key, b.Take((startblock + 1) * 16).ToArray()));
@@ -1821,20 +1828,95 @@ namespace Cryptopals
                             b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock));
                             break;
                         }
-                        catch { b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock)); }
+                        catch (ArgumentException) { b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock)); }*/
+                        b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock));
+                        if (PKCS7Check(decrypt_cbc(iv, key, b.Take((startblock + 1) * 16).ToArray()))) {
+                            b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock));
+                            data[startinblock] = (byte)i;
+                            break;
+                        }
+                        b[(startblock - 1) * 16 + startinblock] ^= (byte)(i ^ (16 - startinblock));
                     }
                     for (int j = 15; j > startinblock; j--) { b[(startblock - 1) * 16 + j] ^= (byte)(data[j] ^ (16 - startinblock)); }
                 }
-                for (int j = 0; j < 16; j++) { b[startblock * 16 + j] = data[j]; }
+                Array.Copy(data, 0, b, startblock * 16, 16);
             }
-            Console.WriteLine("Decrypted value: " + (Encoding.ASCII.GetString(PKCS7Strip(b.Skip(16).ToArray())) == rndstrs[ct]));
-
+            return Encoding.ASCII.GetString(PKCS7Strip(b.Skip(16).ToArray())) == rndstrs[ct];
+        }
+        static public bool Challenge18()
+        {
             //SET 3 CHALLENGE 18
-            Console.WriteLine("3.18 Recovered CTR string: " + System.Text.Encoding.ASCII.GetString(crypt_ctr(0, System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), Convert.FromBase64String("L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="))));
-            Console.WriteLine("Decrypted and re-encrypted value recovers original encryption: " + ("L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==" == Convert.ToBase64String(crypt_ctr(0, System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), crypt_ctr(0, System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE"), Convert.FromBase64String("L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="))))));
-
-            //SET 3 CHALLENGE 19 - WEAK SOLUTION DOES NOT PROPERLY DEAL WITH TRIGRAMS!!!
-            rndstrs = new string[] {"SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
+            string passResult = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby ";
+            string str = "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==";
+            byte[] key = System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE");
+            if (System.Text.Encoding.ASCII.GetString(crypt_ctr(0, key, Convert.FromBase64String(str))) != passResult) return false;
+            //test encrypt-decrypt returns same result
+            return str == Convert.ToBase64String(crypt_ctr(0, key, crypt_ctr(0, key, Convert.FromBase64String(str))));
+        }
+        static private Tuple<byte, double> BigramHandler(GetLeastXORBiTrigramScoreProto GetLeastXORBiTrigramScore, Tuple<byte, double> val, byte[][] lines, int i, byte[] b, byte[] analysis)
+        {
+            //look backward from a known good starting point
+            IEnumerable<byte[]> e = lines.Where((bts) => bts.Length > i);
+            Tuple<byte, double>[] vals = GetLeastXORBiTrigramScore(
+                e.Select((bts) => (byte)(bts[i - 4] ^ b[i - 4])).ToArray(),
+                e.Select((bts) => (byte)(bts[i - 3] ^ b[i - 3])).ToArray(),
+                e.Select((bts) => (byte)(bts[i - 2] ^ b[i - 2])).ToArray(),
+                e.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray(), analysis);
+            //now look forward by one for confirmation of all possible scores
+            if (vals.Length == 0) { }
+            else if (b.Length == i + 1 || vals.Length == 1) val = vals.First();
+            else
+            {
+                IEnumerable<byte[]> e1 = e.Where((bts) => bts.Length > i + 1);
+                byte[] o = e1.Select((bts) => (byte)(bts[i - 3] ^ b[i - 3])).ToArray();
+                byte[] p = e1.Select((bts) => (byte)(bts[i - 2] ^ b[i - 2])).ToArray();
+                byte[] q = e1.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray();
+                byte[] s = e1.Select((bts) => bts[i + 1]).ToArray();
+                IEnumerable<byte[]> e2 = e1.Where((bts) => bts.Length > i + 2);
+                byte[] o1 = e2.Select((bts) => (byte)(bts[i - 2] ^ b[i - 2])).ToArray();
+                byte[] p1 = e2.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray();
+                byte[] s1 = e2.Select((bts) => bts[i + 2]).ToArray();
+                IEnumerable<byte[]> e3 = e2.Where((bts) => bts.Length > i + 3);
+                byte[] o2 = e3.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray();
+                byte[] s2 = e3.Select((bts) => bts[i + 3]).ToArray();
+                val = vals.Take(20).Select(x =>
+                {
+                    Tuple<byte, double>[] vs = GetLeastXORBiTrigramScore(o, p, q,
+                        e1.Select((bts) => (byte)(bts[i] ^ x.Item1)).ToArray(), s);
+                    if (b.Length != i + 2 && vs.Length > 1)
+                    { //second look ahead
+                        byte[] q1 = e2.Select((bts) => (byte)(bts[i] ^ x.Item1)).ToArray();
+                        return vs.Take(20).Select(y =>
+                        {
+                            Tuple<byte, double>[] vls = GetLeastXORBiTrigramScore(o1, p1, q1,
+                                e2.Select((bts) => (byte)(bts[i + 1] ^ y.Item1)).ToArray(), s1);
+                            /*if (b.Length != i + 3 && vls.Length > 1)
+                            {
+                                byte[] p2 = e3.Select((bts) => (byte)(bts[i] ^ x.Item1)).ToArray();
+                                byte[] q2 = e3.Select((bts) => (byte)(bts[i + 1] ^ y.Item1)).ToArray();
+                                return vls.Take(20).Select(z =>
+                                    {
+                                        Tuple<byte, double>[] v = GetLeastXORBiTrigramScore(o2, p2, q2,
+                                            e3.Select((bts) => (byte)(bts[i + 2] ^ z.Item1)).ToArray(), s2);
+                                        return new Tuple<byte, double>(x.Item1, v.Length == 0 ? 0 : v.First().Item2 + z.Item2 + y.Item2 + x.Item2);
+                                    }).OrderByDescending(z => z.Item2).First();
+                            }
+                            else*/ return new Tuple<byte, double>(x.Item1, vls.Length == 0 ? 0 : vls.First().Item2 + y.Item2 + x.Item2);
+                        }).OrderByDescending(y => y.Item2).First();
+                    }
+                    else return new Tuple<byte, double>(x.Item1, vs.Length == 0 ? 0 : vs.First().Item2 + x.Item2);
+                }).OrderByDescending(x => x.Item2).First();
+            }
+            return val; //unfortunately a tie in one case will cause an error
+        }
+        static public bool Challenge19()
+        {
+            //SET 3 CHALLENGE 19
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            GetLeastXORBiTrigramScoreProto GetLeastXORBiTrigramScore = GetLeastXORBiTrigramScoreGen(
+                new Dictionary<string, double> { ["turn"] = double.PositiveInfinity, ["urn,"] = double.PositiveInfinity });
+            byte[] key = new byte[16]; //Easter, 1916, a poem by W. B. Yeats
+            string[] rndstrs = new string[] {"SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
                         "Q29taW5nIHdpdGggdml2aWQgZmFjZXM=",
                         "RnJvbSBjb3VudGVyIG9yIGRlc2sgYW1vbmcgZ3JleQ==",
                         "RWlnaHRlZW50aC1jZW50dXJ5IGhvdXNlcy4=",
@@ -1874,36 +1956,100 @@ namespace Cryptopals
                         "SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=",
                         "VHJhbnNmb3JtZWQgdXR0ZXJseTo=",
                         "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4="};
+            string[] passResult = rndstrs.Select(str => System.Text.Encoding.ASCII.GetString(Convert.FromBase64String(str))).ToArray();
+            byte[][] lines = rndstrs.Select((str) => crypt_ctr(0, key, Convert.FromBase64String(str))).ToArray();
+            int m = lines.Max((bts) => bts.Length);
+            byte[] b = new byte[m]; //maximum length of keystream to try to decode
+            for (int i = 0; i < b.Length; i++)
+            {
+                byte[] analysis = lines.Where((bts) => bts.Length > i).Select((bts) => bts[i]).ToArray();
+                Tuple<byte, double>[] vals = GetLeastXORCharacterScore(analysis);
+                Tuple<byte, double> val = i == 0 && vals.First().Item2 == vals[1].Item2 ? vals[1] : vals.First(); //prefer upper case when lower case assumed to win in tie
+                if (i > 3 && (analysis.Length <= 13 || val.Item2 <= 80))
+                {
+                    val = BigramHandler(GetLeastXORBiTrigramScore, val, lines, i, b, analysis);
+                }
+                b[i] = val.Item1;
+            }
+            Console.WriteLine(System.Text.Encoding.ASCII.GetString(passResult.Select(s => (byte)s[0]).ToArray()));
+            Console.WriteLine(System.Text.Encoding.ASCII.GetString(lines.Select(s => (byte)(s[0] ^ b[0])).ToArray()));
+            byte[] goodb = FixedXOR(lines.First(l => l.Length == m), System.Text.Encoding.ASCII.GetBytes(passResult.First(l => l.Length == m)));
+            Console.WriteLine(string.Join("  ", Enumerable.Range(0, m).Where(i => b[i] != goodb[i]).Select(i => i.ToString() + " " + goodb[i] + " " + b[i])));
+            for (int i = 0; i < lines.Length; i++) {
+                if (System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray())) != passResult[i]) {
+                    Console.WriteLine(passResult[i]);
+                    Console.WriteLine(System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray())));
+                }
+            }
+            return Enumerable.Range(0, lines.Length).All(i => System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray())) == passResult[i]);
+        }
+        static public bool Challenge20()
+        {
+            //SET 3 CHALLENGE 20
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            GetLeastXORBiTrigramScoreProto GetLeastXORBiTrigramScore = GetLeastXORBiTrigramScoreGen(new Dictionary<string, double>
+            { [" who"] = 100, ["t th"] = double.PositiveInfinity, ["e sc"] = double.PositiveInfinity, ["e mo"] = double.PositiveInfinity,
+                ["he m"] = double.PositiveInfinity, ["le s"] = double.PositiveInfinity,
+                [" sce"] = 101, [" mon"] = 102, ["ener"] = double.PositiveInfinity,
+                ["nery"] = 100
+            });
+            byte[] key = new byte[16];
             rnd.GetBytes(key);
-            lines = rndstrs.Select((str) => crypt_ctr(0, key, Convert.FromBase64String(str))).ToArray();
-            b = new byte[lines.Max((bts) => bts.Length)]; //maximum length of keystream to try to decode
-            for (int i = 0; i < b.Length; i++)
-            {
+            byte[][] passResult = ReadChallengeFile("20.txt").Select((s) => Convert.FromBase64String(s)).ToArray();
+            //for (int i = 0; i < passResult.Length; i++) Console.WriteLine(System.Text.Encoding.ASCII.GetString(passResult[i]));
+            byte[][] lines = passResult.Select(s => crypt_ctr(0, key, s)).ToArray();
+            int m = lines.Max(l => l.Length);
+            byte[] b = new byte[m];
+            for (int i = 0; i < m; i++) {
+                //maximum length of keystream to try to decode, but could take minimum as problem states to reduce logic
                 byte[] analysis = lines.Where((bts) => bts.Length > i).Select((bts) => bts[i]).ToArray();
-                dynamic val = GetLeastXORCharacterScore(analysis);
-                if (analysis.Length <= 13 || val.score <= 80)
-                {
-                    val = GetLeastXORBigramScore(lines.Where((bts) => bts.Length > i + 1).Select((bts) => bts[i]).ToArray(), lines.Where((bts) => bts.Length > i + 1).Select((bts) => bts[i + 1]).ToArray());
+                Tuple<byte, double>[] vals = GetLeastXORCharacterScore(analysis);
+                Tuple<byte, double> val = i == 0 && vals.First().Item2 == vals[1].Item2 ? vals[1] : vals.First(); //prefer upper case when lower case assumed to win in tie
+                if (i > 3 && (analysis.Length <= 13 || val.Item2 <= 80)) {
+                    val = BigramHandler(GetLeastXORBiTrigramScore, val, lines, i, b, analysis);
                 }
-                b[i] = val.index;
+                b[i] = val.Item1;
             }
-            for (int i = 0; i < lines.Length; i++) { Console.WriteLine(System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray()))); }
+            Console.WriteLine(System.Text.Encoding.ASCII.GetString(passResult.Select(s => s[0]).ToArray()));
+            Console.WriteLine(System.Text.Encoding.ASCII.GetString(lines.Select(s => (byte)(s[0] ^ b[0])).ToArray()));
+            //Console.WriteLine(HexEncode());
+            //Console.WriteLine(HexEncode(b));
+            byte[] goodb = FixedXOR(lines.First(l => l.Length == m), passResult.First(l => l.Length == m));
+            //0 101 103 105 107 108 109 111 112 113 114 115 116 117 are problematic
+            Console.WriteLine(string.Join("  ", Enumerable.Range(0, m).Where(i => b[i] != goodb[i]).Select(i => i.ToString() + " " + goodb[i] + " " + b[i])));
 
-            //SET 3 CHALLENGE 20 - WEAK SOLUTION DOES NOT PROPERLY DEAL WITH TRIGRAMS!!!
-            lines = System.IO.File.ReadAllLines("../../20.txt").Select(s => crypt_ctr(0, key, Convert.FromBase64String(s))).ToArray();
-            b = new byte[lines.Max((bts) => bts.Length)]; //maximum length of keystream to try to decode
-            for (int i = 0; i < b.Length; i++)
-            {
-                byte[] analysis = lines.Where((bts) => bts.Length > i).Select((bts) => bts[i]).ToArray();
-                dynamic val = GetLeastXORCharacterScore(analysis);
-                if (analysis.Length <= 13 || val.score <= 80)
-                {
-                    val = GetLeastXORBigramScore(lines.Where((bts) => bts.Length > i + 1).Select((bts) => bts[i]).ToArray(), lines.Where((bts) => bts.Length > i + 1).Select((bts) => bts[i + 1]).ToArray());
+            for (int i = 0; i < lines.Length; i++) {
+                if (System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray())) != System.Text.Encoding.ASCII.GetString(passResult[i])) {
+                    Console.WriteLine(System.Text.Encoding.ASCII.GetString(passResult[i]));
+                    Console.WriteLine(System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray())));
                 }
-                b[i] = val.index;
             }
-            Console.WriteLine("3.20 Decoded file: ");
-            for (int i = 0; i < lines.Length; i++) { Console.WriteLine(System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray()))); }
+            return Enumerable.Range(0, lines.Length).All(i => System.Text.Encoding.ASCII.GetString(FixedXOR(lines[i], b.Take(lines[i].Length).ToArray())) == System.Text.Encoding.ASCII.GetString(passResult[i]));
+        }
+        static public bool Challenge21()
+        {
+            return false;
+        }
+        static public bool Challenge22()
+        {
+            return false;
+        }
+        static public bool Challenge23()
+        {
+            return false;
+        }
+        static public bool Challenge24()
+        {
+            return false;
+        }
+        static public void Set3()
+        {
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            byte[] b;
+            byte[] key = new byte[16];
+            byte[] iv = new byte[16];
+            int ct;
+            byte[] output;
 
             //SET 3 CHALLENGE 21
             MersenneTwister mt = new MersenneTwister();

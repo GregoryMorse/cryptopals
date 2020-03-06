@@ -39,14 +39,14 @@ def challenge11():
   return True
 
 def encryption_oracle_with_key(key_data, input):
-  return encrypt_ecb(key_data[0], input + key_data[1])
+  return encrypt_ecb(key_data[0], pkcs7pad(input + key_data[1], 16))
 
 def challenge12():  
   passBlockSize = 16
   passResult = ("Rollin' in my 5.0\n" #Vanilla Ice - Ice Ice Baby
                 "With my rag-top down so my hair can blow\n"
                 "The girlies on standby waving just to say hi\n"
-                "Did you stop? No, I just drove by")
+                "Did you stop? No, I just drove by\n")
   plainText = codecs.decode(bytes(
     "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg"
     "aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq"
@@ -146,7 +146,7 @@ def challenge14():
   passResult = ("Rollin' in my 5.0\n" #Vanilla Ice - Ice Ice Baby
                 "With my rag-top down so my hair can blow\n"
                 "The girlies on standby waving just to say hi\n"
-                "Did you stop? No, I just drove by")
+                "Did you stop? No, I just drove by\n")
   plainText = codecs.decode(bytes(
     "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg"
     "aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq"
