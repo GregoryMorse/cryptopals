@@ -502,5 +502,85 @@ namespace Cryptopals
             }
             return val; //a tie in can cause errors
         }
+        public class MersenneTwister
+        {
+            public uint[] x = new uint[624];
+            int index;
+
+            public void Initialize(uint seed)
+            {
+                index = 624;
+                uint i = 1;
+                x[0] = seed;
+                int j = 0;
+                uint _a; uint _b;
+                do
+                {
+                    _a = i + 1812433253 * (x[j] ^ (x[j] >> 30));
+                    x[j + 1] = _a;
+                    _b = i + 1812433253 * (_a ^ (_a >> 30)) + 1;
+                    i += 2;
+                    x[j + 2] = _b;
+                    j += 2;
+                } while (j < 0x26C);
+                x[0x26c] = 0; //for reinitialization...or introduces error
+                x[0x26d] = 0;
+                x[0x26e] = 0; x[0x26f] = 0;
+            }
+            public void Splice(uint[] vals)
+            {
+                index = 0;
+                vals.CopyTo(x, 0);
+            }
+            private uint Twist()
+            {
+                int top = 397, l = 623;
+                uint j = 0;
+                int i; uint _c, _out; int _f;
+                do
+                {
+                    i = (top - 396) % 624;
+                    _c = (x[j] ^ (x[j] ^ x[i]) & 0x7FFFFFFF) >> 1;
+                    if (((x[j] ^ (x[j] ^ x[i])) & 1) != 0)
+                        _c ^= 0x9908B0DFu;
+                    _f = top++;
+                    _out = _c ^ x[_f % 624];
+                    x[j] = _out;
+                    ++j;
+                    --l;
+                } while (l != 0);
+                index = 0;
+                return _out;
+            }
+            static public uint Unextract(uint value) //untemper
+            {
+                value = value ^ value >> 18; //inverse of x ^ (x >> 18)
+                value = value ^ ((value & 0x1DF8Cu) << 15); //inverse of ((x & 0xFFFFDF8C) << 15) ^ x = (x << 15) & 0xEFC60000 ^ x
+                uint t = value; //inverse of ((x & 0xFF3A58AD) << 7) ^ x = ((x << 7) & 0x9D2C5680) ^ x
+                t = ((t & 0x0000002D) << 7) ^ value; //7 bits
+                t = ((t & 0x000018AD) << 7) ^ value; //14 bits
+                t = ((t & 0x001A58AD) << 7) ^ value; //21 bits
+                value = ((t & 0x013A58AD) << 7) ^ value; //32-7 bits
+                                                         //inverse of x ^ x >> 11
+                uint top = value & 0xFFE00000;
+                uint mid = value & 0x001FFC00;
+                uint low = value & 0x000003ff;
+                return top | ((top >> 11) ^ mid) | ((((top >> 11) ^ mid) >> 11) ^ low);
+            }
+            public uint Extract() //temper
+            {
+                int i = index;
+                if (index >= 624)
+                {
+                    Twist();
+                    i = index;
+                }
+                uint e = x[i];
+                uint _v = x[i] >> 11;
+                index = i + 1;
+                uint def = (((_v ^ e) & 0xFF3A58AD) << 7) ^ _v ^ e;
+                return ((def & 0xFFFFDF8C) << 15) ^ def ^ ((((def & 0xFFFFDF8Cu) << 15) ^ def) >> 18);
+            }
+        }
     }
 }

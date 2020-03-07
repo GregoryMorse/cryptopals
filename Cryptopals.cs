@@ -1111,86 +1111,6 @@ namespace Cryptopals
         public int Computed;                             /* Is the digest computed?         */
         public int Corrupted;                            /* Is the message digest corrupted? */
     }
-    public class MersenneTwister
-    {
-        public uint [] x = new uint[624];
-        int index;
-
-        public void Initialize(uint seed)
-        {
-            index = 624;
-            uint i = 1;
-            x[0] = seed;
-            int j = 0;
-            uint _a; uint _b;
-            do
-            {
-                _a = i + 1812433253 * (x[j] ^ (x[j] >> 30));
-                x[j + 1] = _a;
-                _b = i + 1812433253 * (_a ^ (_a >> 30)) + 1;
-                i += 2;
-                x[j + 2] = _b;
-                j += 2;
-            } while (j < 0x26C);
-            x[0x26c] = 0; //for reinitialization...or introduces error
-            x[0x26d] = 0;
-            x[0x26e] = 0;
-        }
-        public void Splice(uint[] vals)
-        {
-            index = 0;
-            vals.CopyTo(x, 0);
-        }
-        private uint Twist()
-        {
-            int top = 397, l = 623;
-            uint j = 0;
-            int i; uint _c, _out; int _f;
-            do
-            {
-                i = (top - 396) % 624;
-                _c = (x[j] ^ (x[j] ^ x[i]) & 0x7FFFFFFF) >> 1;
-                if (((x[j] ^ (x[j] ^ x[i])) & 1) != 0)
-                    _c ^= 0x9908B0DFu;
-                _f = top++;
-                _out = _c ^ x[_f % 624];
-                x[j] = _out;
-                ++j;
-                --l;
-            } while (l != 0);
-            index = 0;
-            return _out;
-        }
-        public uint Unextract(uint value) //untemper
-        {
-            value = value ^ value >> 18; //inverse of x ^ (x >> 18)
-            value = value ^ ((value & 0x1DF8Cu) << 15); //inverse of ((x & 0xFFFFDF8C) << 15) ^ x = (x << 15) & 0xEFC60000 ^ x
-            uint t = value; //inverse of ((x & 0xFF3A58AD) << 7) ^ x = ((x << 7) & 0x9D2C5680) ^ x
-            t =     ((t & 0x0000002D) << 7) ^ value; //7 bits
-            t =     ((t & 0x000018AD) << 7) ^ value; //14 bits
-            t =     ((t & 0x001A58AD) << 7) ^ value; //21 bits
-            value = ((t & 0x013A58AD) << 7) ^ value; //32-7 bits
-            //inverse of x ^ x >> 11
-            uint top = value & 0xFFE00000;
-            uint mid = value & 0x001FFC00;
-            uint low = value & 0x000003ff;
-            return top | ((top >> 11) ^ mid) | ((((top >> 11) ^ mid) >> 11) ^ low);
-        }
-        public uint Extract() //temper
-        {
-            int i = index;
-            if (index >= 624)
-            {
-                Twist();
-                i = index;
-            }
-            uint e = x[i];
-            uint _v = x[i] >> 11;
-            index = i + 1;
-            uint def = (((_v ^ e) & 0xFF3A58AD) << 7) ^ _v ^ e;
-            return ((def & 0xFFFFDF8C) << 15) ^ def ^ ((((def & 0xFFFFDF8Cu) << 15) ^ def) >> 18);
-        }
-    }
     public class Crypto
     {
         static private BigInteger GetNextRandomBig(RandomNumberGenerator rnd, BigInteger Maximum)
@@ -1205,12 +1125,6 @@ namespace Cryptopals
                 ret = new BigInteger(tmp);
             } while (Maximum <= ret);
             return ret;
-        }
-        static private byte[] MTCipher(ushort seed, byte[] input)
-        {
-            MersenneTwister mt = new MersenneTwister();
-            mt.Initialize((uint)seed);
-            return FixedXOR(Enumerable.Range(0, (input.Length >> 2) + (input.Length % 4 == 0 ? 0 : 1)).Select((i) => BitConverter.GetBytes(mt.Extract())).SelectMany((d) => d).Take(input.Length).ToArray(), input);
         }
         static public bool Challenge1()
         {
@@ -1864,38 +1778,19 @@ namespace Cryptopals
         }
         static public bool Challenge21()
         {
-            return false;
-        }
-        static public bool Challenge22()
-        {
-            return false;
-        }
-        static public bool Challenge23()
-        {
-            return false;
-        }
-        static public bool Challenge24()
-        {
-            return false;
-        }
-        static public void Set3()
-        {
-            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
-            byte[] b;
-            byte[] key = new byte[16];
-            byte[] iv = new byte[16];
-            int ct;
-            byte[] output;
-
             //SET 3 CHALLENGE 21
             MersenneTwister mt = new MersenneTwister();
             mt.Initialize(0);
-            Console.WriteLine("3.21 Mersenne Twister value with 0 seed: " + mt.Extract());
-
+            return mt.Extract() == 2357136044;
+        }
+        static public bool Challenge22()
+        {
             //SET 3 CHALLENGE 22
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            MersenneTwister mt = new MersenneTwister();
             uint time = (uint)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
             mt.Initialize(time);
-            uint delay1 = time + 40 + (uint)GetNextRandom(rnd, 961);
+            uint delay1 = time + 40 + (uint)GetNextRandom(rnd, 961); //simulate the delay only
             uint firstop = mt.Extract();
             while (true)
             {
@@ -1903,42 +1798,60 @@ namespace Cryptopals
                 if (mt.Extract() == firstop) break;
                 delay1--;
             }
-            Console.WriteLine("3.22 Inital time seed recovered: " + (time == delay1));
-
+            return time == delay1;
+        }
+        static public bool Challenge23()
+        {
             //SET 3 CHALLENGE 23
+            MersenneTwister mt = new MersenneTwister();
             mt.Initialize(0);
             uint[] vals = new uint[624];
+            int ct;
             for (ct = 0; ct < 624; ct++) { vals[ct] = mt.Extract(); }
             MersenneTwister mtsplice = new MersenneTwister();
             mtsplice.Initialize(0);
-            for (ct = 0; ct < 624; ct++) { vals[ct] = mt.Unextract(vals[ct]); }
+            for (ct = 0; ct < 624; ct++) { vals[ct] = MersenneTwister.Unextract(vals[ct]); }
             mtsplice.Splice(vals);
             mt.Initialize(0);
             for (ct = 0; ct < 624; ct++) { if (mtsplice.Extract() != mt.Extract()) break; }
-            Console.WriteLine("3.23 All values in Mersenne Twister state are the same: " + (ct == 624));
-
+            return ct == 624;
+        }
+        static private byte[] MTCipher(ushort seed, byte[] input)
+        {
+            MersenneTwister mt = new MersenneTwister();
+            mt.Initialize((uint)seed);
+            return FixedXOR(Enumerable.Range(0, (input.Length >> 2) + (input.Length % 4 == 0 ? 0 : 1)).Select((i) => BitConverter.GetBytes(mt.Extract())).SelectMany((d) => d).Take(input.Length).ToArray(), input);
+        }
+        static public bool Challenge24()
+        {
             //SET 3 CHALLENGE 24
+            RandomNumberGenerator rnd = RandomNumberGenerator.Create();
+            byte[] b;
+            byte[] key = new byte[16];
+            byte[] iv = new byte[16];
+            byte[] output;
+            MersenneTwister mt = new MersenneTwister();
             b = new byte[GetNextRandom(rnd, 256)];
             rnd.GetBytes(b);
             b = Enumerable.Concat(b, Enumerable.Repeat((byte)'A', 14)).ToArray();
-            firstop = (uint)(GetNextRandom(rnd, ushort.MaxValue));
+            uint firstop = (uint)(GetNextRandom(rnd, ushort.MaxValue)), time;
             output = MTCipher((ushort)firstop, b);
             for (time = 0; time <= ushort.MaxValue; time++) {
                 mt.Initialize(time);
                 if (new ByteArrayComparer().Equals(Enumerable.Repeat((byte)'A', 14).ToArray(), FixedXOR(Enumerable.Range(0, (output.Length >> 2) + (output.Length % 4 == 0 ? 0 : 1)).Select((i) => BitConverter.GetBytes(mt.Extract())).SelectMany((d) => d).Skip(output.Length - 14).Take(14).ToArray(), output.Skip(output.Length - 14).ToArray()))) break;
             }
-            Console.WriteLine("3.24 Found original seed: " + (firstop == time));
+            if (firstop != time) return false;
             time = (uint)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
             mt.Initialize(time); //no difference really from challenge 22...
             firstop = mt.Extract();
-            time += 40 + (uint)GetNextRandom(rnd, 961);
+            uint delay1 = time + 40 + (uint)GetNextRandom(rnd, 961);
             while (true)
             {
-                mt.Initialize(time);
+                mt.Initialize(delay1);
                 if (mt.Extract() == firstop) break;
-                time--;
+                delay1--;
             }
-            Console.WriteLine("Found password token seed: " + (true));
+            return time == delay1;
         }
         static byte[] edit(byte[] input, byte[] key, int offset, byte[] plaintext)
         {

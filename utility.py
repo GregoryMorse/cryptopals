@@ -67,7 +67,7 @@ def characterScore(bin, exclude, freqs):
   return sum([freqs[i] * (d[i] if i in d else 0) for i in freqs]) * 100
 
 def getLeastXORCharacterScore(bin):
-  exclude = list(range(0, 10)) + list(range(11, 32)) + list(range(127, 256)) + list([ord(x) for x in "$#<>[]{}+^*&%()~|"])
+  exclude = list(range(0, 10)) + list(range(11, 32)) + list(range(127, 256)) + list([ord(x) for x in "$#<>[]{}+^*&%()~|"] )
   
   freqs = {ord('.'):0.0653, ord(','):0.0616, ord(';'):0.0032, ord(':'):0.0034,
            ord('!'):0.0033, ord('?'):0.0056, ord('\''): 0.0243, ord('"'):0.0267,
@@ -201,11 +201,6 @@ def crypt_ctr(nonce, key, input):
     o[ctr:ctr+16] = xorBins(input[ctr:ctr+rem], encrypt_ecb(key, nonce.to_bytes(8, byteorder='little') + (ctr >> 4).to_bytes(8, byteorder='little'))[:rem])
   return o
   
-def readUtilityFile(fileName):
-  with open(os.path.join(curDir, fileName), "r") as f:
-    return f.readlines()
-  return []
-
 def getLeastXORBiTrigramScoreGen(lastWords):
   punctFreqs = {
            ord('.'):0.0653, ord(','):0.0616, ord(';'):0.0032, ord(':'):0.0034,
@@ -291,6 +286,68 @@ def bigramHandler(getLeastXORBiTrigramScore, val, lines, i, b, analysis):
       else: return x[0], (0 if len(vs) == 0 else vs[0][1] + x[1])
     val = sorted([firstLookAhead(x) for x in vals], key=lambda x: x[1], reverse=True)[0]
   return val
+  
+class MersenneTwister:
+  def initialize(self, seed):
+    self.index = 624
+    self.x = [0] * 624
+    i = 1
+    self.x[0] = seed
+    j = 0
+    while True:
+      a = (i + 1812433253 * (self.x[j] ^ (self.x[j] >> 30))) & 0xFFFFFFFF
+      self.x[j + 1] = a
+      b = (i + 1812433253 * (a ^ (a >> 30)) + 1) & 0xFFFFFFFF
+      i += 2
+      self.x[j + 2] = b
+      j += 2
+      if j >= 0x26C: break
+    self.x[0x26C] = 0
+    self.x[0x26D] = 0
+    self.x[0x26E] = 0
+    self.x[0x26F] = 0
+  def splice(self, vals):
+    self.index = 0
+    self.x[0:624] = vals[0:624]
+  def twist(self):
+    top, l = 397, 623
+    j = 0
+    while True:
+      i = (top - 396) % 624
+      c = (self.x[j] ^ (self.x[j] ^ self.x[i]) & 0x7FFFFFFF) >> 1
+      if (((self.x[j] ^ (self.x[j] ^ self.x[i])) & 1) != 0):
+        c ^= 0x9908B0DF
+      f, top = top, top + 1
+      out = c ^ self.x[f % 624]
+      self.x[j] = out
+      j += 1
+      l -= 1
+      if l == 0: break
+    self.index = 0
+    return out
+  def unextract(value):
+    value = value ^ value >> 18 #inverse of x ^ (x >> 18)
+    value = value ^ ((value & 0x1DF8C) << 15) #inverse of ((x & 0xFFFFDF8C) << 15) ^ x = (x << 15) & 0xEFC60000 ^ x
+    t = value #inverse of ((x & 0xFF3A58AD) << 7) ^ x = ((x << 7) & 0x9D2C5680) ^ x
+    t = ((t & 0x0000002D) << 7) ^ value #7 bits
+    t = ((t & 0x000018AD) << 7) ^ value #14 bits
+    t = ((t & 0x001A58AD) << 7) ^ value #21 bits
+    value = ((t & 0x013A58AD) << 7) ^ value #32-7 bits
+                                            #inverse of x ^ x >> 11
+    top = value & 0xFFE00000
+    mid = value & 0x001FFC00
+    low = value & 0x000003ff
+    return top | ((top >> 11) ^ mid) | ((((top >> 11) ^ mid) >> 11) ^ low)
+  def extract(self):
+    i = self.index
+    if self.index >= 624:
+      self.twist()
+      i = self.index
+    e = self.x[i]
+    v = self.x[i] >> 11
+    self.index = i + 1
+    df = ((((v ^ e) & 0xFF3A58AD) << 7) & 0xFFFFFFFF) ^ v ^ e
+    return (((df & 0xFFFFDF8C) << 15) & 0xFFFFFFFF) ^ df ^ (((((df & 0xFFFFDF8C) << 15) & 0xFFFFFFFF) ^ df) >> 18)
 
 def testUtility():
   def testHexPartToInt():
@@ -328,3 +385,8 @@ def testUtility():
       bPassAll = False
       print("Failed %s" % s[1])
   if bPassAll: print("All utility tests passed")
+  
+def readUtilityFile(fileName):
+  with open(os.path.join(curDir, fileName), "r") as f:
+    return f.readlines()
+  return []

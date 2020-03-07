@@ -134,13 +134,71 @@ def challenge20():
   return all([xorBins(lines[i], b[:len(lines[i])]).decode("utf-8") == passResult[i].decode("utf-8") for i in range(len(lines))])
 
 def challenge21():
-  pass
+  mt = MersenneTwister()
+  mt.initialize(0)
+  import random
+  #random.seed(0)
+  #https://github.com/python/cpython/blob/master/Modules/_randommodule.c
+  #Python always uses seed 19650218U and then some special modifications
+  #based on seed provided so it will not match ever and cannot be used
+  #however setstate can be used per https://github.com/python/cpython/blob/master/Lib/random.py
+  state = random.getstate()
+  random.setstate((state[0], tuple(mt.x + [mt.index]), state[2]))
+  res = mt.extract()
+  if res != random.getrandbits(32): return False
+  return res == 2357136044
   
 def challenge22():
-  pass
+  import time
+  mt = MersenneTwister()
+  t = int(time.time())
+  mt.initialize(t)
+  delay = t + random.randint(40, 1000) #simulate the delay only
+  firstop = mt.extract()
+  while True:
+    mt.initialize(delay)
+    if mt.extract() == firstop: break
+    delay -= 1
+  return t == delay
   
 def challenge23():
-  pass
-  
+  mt = MersenneTwister()
+  mt.initialize(0)
+  vals = []
+  for ct in range(0, 624): vals.append(mt.extract())
+  mtsplice = MersenneTwister()
+  mtsplice.initialize(0)
+  vals = [MersenneTwister.unextract(x) for x in vals]
+  mtsplice.splice(vals)
+  mt.initialize(0)
+  for ct in range(0, 624):
+    if mtsplice.extract() != mt.extract(): return False
+  return True
+
+def mtCipher(seed, input):
+  mt = MersenneTwister()
+  mt.initialize(seed)
+  mtData = [mt.extract().to_bytes(4, 'little') for _ in range((len(input) >> 2) + (0 if len(input) % 4 == 0 else 1))]
+  return xorBins([item for sublist in mtData for item in sublist][:len(input)], input)
+
 def challenge24():
-  pass
+  import time
+  mt = MersenneTwister()
+  b = [random.getrandbits(8) for _ in range(random.getrandbits(8))] + [ord('A')] * 14
+  firstop = random.getrandbits(16)
+  output = mtCipher(firstop, b)
+  for t in range(0x10000):
+    mt.initialize(t)
+    mtData = [mt.extract().to_bytes(4, 'little') for _ in range((len(output) >> 2) + (0 if len(output) % 4 == 0 else 1))]    
+    if [ord('A')] * 14 == xorBins([item for sublist in mtData for item in sublist][:-14], output[:-14]):
+      if firstop != t: return False
+      break
+  t = int(time.time())
+  mt.initialize(t)
+  firstop = mt.extract()
+  delay = t + random.randint(40, 1000)
+  while True:
+    mt.initialize(delay)
+    if mt.extract() == firstop: break
+    delay -= 1
+  return t == delay
