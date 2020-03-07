@@ -24,14 +24,15 @@ def challenge3():
   passKey = 88 #could be worked out painstakingly by hand
   passString = "Cooking MC's like a pound of bacon" #Vanilla Ice - Ice Ice Baby
   bin = hexStrToBin(str)
-  key = getLeastXORCharacterScore(bin)[0]
+  key = getLeastXORCharacterScore(bin)[0][0]
   res = xorBins(bin, [key] * len(bin)).decode("utf-8")
   return key == passKey and res == passString
 
 def challenge4():
   passLine, passKey, passString = 170, 53, "Now that the party is jumping\n"
   lines = readChallengeFile('4.txt')
-  bestFreqs = [(i, getLeastXORCharacterScore(hexStrToBin(j.rstrip())))
+  firstOfList = lambda x: (0, 0) if len(x) == 0 else x[0]
+  bestFreqs = [(i, firstOfList(getLeastXORCharacterScore(hexStrToBin(j.rstrip()))))
                for i, j in enumerate(lines)]
   best = max(bestFreqs, key=lambda x: x[1][1])
   bestLine = hexStrToBin(lines[best[0]].rstrip())
@@ -128,16 +129,8 @@ def challenge6():
                          for x in readChallengeFile('6.txt')])
   if hammingDistance(bytes("this is a test", "utf-8"),
                      bytes("wokka wokka!!!", "utf-8")) != 37: return False
-  ciphLen = len(cipherData)
-  #1 / (ciphLen / i - 1) / i == (i / (ciphLen - i)) / i == 1 / (ciphLen - i)
-  best = min([(i, sum([hammingDistance(cipherData[i * j:i * (j + 1)],
-                                       cipherData[i * (j + 1):i * (j + 2)])
-                       for j in range(ciphLen // i - 1)]) / (ciphLen - i))
-              for i in range(2, 41)], key=lambda x: x[1])
-  key = bytes([getLeastXORCharacterScore(
-                  [cipherData[j] for j in range(i, ciphLen, best[0])])[0]
-               for i in range(best[0])])
-  return (best[0] == passKeyLen and key == passKey and
+  keyLen, key = breakRepXorKey(2, 40, cipherData)
+  return (keyLen == passKeyLen and key == passKey and
           xorRepKeyBins(cipherData, key).decode("utf-8") == passResult)
 
 def challenge7():

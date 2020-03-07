@@ -106,6 +106,23 @@ namespace Cryptopals
         {
             return a.Select((d, i) => CountBitsSet((byte)(d ^ b[i]))).Sum();
         }
+        static public ValueTuple<int, byte[]> breakRepXorKey(int minLen, int maxLen, byte[] b)
+        {
+            Tuple<int, double> minItem = Enumerable.Range(2, maxLen - minLen + 1).
+                Select(j => new Tuple<int, double>(
+                //hamming all neighboring pieces except for the last one if its not a multiple
+                //this is slower but maximal accuracy! must use double for divisions...
+                j,
+                //1 / (ciphLen / i - 1) / i == (i / (ciphLen - i)) / i == 1 / (ciphLen - i)
+                (double)Enumerable.Range(0, b.Length / j - 1).Select(l =>
+                        HammingDistance(b.Skip(l * j).Take(j).ToArray(),
+                        b.Skip((l + 1) * j).Take(j).ToArray())).Sum()
+                        / ((double)b.Length - (double)j)
+            )).OrderBy(x => x.Item2).First();
+            return (minItem.Item1, Enumerable.Range(0, (int)minItem.Item1).Select(j =>
+                    (byte)GetLeastXORCharacterScore(b.Where((c, i) =>
+                        i % (int)minItem.Item1 == j).ToArray()).First().Item1).ToArray());
+        }
         static public byte[] decrypt_ecb(byte[] key, byte[] input)
         {
             System.Security.Cryptography.AesManaged aes128 =
@@ -346,6 +363,144 @@ namespace Cryptopals
                 FixedXOR(input.Skip((int)ctr).Take(rem).ToArray(), encrypt_ecb(key, BitConverter.GetBytes(nonce).Concat(BitConverter.GetBytes(ctr >> 4)).ToArray()).Take(rem).ToArray()).CopyTo(o, (int)ctr);
             }
             return o;
+        }
+        static public string[] ReadUtilityFile(string fileName)
+        {
+            return System.IO.File.ReadAllLines("../../" + fileName);
+        }
+        public delegate Tuple<byte, double>[] GetLeastXORBiTrigramScoreProto(byte[] p, byte[] r, byte[] s, byte[] t);
+        static public GetLeastXORBiTrigramScoreProto GetLeastXORBiTrigramScoreGen(Dictionary<string, double> lastWords)
+        {
+            //http://norvig.com/mayzner.html
+            /*Dictionary<string, double> bigramfreq = new Dictionary<string, double>
+            {   ["TH"]= 3.56, ["HE"]= 3.07, ["IN"]= 2.43, ["ER"]= 2.05, ["AN"]= 1.99,
+                ["RE"]= 1.85, ["ON"]= 1.76, ["AT"]= 1.49, ["EN"]= 1.45, ["ND"]= 1.35,
+                ["TI"]= 1.34, ["ES"]= 1.34, ["OR"]= 1.28, ["TE"]= 1.20, ["OF"]= 1.17,
+                ["ED"]= 1.17, ["IS"]= 1.13, ["IT"]= 1.12, ["AL"]= 1.09, ["AR"]= 1.07,
+                ["ST"]= 1.05, ["TO"]= 1.04, ["NT"]= 1.04, ["NG"]= 0.95, ["SE"]= 0.93,
+                ["HA"]= 0.93, ["AS"]= 0.87, ["OU"]= 0.87, ["IO"]= 0.83, ["LE"]= 0.83,
+                ["VE"]= 0.83, ["CO"]= 0.79, ["ME"]= 0.79, ["DE"]= 0.76, ["HI"]= 0.76,
+                ["RI"]= 0.73, ["RO"]= 0.73, ["IC"]= 0.70, ["NE"]= 0.69, ["EA"]= 0.69,
+                ["RA"]= 0.69, ["CE"]= 0.65, ["LI"]= 0.62, ["CH"]= 0.60, ["LL"]= 0.58,
+                ["BE"]= 0.58, ["MA"]= 0.57, ["SI"]= 0.55, ["OM"]= 0.55, ["UR"]= 0.54};*/
+            Dictionary<char, double> punctfreqs = new Dictionary<char, double> {
+                ['.'] = 0.0653, [','] = 0.0616, [';'] = 0.0032, [':'] = 0.0034, ['!'] = 0.0033,
+                ['?'] = 0.0056, ['\''] = 0.0243, ['"'] = 0.0267, ['-'] = 0.0153, [' '] = 1 / 4.79 };
+            double[] freq = { .08167, .01492, .02202, .04253, .12702, .02228, .02015, .06094, .06966, .00153,
+                              .01292, .04025, .02406, .06749, .07507, .01929, .00095, .05987, .06327, .09356,
+                              .02758, .00978, .02560, .00150, .01994, .00077};
+            //practicalcryptography.com/cryptanalysis/text-characterisation/quadgrams/
+            double totalWords = ReadUtilityFile("english_monograms.txt").Select(str => double.Parse(str.Split(' ')[1])).Sum() / 4.79;
+            Dictionary<string, double> bigramfreq = ReadUtilityFile("english_bigrams.txt").Select(str => 
+                { string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            Dictionary<string, double> trigramfreq = ReadUtilityFile("english_trigrams.txt").Select(str =>
+            { string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            Dictionary<string, double> quadgramfreq = ReadUtilityFile("english_quadgrams.txt").Select(str =>
+            { string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            //Dictionary<string, double> quintgramfreq = ReadChallengeFile("english_quintgrams.txt").Select(str =>
+            //{ string[] sp = str.Split(' '); return new Tuple<string, double>(sp[0], double.Parse(sp[1])); }).ToDictionary(x => x.Item1, x => x.Item2);
+            return (byte[] p, byte[] r, byte[] s, byte[] t) =>
+            {
+                Tuple<byte, double>[] freqs = GetLeastXORCharacterScore(t);
+                for (int top = 0; top < freqs.Length; top++)
+                {
+                    double score = 0;
+                    for (int i = 0; i < t.Length; i++)
+                    {
+                        char nextChar = (char)(freqs[top].Item1 ^ t[i]);
+                        if (t.Length <= 2)
+                        { //statistical break down is basically guaranteed at this point under too many circumstances so must use word list
+
+                            string str = new string(new char[] { (char)p[i], (char)r[i], (char)s[i], nextChar });
+                            if (lastWords.ContainsKey(str)) { score = lastWords[str]; break; }
+                        }
+                        if (".,;:!? ".IndexOf((char)s[i]) != -1 && ".,;:!? ".IndexOf(nextChar) != -1 ||
+                            ".,;:!? ".IndexOf((char)r[i]) != -1 && ".,;:!? ".IndexOf(nextChar) != -1 ||
+                            char.IsLetter((char)s[i]) && char.IsNumber(nextChar) ||
+                            char.IsLetter((char)s[i]) && char.IsUpper(nextChar))
+                        {
+                            score = 0; break;
+                        }
+                        /*if (char.IsLetter((char)o[i]) && char.IsLetter((char)p[i]) && char.IsLetter((char)r[i]) && char.IsLetter((char)s[i]) && char.IsLetter(nextChar)) {
+                            string str = new string(new char[] { (char)o[i], (char)p[i], (char)r[i], (char)s[i], nextChar });
+                            if (!quintgramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += quintgramfreq[str.ToUpper()] / totalWords * 5 * 5 * 5 * 5 * 5;
+                        } else*/
+                        if (char.IsLetter((char)p[i]) && char.IsLetter((char)r[i]) && char.IsLetter((char)s[i]) && char.IsLetter(nextChar))
+                        {
+                            string str = new string(new char[] { (char)p[i], (char)r[i], (char)s[i], nextChar });
+                            //Console.WriteLine(str);
+                            if (!quadgramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += quadgramfreq[str.ToUpper()] / totalWords * 4 * 4 * 4 * 4;
+                        }
+                        else if (char.IsLetter((char)r[i]) && char.IsLetter((char)s[i]) && char.IsLetter(nextChar))
+                        {
+                            string str = new string(new char[] { (char)r[i], (char)s[i], nextChar });
+                            if (!trigramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += trigramfreq[str.ToUpper()] / totalWords * 3 * 3 * 3;
+                        }
+                        else if (char.IsLetter((char)s[i]) && char.IsLetter(nextChar))
+                        {
+                            string str = new string(new char[] { (char)s[i], nextChar });
+                            if (!bigramfreq.ContainsKey(str.ToUpper())) { score = 0; break; }
+                            score += bigramfreq[str.ToUpper()] / totalWords * 2 * 2;
+                        }
+                        else if (".,;:!? ".IndexOf(nextChar) != -1)
+                        {
+                            score += punctfreqs[nextChar];
+                        }
+                        else if (".,;:!? ".IndexOf((char)s[i]) != -1 && char.IsLetter(nextChar))
+                        {
+                            score += char.IsUpper(nextChar) ? freq[nextChar - 'A'] : freq[nextChar - 'a'];
+                        }
+                        else { score = 0; break; }
+                        //if ((char1f[top].Item1 ^ s[m]) == bigraphfreq[i].Key[0] || (char1f[top].Item1 ^ s[m]) == (bigraphfreq[i].Key[0] - 'A' + 'a')) {
+                        //char1f[top] = new Tuple<byte, double>(char1f[top].Item1, char1f[top].Item2 + char2f.First((c) => c.Item1 == (bigraphfreq[i].Key[1] ^ t[m]) || c.Item1 == ((bigraphfreq[i].Key[1] - 'A' + 'a') ^ t[m])).Item2 * bigraphfreq[i].Value * 26);
+                        //}
+                    }
+                    freqs[top] = new Tuple<byte, double>(freqs[top].Item1, score);
+                }
+                return freqs.Where(x => x.Item2 != 0).OrderByDescending((c) => c.Item2).ToArray();
+            };
+        }
+        static public Tuple<byte, double> BigramHandler(GetLeastXORBiTrigramScoreProto GetLeastXORBiTrigramScore, Tuple<byte, double> val, byte[][] lines, int i, byte[] b, byte[] analysis)
+        {
+            //look backward from a known good starting point
+            IEnumerable<byte[]> e = lines.Where((bts) => bts.Length > i);
+            Tuple<byte, double>[] vals = GetLeastXORBiTrigramScore(
+                e.Select((bts) => (byte)(bts[i - 3] ^ b[i - 3])).ToArray(),
+                e.Select((bts) => (byte)(bts[i - 2] ^ b[i - 2])).ToArray(),
+                e.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray(), analysis);
+            //now look forward by one for confirmation of all possible scores
+            if (vals.Length == 0) { }
+            else if (b.Length == i + 1 || vals.Length == 1) val = vals.First();
+            else
+            {
+                IEnumerable<byte[]> e1 = e.Where((bts) => bts.Length > i + 1);
+                byte[] p = e1.Select((bts) => (byte)(bts[i - 2] ^ b[i - 2])).ToArray();
+                byte[] q = e1.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray();
+                byte[] s = e1.Select((bts) => bts[i + 1]).ToArray();
+                IEnumerable<byte[]> e2 = e1.Where((bts) => bts.Length > i + 2);
+                byte[] p1 = e2.Select((bts) => (byte)(bts[i - 1] ^ b[i - 1])).ToArray();
+                byte[] s1 = e2.Select((bts) => bts[i + 2]).ToArray();
+                val = vals.Select(x =>
+                {
+                    Tuple<byte, double>[] vs = GetLeastXORBiTrigramScore(p, q,
+                        e1.Select((bts) => (byte)(bts[i] ^ x.Item1)).ToArray(), s);
+                    if (b.Length != i + 2 && vs.Length > 1)
+                    { //second look ahead
+                        byte[] q1 = e2.Select((bts) => (byte)(bts[i] ^ x.Item1)).ToArray();
+                        return vs.Select(y =>
+                        {
+                            Tuple<byte, double>[] vls = GetLeastXORBiTrigramScore(p1, q1,
+                                e2.Select((bts) => (byte)(bts[i + 1] ^ y.Item1)).ToArray(), s1);
+                            return new Tuple<byte, double>(x.Item1, vls.Length == 0 ? 0 : vls.First().Item2 + y.Item2 + x.Item2);
+                        }).OrderByDescending(y => y.Item2).First();
+                    }
+                    else return new Tuple<byte, double>(x.Item1, vs.Length == 0 ? 0 : vs.First().Item2 + x.Item2);
+                }).OrderByDescending(x => x.Item2).First();
+            }
+            return val; //a tie in can cause errors
         }
     }
 }

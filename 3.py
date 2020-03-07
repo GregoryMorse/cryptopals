@@ -44,11 +44,95 @@ def challenge18():
   return str == codecs.encode(crypt_ctr(0, key, crypt_ctr(0, key, codecs.decode(bytes(str, "utf-8"), "base64"))), "base64")[:-1].decode("utf-8")
   
 def challenge19():
-  pass
+  getLeastXORBiTrigramScore = getLeastXORBiTrigramScoreGen(
+    {"turn":float("inf"), "urn,":float("inf")})
+  key = random.getrandbits(128).to_bytes(16, 'little')
+  rndStrs = [ "SSBoYXZlIG1ldCB0aGVtIGF0IGNsb3NlIG9mIGRheQ==",
+              "Q29taW5nIHdpdGggdml2aWQgZmFjZXM=",
+              "RnJvbSBjb3VudGVyIG9yIGRlc2sgYW1vbmcgZ3JleQ==",
+              "RWlnaHRlZW50aC1jZW50dXJ5IGhvdXNlcy4=",
+              "SSBoYXZlIHBhc3NlZCB3aXRoIGEgbm9kIG9mIHRoZSBoZWFk",
+              "T3IgcG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
+              "T3IgaGF2ZSBsaW5nZXJlZCBhd2hpbGUgYW5kIHNhaWQ=",
+              "UG9saXRlIG1lYW5pbmdsZXNzIHdvcmRzLA==",
+              "QW5kIHRob3VnaHQgYmVmb3JlIEkgaGFkIGRvbmU=",
+              "T2YgYSBtb2NraW5nIHRhbGUgb3IgYSBnaWJl",
+              "VG8gcGxlYXNlIGEgY29tcGFuaW9u",
+              "QXJvdW5kIHRoZSBmaXJlIGF0IHRoZSBjbHViLA==",
+              "QmVpbmcgY2VydGFpbiB0aGF0IHRoZXkgYW5kIEk=",
+              "QnV0IGxpdmVkIHdoZXJlIG1vdGxleSBpcyB3b3JuOg==",
+              "QWxsIGNoYW5nZWQsIGNoYW5nZWQgdXR0ZXJseTo=",
+              "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=",
+              "VGhhdCB3b21hbidzIGRheXMgd2VyZSBzcGVudA==",
+              "SW4gaWdub3JhbnQgZ29vZCB3aWxsLA==",
+              "SGVyIG5pZ2h0cyBpbiBhcmd1bWVudA==",
+              "VW50aWwgaGVyIHZvaWNlIGdyZXcgc2hyaWxsLg==",
+              "V2hhdCB2b2ljZSBtb3JlIHN3ZWV0IHRoYW4gaGVycw==",
+              "V2hlbiB5b3VuZyBhbmQgYmVhdXRpZnVsLA==",
+              "U2hlIHJvZGUgdG8gaGFycmllcnM/",
+              "VGhpcyBtYW4gaGFkIGtlcHQgYSBzY2hvb2w=",
+              "QW5kIHJvZGUgb3VyIHdpbmdlZCBob3JzZS4=",
+              "VGhpcyBvdGhlciBoaXMgaGVscGVyIGFuZCBmcmllbmQ=",
+              "V2FzIGNvbWluZyBpbnRvIGhpcyBmb3JjZTs=",
+              "SGUgbWlnaHQgaGF2ZSB3b24gZmFtZSBpbiB0aGUgZW5kLA==",
+              "U28gc2Vuc2l0aXZlIGhpcyBuYXR1cmUgc2VlbWVkLA==",
+              "U28gZGFyaW5nIGFuZCBzd2VldCBoaXMgdGhvdWdodC4=",
+              "VGhpcyBvdGhlciBtYW4gSSBoYWQgZHJlYW1lZA==",
+              "QSBkcnVua2VuLCB2YWluLWdsb3Jpb3VzIGxvdXQu",
+              "SGUgaGFkIGRvbmUgbW9zdCBiaXR0ZXIgd3Jvbmc=",
+              "VG8gc29tZSB3aG8gYXJlIG5lYXIgbXkgaGVhcnQs",
+              "WWV0IEkgbnVtYmVyIGhpbSBpbiB0aGUgc29uZzs=",
+              "SGUsIHRvbywgaGFzIHJlc2lnbmVkIGhpcyBwYXJ0",
+              "SW4gdGhlIGNhc3VhbCBjb21lZHk7",
+              "SGUsIHRvbywgaGFzIGJlZW4gY2hhbmdlZCBpbiBoaXMgdHVybiw=",
+              "VHJhbnNmb3JtZWQgdXR0ZXJseTo=",
+              "QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4="]
+  passResult = [codecs.decode(bytes(x, "utf-8"), "base64").decode("utf-8") for x in rndStrs]
+  lines = [crypt_ctr(0, key, codecs.decode(bytes(x, "utf-8"), "base64")) for x in rndStrs]
+  m = max([len(l) for l in lines])
+  b = bytearray(m)
+  for i in range(len(b)):
+    analysis = [s[i] for s in filter(lambda x: len(x) > i, lines)]
+    vals = getLeastXORCharacterScore(analysis)
+    val = vals[0]
+    if i == 0 and val[1] == vals[1][1]:
+      if (len(list(filter(lambda x: str.isupper(chr(x)), xorBins(analysis, [vals[1][0]] * len(analysis))))) >
+          len(list(filter(lambda x: str.isupper(chr(x)), xorBins(analysis, [val[0]] * len(analysis)))))):
+        val = vals[1]
+    if i > 3 and (len(analysis) <= 13 or val[1] <= 80):
+      val = bigramHandler(getLeastXORBiTrigramScore, val, lines, i, b, analysis)
+    b[i] = val[0]
+  for i in range(len(lines)):
+    if xorBins(lines[i], b[:len(lines[i])]).decode("utf-8") != passResult[i]:
+      print(passResult[i])
+      print(xorBins(lines[i], b[:len(lines[i])]).decode("utf-8"))
+  return all([xorBins(lines[i], b[:len(lines[i])]).decode("utf-8") == passResult[i] for i in range(len(lines))])
   
 def challenge20():
-  pass
-  
+  getLeastXORBiTrigramScore = getLeastXORBiTrigramScoreGen(
+    {" who":float("inf"), "he m":float("inf"),
+     " sce":float("inf"), "nery":float("inf")})
+  key = random.getrandbits(128).to_bytes(16, 'little')
+  passResult = [codecs.decode(bytes(x, "utf-8"), "base64") for x in readChallengeFile("20.txt")]
+  lines = [crypt_ctr(0, key, x) for x in passResult]
+  m = max([len(l) for l in lines])
+  b = bytearray(m)
+  mn = min([len(l) for l in lines])
+  keyLen, firstBytes = breakRepXorKey(2, m, [item for sublist in [x[:mn] for x in lines] for item in sublist])
+  b[:mn] = firstBytes
+  for i in range(mn, m):
+    analysis = [s[i] for s in filter(lambda x: len(x) > i, lines)]
+    vals = getLeastXORCharacterScore(analysis)
+    val = vals[0]
+    if i > 3 and (len(analysis) <= 13 or val[1] <= 80):
+      val = bigramHandler(getLeastXORBiTrigramScore, val, lines, i, b, analysis)
+    b[i] = val[0]
+  for i in range(len(lines)):
+    if xorBins(lines[i], b[:len(lines[i])]).decode("utf-8") != passResult[i].decode("utf-8"):
+      print(passResult[i].decode("utf-8"))
+      print(xorBins(lines[i], b[:len(lines[i])]).decode("utf-8"))
+  return all([xorBins(lines[i], b[:len(lines[i])]).decode("utf-8") == passResult[i].decode("utf-8") for i in range(len(lines))])
+
 def challenge21():
   pass
   

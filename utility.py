@@ -57,27 +57,31 @@ def xorBins(bin1, bin2):
   if l != len(bin2): return None
   return bytes([bin1[i] ^ bin2[i] for i in range(l)])
 
-def characterScore(bin):
-  freqs = {'.':0.0653, ',':0.0616, ';':0.0032, ':':0.0034, '!':0.0033,
-           '?':0.0056, '\'': 0.0243, '"':0.0267, '-':0.0153, ' ':1/4.79}
+def characterScore(bin, exclude, freqs):
+  #use unprintable characters as immediate exclusion except new line...
+  d = dict()
+  for i in bin: #group by frequency
+    if i in d: d[i] += 1
+    else: d[i] = 1
+  if any(x in d for x in exclude): return 0
+  return sum([freqs[i] * (d[i] if i in d else 0) for i in freqs]) * 100
+
+def getLeastXORCharacterScore(bin):
+  exclude = list(range(0, 10)) + list(range(11, 32)) + list(range(127, 256)) + list([ord(x) for x in "$#<>[]{}+^*&%()~|"])
+  
+  freqs = {ord('.'):0.0653, ord(','):0.0616, ord(';'):0.0032, ord(':'):0.0034,
+           ord('!'):0.0033, ord('?'):0.0056, ord('\''): 0.0243, ord('"'):0.0267,
+           ord('-'):0.0153, ord(' '):1/4.79}
   freq = (.08167, .01492, .02202, .04253, .12702, .02228, .02015, .06094,
           .06966, .00153, .01292, .04025, .02406, .06749, .07507, .01929,
           .00095, .05987, .06327, .09356, .02758, .00978, .02560, .00150,
           .01994, .00077) #a-z/A-Z
-  #can improve by negative weight for certain bad characters...
-  spaceFreq, d = 0.3, dict()
-  for i in bin: #group by frequency
-    if i in d: d[i] += 1
-    else: d[i] = 1
-  return (sum([freqs[i] * (d[ord(i)] if ord(i) in d else 0) for i in freqs]) +
-          sum([j * ((d[ord('a') + i] if (ord('a') + i) in d else 0) +
-                    (d[ord('A') + i] if (ord('A') + i) in d else 0))
-                    for i, j in enumerate(freq)])) * 100
-
-def getLeastXORCharacterScore(bin):
+  for i, x in enumerate(freq):
+    freqs[ord('a') + i] = x
+    freqs[ord('A') + i] = x
   l = len(bin)
-  freqs = [(i,characterScore(xorBins(bin, bytes([i] * l)))) for i in range(256)]
-  return max(freqs, key=lambda x: x[1])
+  freqs = [(i,characterScore(xorBins(bin, bytes([i] * l)), exclude, freqs)) for i in range(256)]
+  return list(sorted(filter(lambda x: x[1] != 0, freqs), key=lambda x: x[1], reverse=True)) #max(freqs, key=lambda x: x[1])
 
 def xorRepKeyBins(bin, key):
   keylen = len(key)
@@ -104,6 +108,17 @@ def hammingDistance(bin1, bin2):
   if len(bin1) != len(bin2): return None
   return countSetBits(int.from_bytes(bin1, byteorder='big', signed=False) ^ 
                       int.from_bytes(bin2, byteorder='big', signed=False))
+
+def breakRepXorKey(minLen, maxLen, cipherData):
+  ciphLen = len(cipherData)
+  #1 / (ciphLen / i - 1) / i == (i / (ciphLen - i)) / i == 1 / (ciphLen - i)
+  best = min([(i, sum([hammingDistance(cipherData[i * j:i * (j + 1)],
+                                       cipherData[i * (j + 1):i * (j + 2)])
+                       for j in range(ciphLen // i - 1)]) / (ciphLen - i))
+              for i in range(minLen, maxLen + 1)], key=lambda x: x[1])
+  return best[0], bytes([getLeastXORCharacterScore(
+                  [cipherData[j] for j in range(i, ciphLen, best[0])])[0][0]
+               for i in range(best[0])])
 
 #pip install pycryptodome
 #pip install pycryptodomex
@@ -185,6 +200,97 @@ def crypt_ctr(nonce, key, input):
     rem = min(l - ctr, 16)
     o[ctr:ctr+16] = xorBins(input[ctr:ctr+rem], encrypt_ecb(key, nonce.to_bytes(8, byteorder='little') + (ctr >> 4).to_bytes(8, byteorder='little'))[:rem])
   return o
+  
+def readUtilityFile(fileName):
+  with open(os.path.join(curDir, fileName), "r") as f:
+    return f.readlines()
+  return []
+
+def getLeastXORBiTrigramScoreGen(lastWords):
+  punctFreqs = {
+           ord('.'):0.0653, ord(','):0.0616, ord(';'):0.0032, ord(':'):0.0034,
+           ord('!'):0.0033, ord('?'):0.0056, ord('\''): 0.0243, ord('"'):0.0267,
+           ord('-'):0.0153, ord(' '):1/4.79}
+  freq = (.08167, .01492, .02202, .04253, .12702, .02228, .02015, .06094,
+          .06966, .00153, .01292, .04025, .02406, .06749, .07507, .01929,
+          .00095, .05987, .06327, .09356, .02758, .00978, .02560, .00150,
+          .01994, .00077) #a-z/A-Z
+  totalWords = sum([float(x.split(' ')[1]) for x in readUtilityFile("english_monograms.txt")]) / 4.79
+  def gramSplit(l): return l[0], float(l[1])
+  bigramFreq = {key: value for key, value in [gramSplit(x.split(' ')) for x in readUtilityFile("english_bigrams.txt")]}
+  trigramFreq = {key: value for key, value in [gramSplit(x.split(' ')) for x in readUtilityFile("english_trigrams.txt")]}
+  quadgramFreq = {key: value for key, value in [gramSplit(x.split(' ')) for x in readUtilityFile("english_quadgrams.txt")]}
+  def getLeastXORBiTrigramScore(p, r, s, t):
+    freqs = getLeastXORCharacterScore(t)
+    for top in range(len(freqs)):
+      score = 0
+      for i in range(len(t)):
+        nextChar = freqs[top][0] ^ t[i]
+        if len(t) <= 2:
+          st = "".join([chr(p[i]), chr(r[i]), chr(s[i]), chr(nextChar)])
+          if st in lastWords:
+            score = lastWords[st]
+            break
+        if (chr(s[i]) in ".,;:!? " and chr(nextChar) in ".,;:!? " or
+            chr(r[i]) in ".,;:!? " and chr(nextChar) in ".,;:!? " or
+            str.isalpha(chr(s[i])) and str.isdigit(chr(nextChar)) or
+            str.isalpha(chr(s[i])) and str.isupper(chr(nextChar))):
+          score = 0
+          break
+        if str.isalpha(chr(p[i])) and str.isalpha(chr(r[i])) and str.isalpha(chr(s[i])) and str.isalpha(chr(nextChar)):
+          st = "".join([chr(p[i]), chr(r[i]), chr(s[i]), chr(nextChar)])
+          if not st.upper() in quadgramFreq:
+            score = 0
+            break
+          score += quadgramFreq[st.upper()] / totalWords * 4 * 4 * 4 * 4
+        elif str.isalpha(chr(r[i])) and str.isalpha(chr(s[i])) and str.isalpha(chr(nextChar)):
+          st = "".join([chr(r[i]), chr(s[i]), chr(nextChar)])
+          if not st.upper() in trigramFreq:
+            score = 0
+            break
+          score += trigramFreq[st.upper()] / totalWords * 3 * 3 * 3
+        elif str.isalpha(chr(s[i])) and str.isalpha(chr(nextChar)):
+          st = "".join([chr(s[i]), chr(nextChar)])
+          if not st.upper() in bigramFreq:
+            score = 0
+            break
+          score += bigramFreq[st.upper()] / totalWords * 2 * 2
+        elif chr(nextChar) in ".,;:!? ":
+          score += punctFreqs[nextChar]
+        elif chr(s[i]) in ".,;:!? " and str.isalpha(chr(nextChar)):
+          score += freq[nextChar - ord('A')] if str.isupper(chr(nextChar)) else freq[nextChar - ord('a')]
+        else:
+          score = 0
+          break
+      freqs[top] = freqs[top][0], score
+    return list(sorted(filter(lambda x: x[1] != 0, freqs), key=lambda x: x[1], reverse=True))          
+  return getLeastXORBiTrigramScore
+  
+def bigramHandler(getLeastXORBiTrigramScore, val, lines, i, b, analysis):
+  e = list(filter(lambda x: len(x) > i, lines))
+  vals = getLeastXORBiTrigramScore([x[i - 3] ^ b[i - 3] for x in e],
+    [x[i - 2] ^ b[i - 2] for x in e], [x[i - 1] ^ b[i - 1] for x in e], analysis)
+  if len(vals) == 0: pass
+  elif len(b) == i + 1 or len(vals) == 1: val = vals[0]
+  else:
+    e1 = list(filter(lambda x: len(x) > i + 1, e))
+    p = [x[i - 2] ^ b[i - 2] for x in e1]
+    q = [x[i - 1] ^ b[i - 1] for x in e1]
+    s = [x[i + 1] for x in e1]
+    e2 = list(filter(lambda x: len(x) > i + 2, e1))
+    p1 = [x[i - 1] ^ b[i - 1] for x in e2]
+    s1 = [x[i + 2] for x in e2]
+    def secondLookAhead(y, x, q1):
+      vls = getLeastXORBiTrigramScore(p1, q1, [bts[i + 1] ^ y[0] for bts in e2], s1)
+      return x[0], (0 if len(vls) == 0 else vls[0][1] + y[1] + x[1])
+    def firstLookAhead(x):
+      vs = getLeastXORBiTrigramScore(p, q, [bts[i] ^ x[0] for bts in e1], s)
+      if len(b) != i + 2 and len(vs) > 1:
+        q1 = [bts[i] ^ x[0] for bts in e2]
+        return sorted([secondLookAhead(y, x, q1) for y in vs], key=lambda x: x[1], reverse=True)[0]
+      else: return x[0], (0 if len(vs) == 0 else vs[0][1] + x[1])
+    val = sorted([firstLookAhead(x) for x in vals], key=lambda x: x[1], reverse=True)[0]
+  return val
 
 def testUtility():
   def testHexPartToInt():
