@@ -65,20 +65,62 @@ namespace Cryptopals
             new Tuple<Func<bool>, int>(Challenge31, 31),
             new Tuple<Func<bool>, int>(Challenge32, 32)
         };
+        static Tuple<Func<bool>, int>[] Set5 = {
+            new Tuple<Func<bool>, int>(Challenge33, 33),
+            new Tuple<Func<bool>, int>(Challenge34, 34),
+            new Tuple<Func<bool>, int>(Challenge35, 35),
+            new Tuple<Func<bool>, int>(Challenge36, 36),
+            new Tuple<Func<bool>, int>(Challenge37, 37),
+            new Tuple<Func<bool>, int>(Challenge38, 38),
+            new Tuple<Func<bool>, int>(Challenge39, 39),
+            new Tuple<Func<bool>, int>(Challenge40, 40)
+        };
+        static Tuple<Func<bool>, int>[] Set6 = {
+            new Tuple<Func<bool>, int>(Challenge41, 41),
+            new Tuple<Func<bool>, int>(Challenge42, 42),
+            new Tuple<Func<bool>, int>(Challenge43, 43),
+            new Tuple<Func<bool>, int>(Challenge44, 44),
+            new Tuple<Func<bool>, int>(Challenge45, 45),
+            new Tuple<Func<bool>, int>(Challenge46, 46),
+            new Tuple<Func<bool>, int>(Challenge47, 47),
+            new Tuple<Func<bool>, int>(Challenge48, 48)
+        };
+        static Tuple<Func<bool>, int>[] Set7 = {
+            new Tuple<Func<bool>, int>(Challenge49, 49),
+            new Tuple<Func<bool>, int>(Challenge50, 50),
+            new Tuple<Func<bool>, int>(Challenge51, 51),
+            new Tuple<Func<bool>, int>(Challenge52, 52),
+            new Tuple<Func<bool>, int>(Challenge53, 53),
+            new Tuple<Func<bool>, int>(Challenge54, 54),
+            new Tuple<Func<bool>, int>(Challenge55, 55),
+            new Tuple<Func<bool>, int>(Challenge56, 56)
+        };
+        static Tuple<Func<bool>, int>[] Set8 = {
+            new Tuple<Func<bool>, int>(Challenge57, 57),
+            new Tuple<Func<bool>, int>(Challenge58, 58),
+            new Tuple<Func<bool>, int>(Challenge59, 59),
+            new Tuple<Func<bool>, int>(Challenge60, 60),
+            new Tuple<Func<bool>, int>(Challenge61, 61),
+            new Tuple<Func<bool>, int>(Challenge62, 62),
+            new Tuple<Func<bool>, int>(Challenge63, 63),
+            new Tuple<Func<bool>, int>(Challenge64, 64)
+        };
+        static Tuple<Func<bool>, int>[] Set9 = {
+            new Tuple<Func<bool>, int>(Challenge65, 65),
+            new Tuple<Func<bool>, int>(Challenge66, 66),
+        };
         static void Main(string[] args)
         {
             //testMul();
             //RunSet(1, Set1);
             //RunSet(2, Set2);
             //RunSet(3, Set3);
-            RunSet(4, Set4);
-            //Set4();
-            //Set5();
-            //Set6();
-            //Set7();
-            //Set8();
-            //Set9();
-
+            //RunSet(4, Set4);
+            //RunSet(5, Set5);
+            //RunSet(6, Set6);
+            //RunSet(7, Set7);
+            //RunSet(8, Set8);
+            RunSet(9, Set9);
             Console.ReadKey();
         }
     }

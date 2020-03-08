@@ -1341,8 +1341,7 @@ namespace Cryptopals
             }
             return result;
         }
-
-        static void Set5()
+        static public bool Challenge33()
         {
             //SET 5 CHALLENGE 33
             RandomNumberGenerator rnd = RandomNumberGenerator.Create();
@@ -1364,54 +1363,86 @@ namespace Cryptopals
             BigInteger _B = BigInteger.ModPow(_g, _b, _p);
             BigInteger _s = BigInteger.ModPow(_B, _a, _p);
             Console.WriteLine("Shared secrets equal with big parameters: " + (_s == BigInteger.ModPow(_A, _b, _p)));
-
+            return false;
+        }
+        static public bool Challenge34()
+        {
             //SET 5 CHALLENGE 34
             DHClient Alice = new DHClient();
             DHClient Bob = new DHClient();
             Console.WriteLine("5.34 Message exchange successful: " + Alice.SendDH(null, Bob));
             ManInTheMiddle Chuck = new ManInTheMiddle();
             Console.WriteLine("Message exchange injection and snooping successful: " + Alice.SendDH(Chuck, Bob));
-
+            return false;
+        }
+        static public bool Challenge35()
+        {
             //SET 5 CHALLENGE 35
             //when g=1 or g=p-1, and we set A=1 then the secret will always be 1
             //when g=p, we set A=p and the secret will always be 0 similar to the previous break
             //if not setting A, the protocol will abort because the initiator has s=A or s=1, but the receiver has s=A^b so cannot decrypt the first message
             //at best by setting s=A or s=1, the first message of initiator can be decrypted before the abort occurs
+            DHClient Alice = new DHClient();
+            DHClient Bob = new DHClient();
+            ManInTheMiddle Chuck = new ManInTheMiddle();
             Chuck.attackver = 1;
-            Console.WriteLine("5.35 With g=1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("5.35 With g=1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
             Chuck.attackver = 2;
-            Console.WriteLine("With g=p injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
             Chuck.attackver = 3; //8 tries to prove that it works in the other 25% of cases
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-            Console.WriteLine("With g=p-1 injection and snopping successful: " + Alice.SendParameter(Chuck, Bob));
-
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            Console.WriteLine("With g=p-1 injection and snooping successful: " + Alice.SendParameter(Chuck, Bob));
+            return false;
+        }
+        static public bool Challenge36()
+        {
             //SET 5 CHALLENGE 36
+            DHClient Alice = new DHClient();
+            DHClient Bob = new DHClient();
             Console.WriteLine("5.36 Secure Remote Password DH succeeds: " + Alice.SendEmailDH(null, Bob));
-
+            return false;
+        }
+        static public bool Challenge37()
+        {
             //SET 5 CHALLENGE 37
+            BigInteger _p = BigInteger.Parse("00" + "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed529077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff", System.Globalization.NumberStyles.HexNumber);
+            DHClient Alice = new DHClient();
+            DHClient Bob = new DHClient();
             Console.WriteLine("5.37 SRP with 0 public exponent succeeds: " + Alice.SendEmailDHBreakKey(Bob, 0)); //p, p^2, ..., p^n
             Console.WriteLine("n succeeds: " + Alice.SendEmailDHBreakKey(Bob, _p));
             Console.WriteLine("n^2 succeeds: " + Alice.SendEmailDHBreakKey(Bob, BigInteger.ModPow(_p, 2, _p)));
-
+            return false;
+        }
+        static public bool Challenge38()
+        {
             //SET 5 CHALLENGE 38
+            DHClient Alice = new DHClient();
+            DHClient Bob = new DHClient();
+            ManInTheMiddle Chuck = new ManInTheMiddle();
             Console.WriteLine("5.38 Simplified SRP succeeds: " + Alice.SendEmailDH(null, Bob, true));
             Console.WriteLine("With MITM dictionary attack salt=0, u=1, b=1, B=g finds password: " + Alice.SendEmailDH(Chuck, Bob, true));
-
+            return false;
+        }
+        static public bool Challenge39()
+        {
             //SET 5 CHALLENGE 39
             RandomNumberGenerator rng = RandomNumberGenerator.Create();
-            BigInteger _q;
+            BigInteger _p, _q;
             BigInteger et;
-            do {
-                do {
+            do
+            {
+                do
+                {
                     _p = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_p, 64));
-                do {
+                do
+                {
                     _q = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_q, 64));
             } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
@@ -1420,24 +1451,47 @@ namespace Cryptopals
             BigInteger m = 42;
             BigInteger c = BigInteger.ModPow(m, 3, n);
             Console.WriteLine("5.39 RSA decrypts to 42: " + (42 == BigInteger.ModPow(c, d, n)));
-
+            return false;
+        }
+        static public bool Challenge40()
+        {
             //SET 5 CHALLENGE 40
+            RandomNumberGenerator rng = RandomNumberGenerator.Create();
+            BigInteger _p, _q, et, m = 42;
             do
             {
-                do {
+                do
+                {
                     _p = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_p, 64));
-                do {
+                do
+                {
+                    _q = GetPivotRandom(rng, 128);
+                } while (!IsProbablePrime(_q, 64));
+            } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
+            BigInteger n = _p * _q;
+            BigInteger c = BigInteger.ModPow(m, 3, n);
+            do
+            {
+                do
+                {
+                    _p = GetPivotRandom(rng, 128);
+                } while (!IsProbablePrime(_p, 64));
+                do
+                {
                     _q = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_q, 64));
             } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
             BigInteger n1 = _p * _q;
             BigInteger c1 = BigInteger.ModPow(m, 3, n1);
-            do {
-                do {
+            do
+            {
+                do
+                {
                     _p = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_p, 64));
-                do {
+                do
+                {
                     _q = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_q, 64));
             } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
@@ -1445,7 +1499,9 @@ namespace Cryptopals
             BigInteger c2 = BigInteger.ModPow(m, 3, n2);
             BigInteger result = BigInteger.Remainder(c * n1 * n2 * modInverse(n1 * n2, n) + c1 * n * n2 * modInverse(n * n2, n1) + c2 * n * n1 * modInverse(n * n1, n2), n * n1 * n2);
             Console.WriteLine("5.40 Integer cube root result: " + icbrt2(result));
+            return false;
         }
+
         static BigInteger GetPivotRandom(RandomNumberGenerator rng, int BitSize)
         {
             byte[] r = new byte[(BitSize >> 3) + 1];
@@ -1572,7 +1628,7 @@ namespace Cryptopals
                 return obj[0].GetHashCode() ^ obj[1].GetHashCode();
             }
         }
-        static void Set6()
+        static public bool Challenge41()
         {
             //SET 6 CHALLENGE 41
             RandomNumberGenerator rng = RandomNumberGenerator.Create();
@@ -1600,8 +1656,28 @@ namespace Cryptopals
             BigInteger cprime = BigInteger.Remainder(BigInteger.ModPow(s, 3, n) * c, n);
             BigInteger pprime = BigInteger.ModPow(cprime, d, n);
             Console.WriteLine(BigInteger.Remainder(pprime * modInverse(s, n), n) == BigInteger.ModPow(c, d, n));
-
+            return false;
+        }
+        static public bool Challenge42()
+        {
             //SET 6 CHALLENGE 42
+            BigInteger _p;
+            BigInteger _q;
+            BigInteger et;
+            do
+            {
+                //do {
+                //    _p = GetPivotRandom(rng, 1536);
+                //} while (!IsProbablePrime(_p, 256));
+                //do {
+                //    _q = GetPivotRandom(rng, 1536);
+                //} while (!IsProbablePrime(_q, 256));
+                _p = BigInteger.Parse("1538351477610061478490275877391293689255689217092560136893201361066354534867286429869906388817450032805434945081435502701151173877054093820587462501081516115401787238232395766006570867734998219138782543194600598895943441696131379232436323406139242567467532952373171298341997661953712862783689776081779825537852625355036649464217371831489726158268205007742056794397136669173163944001808779586539476193869917647876298150485787155207601800373938150694570451769785649");
+                _q = BigInteger.Parse("1734827493435818336176773058030525039389969784884677585793445816767712516001795534356117069792199524584394009072617626753229173135864269965383874172480571223231886094115416162519003126923068072334212152436574466333269254678824843170019255570014611225507046425550398082136107201319933605255673980430818069748924916231863199520474254420649220258987612270431816034603732864149517943444944076137587884492262147097216000644970827565982359738448318803265238993406676797");
+            } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
+
+            BigInteger n = _p * _q;
+            BigInteger d = modInverse(3, et);
             //get a real signature with a valid ASN.1 value from the libraries to check this more difficult to obtain value though for some hash functions its in RFC
             byte[] sig;
             byte[] ptext = System.Text.Encoding.ASCII.GetBytes("hi mom");
@@ -1621,17 +1697,20 @@ namespace Cryptopals
             //SHA1 "1.3.14.3.2.26", SHA256 "2.16.840.1.101.3.4.2.1", 15 vs 19 bytes
             //DER encoded: 30 21 30 09 06 05 2b 0e 03 02 1a 05 00 04 14, 30 31 30 0d 06 09 60 86 48 01 65 03 04 02 01 05 00 04 20
             byte[] ASN1_PKCS1_SHA1 = new byte[] { 0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0xe, 3, 2, 0x1a, 5, 0, 4, 0x14 }; //DER encoded PKCS#1 (-> 1.5) "1.2.840.113549.1.1" iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) 1 with SHA-1=5, SHA-256=11
-            m = BytesToBigInt(new byte[] { 0 }.Concat(ASN1_PKCS1_SHA1.Concat(hf.ComputeHash(ptext))).ToArray());
+            BigInteger m = BytesToBigInt(new byte[] { 0 }.Concat(ASN1_PKCS1_SHA1.Concat(hf.ComputeHash(ptext))).ToArray());
             // PKCS#1 00 01 FF ... FF 00
             m = BigInteger.ModPow(BytesToBigInt(new byte[] { 0, 1 }.Concat(Enumerable.Repeat((byte)0xFF, 384 - 2 - 36)).ToArray()) * BigInteger.Pow(2, 288) + m, d, n); //legitimate signature
             BigInteger signature = BigInteger.ModPow(m, 3, n); // = BigInteger.Pow(m, 3);
             sig = PadToSize(BigIntToBytes(signature), 384);
-            if (sig[0] == 0 && sig[1] == 1) {
+            if (sig[0] == 0 && sig[1] == 1)
+            {
                 int i;
-                for (i = 2; i < sig.Length; i++) {
+                for (i = 2; i < sig.Length; i++)
+                {
                     if (sig[i] != 0xFF) break;
                 }
-                if (sig[i] == 0 && new ByteArrayComparer().Equals(ASN1_PKCS1_SHA1, sig.Skip(i + 1).Take(15).ToArray())) {
+                if (sig[i] == 0 && new ByteArrayComparer().Equals(ASN1_PKCS1_SHA1, sig.Skip(i + 1).Take(15).ToArray()))
+                {
                     Console.WriteLine(new ByteArrayComparer().Equals(sig.Skip(i + 16).Take(20).ToArray(), hf.ComputeHash(ptext)));
                 }
             }
@@ -1647,19 +1726,26 @@ namespace Cryptopals
             m = icbrt2(BytesToBigInt(new byte[] { 0, 1 }.Concat(Enumerable.Repeat((byte)0xFF, 384 - 259 - 2 - 36)).ToArray()) * BigInteger.Pow(2, 2360) + m * BigInteger.Pow(2, 2072) + garbage); //forgery
             signature = BigInteger.ModPow(m, 3, n); // = BigInteger.Pow(m, 3);
             sig = PadToSize(BigIntToBytes(signature), 384);
-            if (sig[0] == 0 && sig[1] == 1) {
+            if (sig[0] == 0 && sig[1] == 1)
+            {
                 int i;
-                for (i = 2; i < sig.Length; i++) {
+                for (i = 2; i < sig.Length; i++)
+                {
                     if (sig[i] != 0xFF) break;
                 }
                 //i == 384 - 36 check would avoid the break...
-                if (sig[i] == 0 && new ByteArrayComparer().Equals(ASN1_PKCS1_SHA1, sig.Skip(i + 1).Take(15).ToArray())) {
+                if (sig[i] == 0 && new ByteArrayComparer().Equals(ASN1_PKCS1_SHA1, sig.Skip(i + 1).Take(15).ToArray()))
+                {
                     Console.WriteLine(new ByteArrayComparer().Equals(sig.Skip(i + 16).Take(20).ToArray(), hf.ComputeHash(ptext)));
                 }
             }
-
+            return false;
+        }
+        static public bool Challenge43()
+        {
             //SET 6 CHALLENGE 43
-
+            SHA1 hf = SHA1.Create();
+            BigInteger _p, _q;
             _p = BigInteger.Parse("00" + "800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", System.Globalization.NumberStyles.HexNumber);
             _q = BigInteger.Parse("00" + "f4f47f05794b256174bba6e9b396a7707e563c5b", System.Globalization.NumberStyles.HexNumber);
             BigInteger g = BigInteger.Parse("5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119458fef538b8fa4046c8db53039db620c094c9fa077ef389b5322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a0470f5b64c36b625a097f1651fe775323556fe00b3608c887892878480e99041be601a62166ca6894bdd41a7054ec89f756ba9fc95302291", System.Globalization.NumberStyles.HexNumber);
@@ -1667,37 +1753,52 @@ namespace Cryptopals
             byte[] b = System.Text.Encoding.ASCII.GetBytes("For those that envy a MC it can be hazardous to your health\nSo be friendly, a matter of life and death, just like a etch-a-sketch\n");
             Console.WriteLine(new ByteArrayComparer().Equals(hf.ComputeHash(b), HexDecode("d2d0714f014a9784047eaeccf956520045c45265")));
             BigInteger r = BigInteger.Parse("548099063082341131477253921760299949438196259240");
-            s = BigInteger.Parse("857042759984254168557880549501802188789837994940");
+            BigInteger s = BigInteger.Parse("857042759984254168557880549501802188789837994940");
             BigInteger realx = BigInteger.Parse("0954edd5e0afe5542a4adf012611a91912a3ec16", System.Globalization.NumberStyles.HexNumber);
             BigInteger x;
             BigInteger mhsh = BytesToBigInt(hf.ComputeHash(b));
             BigInteger rinv = modInverse(r, _q);
-            for (int _k = 16574; _k <= 1 << 16; _k++) {
+            for (int _k = 16574; _k <= 1 << 16; _k++)
+            {
                 x = posRemainder((s * _k - mhsh) * rinv, _q);
                 //x = 499e6554da7afd18096df79f123e6bd17328fb15 k=16575
-                if (BigInteger.ModPow(g, x, _p) == y) {
+                if (BigInteger.ModPow(g, x, _p) == y)
+                {
                     Console.WriteLine("Found x: " + HexEncode(BigIntToBytes(x)) + " k: " + _k.ToString());
-                    if (BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes(HexEncode(BigIntToBytes(x))))) == realx) {
+                    if (BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes(HexEncode(BigIntToBytes(x))))) == realx)
+                    {
                         Console.WriteLine("Matches hash");
                     }
-                    if (r == BigInteger.Remainder(BigInteger.ModPow(g, _k, _p), _q) && s == BigInteger.Remainder(modInverse(_k, _q) * (BytesToBigInt(hf.ComputeHash(b)) + x * r), _q)) {
+                    if (r == BigInteger.Remainder(BigInteger.ModPow(g, _k, _p), _q) && s == BigInteger.Remainder(modInverse(_k, _q) * (BytesToBigInt(hf.ComputeHash(b)) + x * r), _q))
+                    {
                         Console.WriteLine("Matches r and s");
                     }
                     break;
                 }
             }
-
+            return false;
+        }
+        static public bool Challenge44()
+        {
             //SET 6 CHALLENGE 44
-            y = BigInteger.Parse("2d026f4bf30195ede3a088da85e398ef869611d0f68f0713d51c9c1a3a26c95105d915e2d8cdf26d056b86b8a7b85519b1c23cc3ecdc6062650462e3063bd179c2a6581519f674a61f1d89a1fff27171ebc1b93d4dc57bceb7ae2430f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d32971c3de5084cce04a2e147821", System.Globalization.NumberStyles.HexNumber);
-            realx = BigInteger.Parse("00" + "ca8f6f7c66fa362d40760d135b763eb8527d3d52", System.Globalization.NumberStyles.HexNumber);
+            SHA1 hf = SHA1.Create();
+            BigInteger _p, _q;
+            _p = BigInteger.Parse("00" + "800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", System.Globalization.NumberStyles.HexNumber);
+            _q = BigInteger.Parse("00" + "f4f47f05794b256174bba6e9b396a7707e563c5b", System.Globalization.NumberStyles.HexNumber);
+            BigInteger g = BigInteger.Parse("5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119458fef538b8fa4046c8db53039db620c094c9fa077ef389b5322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a0470f5b64c36b625a097f1651fe775323556fe00b3608c887892878480e99041be601a62166ca6894bdd41a7054ec89f756ba9fc95302291", System.Globalization.NumberStyles.HexNumber);
+            BigInteger y = BigInteger.Parse("2d026f4bf30195ede3a088da85e398ef869611d0f68f0713d51c9c1a3a26c95105d915e2d8cdf26d056b86b8a7b85519b1c23cc3ecdc6062650462e3063bd179c2a6581519f674a61f1d89a1fff27171ebc1b93d4dc57bceb7ae2430f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d32971c3de5084cce04a2e147821", System.Globalization.NumberStyles.HexNumber);
+            BigInteger realx = BigInteger.Parse("00" + "ca8f6f7c66fa362d40760d135b763eb8527d3d52", System.Globalization.NumberStyles.HexNumber);
             string[] strs = System.IO.File.ReadAllLines("../../44.txt");
             BigInteger k;
-            for (int i = 0; i < strs.Length; i += 4) { //(n^2+n)/2 possibilities to try
-                for (int j = i + 4; j < strs.Length; j += 4) {
+            for (int i = 0; i < strs.Length; i += 4)
+            { //(n^2+n)/2 possibilities to try
+                for (int j = i + 4; j < strs.Length; j += 4)
+                {
                     k = posRemainder(posRemainder(BigInteger.Parse("00" + strs[i + 3].Remove(0, 3), System.Globalization.NumberStyles.HexNumber) - BigInteger.Parse("00" + strs[j + 3].Remove(0, 3), System.Globalization.NumberStyles.HexNumber), _q) *
                         modInverse(posRemainder(BigInteger.Parse(strs[i + 1].Remove(0, 3)) - BigInteger.Parse(strs[j + 1].Remove(0, 3)), _q), _q), _q);
-                    x = posRemainder((BigInteger.Parse(strs[j + 1].Remove(0, 3)) * k - BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes(strs[j].Remove(0, 5))))) * modInverse(BigInteger.Parse(strs[j + 2].Remove(0, 3)), _q), _q);
-                    if (BigInteger.ModPow(g, x, _p) == y) {
+                    BigInteger x = posRemainder((BigInteger.Parse(strs[j + 1].Remove(0, 3)) * k - BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes(strs[j].Remove(0, 5))))) * modInverse(BigInteger.Parse(strs[j + 2].Remove(0, 3)), _q), _q);
+                    if (BigInteger.ModPow(g, x, _p) == y)
+                    {
                         Console.WriteLine("Found x: " + HexEncode(BigIntToBytes(x)) + " k: " + HexEncode(BigIntToBytes(k)) + " entries: " + (i / 4).ToString() + ", " + (j / 4).ToString());
                         if (BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes(HexEncode(BigIntToBytes(x))))) == realx)
                         {
@@ -1706,8 +1807,18 @@ namespace Cryptopals
                     }
                 }
             }
-
+            return false;
+        }
+        static public bool Challenge45()
+        {
             //SET 6 CHALLENGE 45
+            SHA1 hf = SHA1.Create();
+            RandomNumberGenerator rng = RandomNumberGenerator.Create();
+            byte[] b = System.Text.Encoding.ASCII.GetBytes("For those that envy a MC it can be hazardous to your health\nSo be friendly, a matter of life and death, just like a etch-a-sketch\n");
+            BigInteger _p, _q;
+            _p = BigInteger.Parse("00" + "800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1", System.Globalization.NumberStyles.HexNumber);
+            _q = BigInteger.Parse("00" + "f4f47f05794b256174bba6e9b396a7707e563c5b", System.Globalization.NumberStyles.HexNumber);
+            BigInteger g, k, y, x, r, s;
             g = 0;
             k = GetRandomBitSize(rng, GetBitSize(_q), _q);
             y = BigInteger.Parse("00" + "84ad4719d044495496a3201c8ff484feb45b962e7302e56a392aee4abab3e4bdebf2955b4736012f21a08084056b19bcd7fee56048e004e44984e2f411788efdc837a0d2e5abb7b555039fd243ac01f0fb2ed1dec568280ce678e931868d23eb095fde9d3779191b8c0299d6e07bbb283e6633451e535c45513b2d33c99ea17", System.Globalization.NumberStyles.HexNumber);
@@ -1723,9 +1834,12 @@ namespace Cryptopals
             Console.WriteLine(DSAValidate(_q, _p, g, y, r, s, BytesToBigInt(hf.ComputeHash(b))));
             Console.WriteLine(DSAValidate(_q, _p, g, y, r, s, BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes("Hello, world")))));
             Console.WriteLine(DSAValidate(_q, _p, g, y, r, s, BytesToBigInt(hf.ComputeHash(System.Text.Encoding.ASCII.GetBytes("Goodbye, world")))));
-
+            return false;
+        }
+        static public bool Challenge46()
+        {
             //SET 6 CHALLENGE 46
-
+            BigInteger _p, _q, et, n, d, m, c;
             do
             {
                 //do
@@ -1747,7 +1861,7 @@ namespace Cryptopals
             //BigInteger.Remainder(BigInteger.ModPow(c, d, n), 2);
             BigInteger lbound = 0;
             BigInteger ubound = n;
-            cprime = c;
+            BigInteger cprime = c;
             BigInteger enctwo = BigInteger.ModPow(2, 3, n);
             BigInteger multiplier = 1;
             //division by 2 will lead to inaccuracies in final bits so must do it with known division at final stage
@@ -1771,8 +1885,13 @@ namespace Cryptopals
             //}
             Console.WriteLine(ubound == m);
             Console.WriteLine(HexEncode(BigIntToBytes(m)));
-
+            return false;
+        }
+        static public bool Challenge47()
+        {
             //SET 6 CHALLENGE 47
+            RandomNumberGenerator rng = RandomNumberGenerator.Create();
+            BigInteger _p, _q, et, n, d, c;
             do
             {
                 do
@@ -1787,14 +1906,19 @@ namespace Cryptopals
             n = _p * _q;
             d = modInverse(3, et);
 
-            b = System.Text.Encoding.ASCII.GetBytes("kick it, CC");
+            byte[] b = System.Text.Encoding.ASCII.GetBytes("kick it, CC");
             byte[] pad = new byte[GetBitSize(n) / 8 - b.Length - 1 - 2];
             rng.GetBytes(pad);
             c = BigInteger.ModPow(BytesToBigInt(new byte[] { 0, 2 }.Concat(pad).Concat(new byte[] { 0 }).Concat(b).ToArray()), 3, n);
             BigInteger result = BleichenBacherPaddingOracle(rng, n, 3, d, c);
             Console.WriteLine("Result: " + HexEncode(BigIntToBytes(result)) + " matches: " + (result == BigInteger.ModPow(c, d, n)));
-
+            return false;
+        }
+        static public bool Challenge48()
+        {
             //SET 6 CHALLENGE 48
+            RandomNumberGenerator rng = RandomNumberGenerator.Create();
+            BigInteger _p, _q, et, n, d, c, result;
             do
             {
                 do
@@ -1808,12 +1932,14 @@ namespace Cryptopals
             } while (modInverse(3, et = (_p - 1) * (_q - 1)) == 1); //the totient must be coprime to our fixed e=3
             n = _p * _q;
             d = modInverse(3, et);
-
-            pad = new byte[GetBitSize(n) / 8 - b.Length - 1 - 2];
+            
+            byte[] b = System.Text.Encoding.ASCII.GetBytes("kick it, CC");
+            byte[] pad = new byte[GetBitSize(n) / 8 - b.Length - 1 - 2];
             rng.GetBytes(pad);
             c = BigInteger.ModPow(BytesToBigInt(new byte[] { 0, 2 }.Concat(pad).Concat(new byte[] { 0 }).Concat(b).ToArray()), 3, n);
             result = BleichenBacherPaddingOracle(rng, n, 3, d, c);
             Console.WriteLine("Result: " + HexEncode(BigIntToBytes(result)) + " matches: " + (result == BigInteger.ModPow(c, d, n)));
+            return false;
         }
         public class Rc4
         {
@@ -2015,7 +2141,7 @@ namespace Cryptopals
             }
             return result;
         }
-        static void Set7()
+        static public bool Challenge49()
         {
             //SET 7 CHALLENGE 49
             //proof regarding CBC-MAC's randomness and its length extension vulnerability
@@ -2049,33 +2175,46 @@ namespace Cryptopals
             cbcmac = encrypt_cbc(cbcmac, key, attackmessage).Skip(16 * ((attackmessage.Length - 1) / 16)).ToArray();
             newattackmessage = message.Concat(attackmessage).Concat(cbcmac).ToArray();
             Console.WriteLine("Length extension appended MAC correct: " + (new ByteArrayComparer().Equals(encrypt_cbc(iv, key, newattackmessage.Take(newattackmessage.Length - 16).ToArray()).Skip(16 * ((newattackmessage.Take(newattackmessage.Length - 16).ToArray().Length - 1) / 16)).ToArray(), cbcmac)));
-
+            return false;
+        }
+        static public bool Challenge50()
+        {
             //SET 7 CHALLENGE 50
-            key = System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE");
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] iv = new byte[16];
+            rng.GetBytes(iv);
+            byte[] key = System.Text.Encoding.ASCII.GetBytes("YELLOW SUBMARINE");
             //16 encrypted bytes before the cbcmac xored with the plaintext are the ones needed to correctly forge this
-            cbcmac = encrypt_cbc(iv, key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("alert('MZA who was that?');\n"), 16)).Skip(16 * (("alert('MZA who was that?');\n".Length - 1) / 16)).Take(16).ToArray();
+            byte[] cbcmac = encrypt_cbc(iv, key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("alert('MZA who was that?');\n"), 16)).Skip(16 * (("alert('MZA who was that?');\n".Length - 1) / 16)).Take(16).ToArray();
             Console.WriteLine("7.50 Verify CBC-MAC expected value: " + (new ByteArrayComparer().Equals(cbcmac, HexDecode("296b8d7cb78a243dda4d0a61d33bbdd1"))));
             cbcmac = encrypt_cbc(iv, key, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("alert('MZA who was that?');\n"), 16)).Skip(16 * (("alert('MZA who was that?');\n".Length - 1) / 16) - 16).Take(16).ToArray();
-            str = "alert('Ayo, the Wu is back!');//                ";
+            string str = "alert('Ayo, the Wu is back!');//                ";
             //     0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF;
             //binary 0 and new line should be only characters we need to watch out for if we use a comment structure
             //one approach is to do length extension and append original message but commented out - not general for multiline so could also return or play other javascript abort game
             //yet better since we have key and hence decryption oracle access, other approach is to decrypt the padding xored with desired output
             //the spirit of this exercise is to show that hash functions are one way and symmetric encryption is not
-            attackmessage = System.Text.Encoding.ASCII.GetBytes(str).Concat(FixedXOR(encrypt_cbc(iv, key, System.Text.Encoding.ASCII.GetBytes(str)).Skip(16 * ((str.Length - 1) / 16)).ToArray(), decrypt_cbc(iv, key, FixedXOR(Enumerable.Repeat((byte)16, 16).ToArray(), FixedXOR(cbcmac, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("alert('MZA who was that?');\n"), 16).Skip(16 * (("alert('MZA who was that?');\n".Length - 1) / 16)).Take(16).ToArray()))))).ToArray();
+            byte[] attackmessage = System.Text.Encoding.ASCII.GetBytes(str).Concat(FixedXOR(encrypt_cbc(iv, key, System.Text.Encoding.ASCII.GetBytes(str)).Skip(16 * ((str.Length - 1) / 16)).ToArray(), decrypt_cbc(iv, key, FixedXOR(Enumerable.Repeat((byte)16, 16).ToArray(), FixedXOR(cbcmac, PKCS7Pad(System.Text.Encoding.ASCII.GetBytes("alert('MZA who was that?');\n"), 16).Skip(16 * (("alert('MZA who was that?');\n".Length - 1) / 16)).Take(16).ToArray()))))).ToArray();
             Console.WriteLine("Forged javascript: \"" + System.Text.Encoding.ASCII.GetString(attackmessage) + "\" same CBC-MAC: " + new ByteArrayComparer().Equals(encrypt_cbc(iv, key, PKCS7Pad(attackmessage, 16)).Skip(16 * ((PKCS7Pad(attackmessage, 16).Length - 1) / 16)).ToArray(), HexDecode("296b8d7cb78a243dda4d0a61d33bbdd1")));
             //Extra Credit: Write JavaScript code that downloads your file, checks its CBC-MAC, and inserts it into the DOM iff it matches the expected hash.
-
+            return false;
+        }
+        static public bool Challenge51()
+        {
             //SET 7 CHALLENGE 51
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             List<string> Candidates = new List<String>(); //queue
             //base 64 character set
             Candidates.Add("sessionid=");
             int baselen = CompressionLengthOracle(Candidates[0], false);
             string charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
-            do {
-                for (int i = 0; i < charset.Length; i++) {
+            do
+            {
+                for (int i = 0; i < charset.Length; i++)
+                {
                     //it will eventually grow up to one byte reasonably with a short session key and though could get more sophisticated with when that happens, no need in this case
-                    if (CompressionLengthOracle(Candidates[0] + charset[i], false) <= baselen + 1) {
+                    if (CompressionLengthOracle(Candidates[0] + charset[i], false) <= baselen + 1)
+                    {
                         Candidates.Add(Candidates[0] + charset[i]);
                     }
                     //could consider equal sign positions for extra efficiency as they are only at the end
@@ -2093,22 +2232,29 @@ namespace Cryptopals
             baselen = CompressionLengthOracle(Candidates[0], true);
             int rnd;
             while (baselen == CompressionLengthOracle(charset[rnd = GetNextRandom(rng, charset.Length - 1)] + Candidates[0], true)) { Candidates[0] = charset[rnd] + Candidates[0]; }
-            do {
-                for (int i = 0; i < charset.Length; i++) {
+            do
+            {
+                for (int i = 0; i < charset.Length; i++)
+                {
                     //it will eventually grow up to one byte reasonably with a short session key and though could get more sophisticated with when that happens, no need in this case
-                    if (CompressionLengthOracle(Candidates[0] + charset[i], true) <= baselen + 1) {
+                    if (CompressionLengthOracle(Candidates[0] + charset[i], true) <= baselen + 1)
+                    {
                         Candidates.Add(Candidates[0] + charset[i]);
                     }
                     //could consider equal sign positions for extra efficiency as they are only at the end
                     //if % 3 = 1 consider '='
                     //if % 3 = 2 && [-1] == '=' consider '='
                 }
-                if (Candidates.Count == 1) {
+                if (Candidates.Count == 1)
+                {
                     Candidates[0] = Candidates[0].Remove(0, 1);
-                    for (int i = 0; i < charset.Length; i++) {
-                        for (int j = 0; j < charset.Length; j++) {
+                    for (int i = 0; i < charset.Length; i++)
+                    {
+                        for (int j = 0; j < charset.Length; j++)
+                        {
                             if (j == i && j == charset.Length - 1) break; if (j == i) j++;
-                            if (CompressionLengthOracle(Candidates[0] + charset[i] + charset[j], true) <= baselen + 1) {
+                            if (CompressionLengthOracle(Candidates[0] + charset[i] + charset[j], true) <= baselen + 1)
+                            {
                                 Candidates.Add(Candidates[0] + charset[i] + charset[j]);
                             }
                         }
@@ -2118,12 +2264,16 @@ namespace Cryptopals
                 Candidates.RemoveAt(0);
             } while (true);
             Console.WriteLine("Recovered plaintext from compression oracle with padding: " + Candidates[0] + " " + System.Text.Encoding.ASCII.GetString(Convert.FromBase64String(Candidates[0].Substring(Candidates[0].IndexOf("sessionid=") + "sessionid=".Length))));
-
+            return false;
+        }
+        static public bool Challenge52()
+        {
             //SET 7 CHALLENGE 52
             byte[][] cols = fcollision(6); //2^6=64 collisions
             int c;
             byte[] h = MD(cols[0], 16);
-            for (c = 1; c < cols.Length; c++) {
+            for (c = 1; c < cols.Length; c++)
+            {
                 if (!(new ByteArrayComparer().Equals(h, MD(cols[c], 16)))) break;
             }
             Console.WriteLine("7.52 Number of collisions generated: " + cols.Length.ToString() + " all verified: " + (c == cols.Length));
@@ -2131,29 +2281,39 @@ namespace Cryptopals
             Dictionary<byte[], int> map;
             h = MD(new byte[] { 0, 0 }, 20);
             //50% chance after 2^10 but it could theoretically go to any length even past 2^20 depending on how evenly distributed the hash function is...since AES is good, unlikely concern
-            for (n = 10; true; n++) {
+            for (n = 10; true; n++)
+            {
                 cols = fcollision(n);
                 h = cols[0];
                 map = new Dictionary<byte[], int>(new ByteArrayComparer());
-                for (c = 0; c < cols.Length; c++) {
+                for (c = 0; c < cols.Length; c++)
+                {
                     byte[] newh = MD(cols[c], 20);
-                    if (map.ContainsKey(newh)) {
+                    if (map.ContainsKey(newh))
+                    {
                         Console.WriteLine("Colliding values and their f||g hash output: " + HexEncode(cols[c]) + ": " + HexEncode(MD(cols[c], 16)) + HexEncode(newh) + " " + HexEncode(cols[map[newh]]) + ": " + HexEncode(MD(cols[map[newh]], 16)) + HexEncode(newh));
                         break;
-                    } else {
+                    }
+                    else
+                    {
                         map.Add(newh, c);
                     }
                 }
                 if (c != cols.Length) break;
             }
             Console.WriteLine("Number of collisions in f to find collision in g as a power of 2: " + n);
-
+            return false;
+        }
+        static public bool Challenge53()
+        {
             //SET 7 CHALLENGE 53
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             byte[] kblock = new byte[16 * 8]; //any message length between k and k+2^k-1 is possible...e.g. 2-5, 3-10, 4-19, 5-36
             rng.GetBytes(kblock);
             byte[][][] expmsg = kcollisions(3); //find k s.t.: k << 3 > ((kblock.Length + 15) / 16)
-            map = new Dictionary<byte[], int>(new ByteArrayComparer());
-            for (int i = 0; i < kblock.Length / 16; i++) {
+            Dictionary<byte[], int> map = new Dictionary<byte[], int>(new ByteArrayComparer());
+            for (int i = 0; i < kblock.Length / 16; i++)
+            {
                 byte[] newh = MD(kblock.Take(i * 16).ToArray(), 16);
                 if (map.ContainsKey(newh)) map[newh] = i; //use last index on this rare coincidence to make this deterministic
                 else map.Add(newh, i);
@@ -2161,56 +2321,71 @@ namespace Cryptopals
             BigInteger bridge;
             byte[] inith = MD(expmsg.Reverse().SelectMany((b) => b[0].Concat(Enumerable.Repeat((byte)0, 16)).Take(16).ToArray()).ToArray(), 16);
             int blocknum;
-            for (bridge = 0; true; bridge++) {
-                if (map.ContainsKey(PrehMD(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge).ToArray(), 16, inith))) {
+            for (bridge = 0; true; bridge++)
+            {
+                if (map.ContainsKey(PrehMD(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge).ToArray(), 16, inith)))
+                {
                     blocknum = map[PrehMD(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge).ToArray(), 16, inith)];
                     if (blocknum > expmsg.Length) break;
                 }
             }
             //already have 1, so 2+4+8+...
             byte[] forgery = new byte[kblock.Length];
-            for (int i = expmsg.Length - 1; i >= 0; i--) {
+            for (int i = expmsg.Length - 1; i >= 0; i--)
+            {
                 Array.Copy(expmsg[i][((blocknum - 1 - expmsg.Length) & (1 << i)) != 0 ? 1 : 0].Concat(Enumerable.Repeat((byte)0, 16)).Take((((blocknum - 1 - expmsg.Length) & (1 << i)) != 0 ? (1 << i) : 0) * 16 + 16).ToArray(), 0, forgery, (((blocknum - 1 - expmsg.Length) & ((1 << expmsg.Length) - (1 << (i + 1)))) + (expmsg.Length - 1 - i)) * 16, (((blocknum - 1 - expmsg.Length) & (1 << i)) != 0 ? (1 << i) : 0) * 16 + 16);
             }
             Array.Copy(BigIntToBytes(bridge).Concat(Enumerable.Repeat((byte)0, 16)).Take(16).ToArray(), 0, forgery, (blocknum - 1) * 16, 16);
             Array.Copy(kblock, blocknum * 16, forgery, blocknum * 16, kblock.Length - blocknum * 16);
             Console.WriteLine("Forgery hash is identical: " + (new ByteArrayComparer().Equals(MD(kblock, 16), MD(forgery, 16))));
-
+            return false;
+        }
+        static public bool Challenge54()
+        {
             //SET 7 CHALLENGE 54
-            cols = ktreecollisions(8);
-            str = String.Empty;
-            for (int i = 0; i < 2430; i++) { //simple formula as a substitute for the actual results
+            byte[][] cols = ktreecollisions(8);
+            string str = String.Empty;
+            for (int i = 0; i < 2430; i++)
+            { //simple formula as a substitute for the actual results
                 str += i.ToString() + ": " + (i % 9) + "-" + ((i + 1) % 9) + "\n";
             }
-            forgery = System.Text.Encoding.ASCII.GetBytes(str);
+            byte[] forgery = System.Text.Encoding.ASCII.GetBytes(str);
             if ((forgery.Length % 16) != 0) forgery = forgery.Concat(Enumerable.Repeat((byte)0, 16 - (forgery.Length % 16))).ToArray();
-            inith = MD(forgery, 16);
-            map.Clear();
-            for (int i = 0; i < (1 << 8); i++) {
+            byte[] inith = MD(forgery, 16);
+            Dictionary<byte[], int> map = new Dictionary<byte[], int>(new ByteArrayComparer());
+            for (int i = 0; i < (1 << 8); i++)
+            {
                 map[cols[i]] = i;
             }
-            for (bridge = 0; true; bridge++) {
+            BigInteger bridge;
+            for (bridge = 0; true; bridge++)
+            {
                 if (map.ContainsKey(PrehMD(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge).ToArray(), 16, inith))) break;
             }
             forgery = forgery.Concat(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge)).ToArray();
             if ((forgery.Length % 16) != 0) forgery = forgery.Concat(Enumerable.Repeat((byte)0, 16 - (forgery.Length % 16))).ToArray();
-            blocknum = (1 << 8);
-            c = map[PrehMD(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge).ToArray(), 16, inith)];
-            for (int i = 7; i >= 0; i--) {
+            int blocknum = (1 << 8);
+            int c = map[PrehMD(bridge == 0 ? new byte[] { 0 } : BigIntToBytes(bridge).ToArray(), 16, inith)];
+            for (int i = 7; i >= 0; i--)
+            {
                 forgery = forgery.Concat(cols[blocknum + c]).ToArray();
                 if ((forgery.Length % 16) != 0) forgery = forgery.Concat(Enumerable.Repeat((byte)0, 16 - (forgery.Length % 16))).ToArray();
                 blocknum += (1 << (i + 1));
                 c >>= 1;
             }
             Console.WriteLine("Forged prediction hash is identical to prior prediction hash: " + (new ByteArrayComparer().Equals(cols[cols.Length - 1], MD(forgery, 16))));
-
+            return false;
+        }
+        static public bool Challenge55()
+        {
             //SET 7 CHALLENGE 55
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             uint[] m1 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
             uint[] m1prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
             uint[] m2 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
             uint[] m2prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
             MD4 md4 = new MD4();
-            forgery = MD4.WangsAttack(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), false, false);
+            byte[] forgery = MD4.WangsAttack(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), false, false);
             Console.WriteLine("7.55 Verify paper hash meets first round conditions: " + (new ByteArrayComparer().Equals(forgery, m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             Console.WriteLine("Verify paper differential: " + (new ByteArrayComparer().Equals(MD4.ApplyWangDifferential(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray()), m1prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             forgery = MD4.WangsAttack(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), false, false);
@@ -2222,8 +2397,8 @@ namespace Cryptopals
             //HexDecode("c6f3b3fe1f4833e0697340fb214fb9ea");
             Console.WriteLine("Hash of second paper message: " + HexEncode(md4.ComputeHash(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             Console.WriteLine("Hash of second paper differential message: " + HexEncode(md4.ComputeHash(m2prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            key = new byte[64];
-            n = 0;
+            byte[] key = new byte[64];
+            int n = 0;
             //byte[] twowords = new byte[8];
             for (int i = 0; i < 20; i++)
             {
@@ -2255,9 +2430,14 @@ namespace Cryptopals
                 } while (new ByteArrayComparer().Equals(forgery, key) || !(new ByteArrayComparer().Equals(md4.ComputeHash(key), md4.ComputeHash(forgery))));
                 Console.WriteLine("Wang et al. paper attack: " + n + " tries: " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
             }
-
+            return false;
+        }
+        static public bool Challenge56()
+        {
             //SET 7 CHALLENGE 56
-            forgery = Convert.FromBase64String("QkUgU1VSRSBUTyBEUklOSyBZT1VSIE9WQUxUSU5F");
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] forgery = Convert.FromBase64String("QkUgU1VSRSBUTyBEUklOSyBZT1VSIE9WQUxUSU5F");
+            byte[] key = new byte[64];
             //position 16, 240 at .00395 chance, .00390625 average, biases at 0 and 16 at half weight
             //position 32, 224 at .00395 chance, .00390625 average, biases at 0 and 32 at half weight
             //1.12% more frequent
@@ -2270,7 +2450,8 @@ namespace Cryptopals
                 int max2 = 0;
                 //new byte[] { (byte)'/' }.Concat()
                 byte[] b = Enumerable.Repeat((byte)'A', Math.Max(0, 15 - len)).Concat(forgery).ToArray();
-                for (int i = 0; i < 1 << 25; i++) {
+                for (int i = 0; i < 1 << 25; i++)
+                {
                     rng.GetBytes(key);
                     Rc4 rc4 = new Rc4(key, b);
                     byte[] peep = rc4.EnDeCrypt();
@@ -2281,7 +2462,8 @@ namespace Cryptopals
                     max = hist[max] > hist[ch ^ 240] ? max : (ch ^ 240);
                     max = hist[max] > hist[ch ^ 0] ? max : (ch ^ 0);
                     max = hist[max] > hist[ch ^ 16] ? max : (ch ^ 16);
-                    if (15 - len + forgery.Length >= 32) {
+                    if (15 - len + forgery.Length >= 32)
+                    {
                         ch = peep[31];
                         hist2[ch ^ 224] += 4;
                         hist2[ch ^ 0]++;
@@ -2296,6 +2478,7 @@ namespace Cryptopals
             }
             Console.WriteLine("7.56 Recovered RC4 statistical decryption: " + System.Text.Encoding.ASCII.GetString(recover));
             Console.WriteLine("Equal to original: " + (new ByteArrayComparer().Equals(recover, forgery)));
+            return false;
         }
         static BigInteger PollardKangaroo(BigInteger a, BigInteger b, int k, BigInteger g, BigInteger p, BigInteger y)
         {
@@ -5466,8 +5649,7 @@ namespace Cryptopals
             }
             return new Tuple<bool[,], bool[][,]>(Ad, Adn);
         }
-
-        static public void Set8()
+        static public bool Challenge57()
         {
             //SET 8 CHALLENGE 57
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
@@ -5483,12 +5665,14 @@ namespace Cryptopals
             int curr = 0;
             BigInteger x;
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            goto p58;
-            for (int i = 2; i < 1 << 16; i++) {
+            for (int i = 2; i < 1 << 16; i++)
+            {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(j, i, out Rem);
-                if (Rem == BigInteger.Zero) {
+                if (Rem == BigInteger.Zero)
+                {
                     rs.Add(i);
-                    do {
+                    do
+                    {
                         j = Quot;
                         Quot = BigInteger.DivRem(j, i, out Rem); //reduce powers of factors:
                         //(Friendly tip: maybe avoid any repeated factors. They only complicate things.)
@@ -5500,7 +5684,8 @@ namespace Cryptopals
             do
             {
                 BigInteger h;
-                do {
+                do
+                {
                     //random number between 1..p
                     BigInteger rand;
                     do { rand = Crypto.GetNextRandomBig(rng, p); } while (rand <= 1);
@@ -5509,9 +5694,11 @@ namespace Cryptopals
                 BigInteger K = BigInteger.ModPow(h, x, p);
                 byte[] t = hmac(K.ToByteArray(), m);
                 BigInteger testK;
-                for (int i = 0; i < rs[curr]; i++) {
+                for (int i = 0; i < rs[curr]; i++)
+                {
                     testK = BigInteger.ModPow(h, i, p);
-                    if (new ByteArrayComparer().Equals(t, hmac(testK.ToByteArray(), m))) {
+                    if (new ByteArrayComparer().Equals(t, hmac(testK.ToByteArray(), m)))
+                    {
                         bs.Add(i);
                         break;
                     }
@@ -5521,19 +5708,24 @@ namespace Cryptopals
             } while (rcum <= q);
             //Chinese Remainder Theorem - arbitrary size by interpolation
             //K = b1 (mod h1), K = b_n (mod r_n)
-            for (int i = 0; i < curr; i++) {
+            for (int i = 0; i < curr; i++)
+            {
                 BigInteger curcum = rcum / rs[i];
                 RecX += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
             Console.WriteLine("8.57 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX, rcum).ToByteArray()));
-
-            p58:
-            goto p59;
+            return false;
+        }
+        static public bool Challenge58()
+        {
             //SET 8 CHALLENGE 58
-            p = BigInteger.Parse("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623");
-            q = BigInteger.Parse("335062023296420808191071248367701059461");
-            j = (p - 1) / q; //34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702
-            g = BigInteger.Parse("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357");
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
+            BigInteger x;
+            BigInteger p = BigInteger.Parse("11470374874925275658116663507232161402086650258453896274534991676898999262641581519101074740642369848233294239851519212341844337347119899874391456329785623");
+            BigInteger q = BigInteger.Parse("335062023296420808191071248367701059461");
+            BigInteger j = (p - 1) / q; //34233586850807404623475048381328686211071196701374230492615844865929237417097514638999377942356150481334217896204702
+            BigInteger g = BigInteger.Parse("622952335333961296978159266084741085889881358738459939978290179936063635566740258555167783009058567397963466103140082647486611657350811560630587013183357");
             BigInteger y = BigInteger.Parse("7760073848032689505395005705677365876654629189298052775754597607446617558600394076764814236081991643094239886772481052254010323780165093955236429914607119");
             /*for (int i = 0; i < 1 << 20; i++) { //small enough to brute force, AC3CD
                 if (y == BigInteger.ModPow(g, i, p)) {
@@ -5548,21 +5740,24 @@ namespace Cryptopals
             do { x = Crypto.GetNextRandomBig(rng, q); } while (x <= 1); //Bob's secret key
             y = BigInteger.ModPow(g, x, p);
             Console.WriteLine("Secret key generated: " + HexEncode(x.ToByteArray()));
-            rs = new List<int>();
-            for (int i = 2; i < 1 << 16; i++) {
+            List<int> rs = new List<int>();
+            for (int i = 2; i < 1 << 16; i++)
+            {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(j, i, out Rem);
-                if (Rem == BigInteger.Zero) {
+                if (Rem == BigInteger.Zero)
+                {
                     rs.Add(i);
-                    do {
+                    do
+                    {
                         j = Quot;
                         Quot = BigInteger.DivRem(j, i, out Rem); //reduce powers of factors:
                         //(Friendly tip: maybe avoid any repeated factors. They only complicate things.)
                     } while (Rem == BigInteger.Zero);
                 }
             }
-            curr = 0;
-            rcum = 1;
-            bs = new List<int>();
+            int curr = 0;
+            BigInteger rcum = 1;
+            List<int> bs = new List<int>();
             do
             {
                 BigInteger h;
@@ -5590,8 +5785,9 @@ namespace Cryptopals
             } while (curr < rs.Count); //(rcum <= q);
             //Chinese Remainder Theorem - arbitrary size by interpolation
             //K = b1 (mod h1), K = b_n (mod r_n)
-            RecX = BigInteger.Zero;
-            for (int i = 0; i < curr; i++) {
+            BigInteger RecX = BigInteger.Zero;
+            for (int i = 0; i < curr; i++)
+            {
                 BigInteger curcum = rcum / rs[i];
                 RecX += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
@@ -5605,9 +5801,13 @@ namespace Cryptopals
             BigInteger Yprime = BigInteger.Remainder(y * modInverse(BigInteger.ModPow(g, RecX, p), p), p);
             BigInteger Mprime = PollardKangaroo(0, (p - 1) / rcum, 23, Gprime, p, Yprime); //(p - 1) / rcum is 40 bits in this case, 23 could also be good
             Console.WriteLine("8.58 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX + Mprime * rcum, p - 1).ToByteArray()));
-
-            p59:
+            return false;
+        }
+        static public bool Challenge59()
+        {
             //SET 8 CHALLENGE 59
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
                 GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743"), Ord = BPOrd * 2 * 2 * 2;
@@ -5618,7 +5818,6 @@ namespace Cryptopals
             Ord = Schoof(Ea, Eb, GF, rng, Ord);
             int[] PickGys = new int[] { 11279326, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
-            //goto p60;
             //http://magma.maths.usyd.edu.au/calc/
             //E: y^2+a_1xy+a_3y=x^3+a_2x^2+a_4x+a_6 over GF(p)
             //K:=GF(233970423115425145524320034830162017933);
@@ -5637,31 +5836,35 @@ namespace Cryptopals
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);
-            Tuple < BigInteger, BigInteger> APub = scaleEC(G, ASecret, Ea, GF);
+            Tuple<BigInteger, BigInteger> APub = scaleEC(G, ASecret, Ea, GF);
             BigInteger BSecret;
             do { BSecret = Crypto.GetNextRandomBig(rng, BPOrd); } while (BSecret <= 1);
-            Tuple < BigInteger, BigInteger> BPub = scaleEC(G, BSecret, Ea, GF);
+            Tuple<BigInteger, BigInteger> BPub = scaleEC(G, BSecret, Ea, GF);
             Tuple<BigInteger, BigInteger> AShared = scaleEC(BPub, ASecret, Ea, GF);
             Tuple<BigInteger, BigInteger> BShared = scaleEC(APub, BSecret, Ea, GF);
             Console.WriteLine("Base point and order correct: " + (scaleEC(G, BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1))));
             Console.WriteLine("Shared Secrets Identical: " + (AShared.Item1 == BShared.Item1));
 
             //Pohlig-Hellman algorithm for discrete logarithms
-            rs = new List<int>();
+            List<int> rs = new List<int>();
             List<int> rsidx = new List<int>();
             rs.Add(8);
             rsidx.Add(0);
-            for (int prms = 1; prms < 4; prms++) {
-                p = Ords[prms];
-                for (int i = 2; i < 1 << 16; i++) {
+            for (int prms = 1; prms < 4; prms++)
+            {
+                BigInteger p = Ords[prms];
+                for (int i = 2; i < 1 << 16; i++)
+                {
                     BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(p, i, out Rem);
-                    if (Rem == BigInteger.Zero) {
+                    if (Rem == BigInteger.Zero)
+                    {
                         if (i != 2 && !rs.Contains(i))
                         {//2^3 as a factor uses original curve, up to 31 result not found
                             rs.Add(i);
                             rsidx.Add(prms);
                         }
-                        do {
+                        do
+                        {
                             p = Quot;
                             Quot = BigInteger.DivRem(p, i, out Rem); //reduce powers of factors:
                             //(Friendly tip: maybe avoid any repeated factors. They only complicate things.)
@@ -5673,15 +5876,17 @@ namespace Cryptopals
                     }
                 }
             }
-            bs = new List<int>();
-            rcum = 1;
-            curr = 0;
+            List<int> bs = new List<int>();
+            BigInteger rcum = 1, x;
+            int curr = 0;
             do { x = Crypto.GetNextRandomBig(rng, BPOrd); } while (x <= 1); //Bob's secret key
             Console.WriteLine("Secret key generated: " + x);
-            do {
+            do
+            {
                 BigInteger hx, hy;
                 Tuple<BigInteger, BigInteger> h;
-                do {
+                do
+                {
                     //random point with between x value between 1..Ord
                     do { hx = Crypto.GetNextRandomBig(rng, Ords[rsidx[curr]]); } while (hx <= 1);
                     hy = TonelliShanks(rng, posRemainder(hx * hx * hx + Ea * hx + PickGys[rsidx[curr]], GF), GF);
@@ -5695,17 +5900,22 @@ namespace Cryptopals
                 byte[] t = hmac(K.Item1.ToByteArray(), m);
                 Tuple<BigInteger, BigInteger> testK;
                 int i;
-                for (i = 0; i < rs[curr]; i++) {
+                for (i = 0; i < rs[curr]; i++)
+                {
                     testK = scaleEC(h, i, Ea, GF);
-                    if (new ByteArrayComparer().Equals(t, hmac(testK.Item1.ToByteArray(), m))) {
+                    if (new ByteArrayComparer().Equals(t, hmac(testK.Item1.ToByteArray(), m)))
+                    {
                         break;
                     }
                 }
-                if (i == rs[curr] || i == 0) {
+                if (i == rs[curr] || i == 0)
+                {
                     //Console.WriteLine(rs[curr]);
                     rs.RemoveAt(curr);
                     rsidx.RemoveAt(curr);
-                } else {
+                }
+                else
+                {
                     //k*u = -k*u, resulting in a combinatorial explosion of potential CRT outputs. 
                     //i or rs[curr] - i
                     //Console.WriteLine(rs[curr] + " " + (rs[curr] - i) + " " + i + " " + BigInteger.Remainder(x, rs[curr]));
@@ -5714,6 +5924,7 @@ namespace Cryptopals
                     curr++;
                 }
             } while (rcum <= BPOrd);
+            BigInteger RecX = BigInteger.Zero;
             //Chinese Remainder Theorem - arbitrary size by interpolation
             //K = b1 (mod h1), K = b_n (mod r_n)
             //CRT trick: compute with bi^2 mod pi compute sqrt(s^2) over all integers (Z) BUT NEED rcum > BPOrd * BPOrd
@@ -5732,49 +5943,62 @@ namespace Cryptopals
                 h = new Tuple<BigInteger, BigInteger>(hx, hy);
                 Tuple<BigInteger, BigInteger> finK = scaleEC(h, x, Ea, GF);
                 byte[] t = hmac(finK.Item1.ToByteArray(), m);
-                for (int r = 0; r < 1 << curr; r++) {
+                for (int r = 0; r < 1 << curr; r++)
+                {
                     RecX = BigInteger.Zero;
-                    for (int i = 0; i < curr; i++) {
+                    for (int i = 0; i < curr; i++)
+                    {
                         BigInteger curcum = rcum / rs[i];
                         RecX += ((r & (1 << i)) != 0 ? bs[i] : rs[i] - bs[i]) * curcum * modInverse(curcum, rs[i]);
                     }
                     RecX = BigInteger.Remainder(RecX, rcum);
                     Tuple<BigInteger, BigInteger> testK = scaleEC(h, RecX, Ea, GF);
-                    if (new ByteArrayComparer().Equals(t, hmac(testK.Item1.ToByteArray(), m))) {
+                    if (new ByteArrayComparer().Equals(t, hmac(testK.Item1.ToByteArray(), m)))
+                    {
                         break;
                     }
                 }
             }
             Console.WriteLine("8.59 Secret key recovered: " + RecX);
-
-        //SET 8 CHALLENGE 60
-        //p60:
-            //goto p61;
-            Ea = 534; Gx = Gx - 178;
+            return false;
+        }
+        static public bool Challenge60()
+        {
+            //SET 8 CHALLENGE 60
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
+            BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"), GF = BigInteger.Parse("233970423115425145524320034830162017933"),
+                BPOrd = BigInteger.Parse("29246302889428143187362802287225875743"), Ord = BPOrd * 2 * 2 * 2;
+            Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
+            int EaOrig = -95051, Ea = 534, Eb = 11279326; Gx = Gx - 178;
             Console.WriteLine("Base point and order correct: " + ladder(Gx, BPOrd, Ea, GF) + " " + (ladder(Gx, BPOrd, Ea, GF) == BigInteger.Zero));
             BigInteger Pt = BigInteger.Parse("76600469441198017145391791613091732004");
             Console.WriteLine(ladder(Pt, 11, Ea, GF)); //0 or infinite
             Console.WriteLine(TonelliShanks(rng, posRemainder(Pt * Pt * Pt + Ea * Pt * Pt + Pt, GF), GF)); //0 meaning non-existent
             BigInteger TwistOrd = 2 * GF + 2 - Ord;
-            rs = new List<int>();
-            p = TwistOrd; //Montgomery curve order are always divisible by 4
-            for (int i = 2; i < 1 << 24; i++) {
+            List<int> rs = new List<int>();
+            BigInteger p = TwistOrd; //Montgomery curve order are always divisible by 4
+            for (int i = 2; i < 1 << 24; i++)
+            {
                 BigInteger Rem = new BigInteger(), Quot = BigInteger.DivRem(p, i, out Rem);
-                if (Rem == BigInteger.Zero) {
+                if (Rem == BigInteger.Zero)
+                {
                     rs.Add(i);
-                    do {
+                    do
+                    {
                         p = Quot;
                         Quot = BigInteger.DivRem(p, i, out Rem); //reduce powers of factors:
                         //(Friendly tip: maybe avoid any repeated factors. They only complicate things.)
-                        if (Rem == BigInteger.Zero) {
+                        if (Rem == BigInteger.Zero)
+                        {
                             Console.WriteLine(i);
                         }
                     } while (Rem == BigInteger.Zero);
                 }
             }
-            bs = new List<int>();
-            rcum = 1;
-            curr = 0;
+            List<int> bs = new List<int>();
+            BigInteger rcum = 1, x;
+            int curr = 0;
             do { x = Crypto.GetNextRandomBig(rng, BPOrd); } while (x <= 1); //Bob's secret key
             //Y = scaleEC(G, x, EaOrig, GF);
             BigInteger hxu = ladder(Gx, x, Ea, GF); //public key used at end, can convert back to Weierstrass for additions in Pollard Kangaroo
@@ -5819,10 +6043,13 @@ namespace Cryptopals
                         break;
                     }
                 }
-                if (i == rs[curr] || i == 0) {
+                if (i == rs[curr] || i == 0)
+                {
                     //Console.WriteLine(rs[curr]);
                     rs.RemoveAt(curr);
-                } else {
+                }
+                else
+                {
                     //k*u = -k*u, resulting in a combinatorial explosion of potential CRT outputs. 
                     //i or rs[curr] - i
                     Console.WriteLine(rs[curr] + " " + (rs[curr] - i) + " " + i + " " + BigInteger.Remainder(x, rs[curr]));
@@ -5835,7 +6062,9 @@ namespace Cryptopals
                                        //Chinese Remainder Theorem - arbitrary size by interpolation
                                        //K = b1 (mod h1), K = b_n (mod r_n)
             List<BigInteger> recxs = new List<BigInteger>();
-            for (int r = 0; r < 1 << curr; r++) {
+            BigInteger RecX;
+            for (int r = 0; r < 1 << curr; r++)
+            {
                 RecX = BigInteger.Zero;
                 for (int i = 0; i < curr; i++)
                 {
@@ -5845,7 +6074,8 @@ namespace Cryptopals
                 RecX = BigInteger.Remainder(RecX, rcum);
                 recxs.Add(RecX);
             }
-            do {
+            do
+            {
                 BigInteger u, hy; //keep querying until narrowed down to only a positive/negative pair
                 do
                 {
@@ -5856,7 +6086,7 @@ namespace Cryptopals
                 u = ladder(u, TwistOrd / rcum, Ea, GF);
                 BigInteger K = ladder(u, x, Ea, GF);
                 byte[] t = hmac(K.ToByteArray(), m);
-                recxs = recxs.Where((BigInteger rx) => 
+                recxs = recxs.Where((BigInteger rx) =>
                     new ByteArrayComparer().Equals(t, hmac(ladder(u, rx, Ea, GF).ToByteArray(), m))).ToList();
             } while (recxs.Count != 2);
             //again still left with 2 possible values, the positive and negative one
@@ -5871,7 +6101,7 @@ namespace Cryptopals
             //x == RecX + mval * rcum
             BigInteger mval = BigInteger.Remainder(x - RecX, rcum) == 0 ? ((x - RecX) / rcum) : ((x - (rcum - RecX)) / rcum);
             BigInteger fixRecX = BigInteger.Remainder(x - RecX, rcum) == 0 ? RecX : (rcum - RecX);
-            Tuple <BigInteger, BigInteger> Yorig = scaleEC(G, x, EaOrig, GF);
+            Tuple<BigInteger, BigInteger> Yorig = scaleEC(G, x, EaOrig, GF);
             Tuple<BigInteger, BigInteger> Ycalc = addEC(scaleEC(G, fixRecX, EaOrig, GF), scaleEC(G, mval * rcum, EaOrig, GF), EaOrig, GF);
             //Yorig.Item1 == Ycalc.Item1 && Yorig.Item2 == Ycalc.Item2;
             Tuple<BigInteger, BigInteger> GprimeEC = scaleEC(G, rcum, EaOrig, GF);
@@ -5892,11 +6122,12 @@ namespace Cryptopals
             YprimeEC = WSToMontg(addEC(montgToWS(Y, 178), invertEC(montgToWS(ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), fixRecX, Ea, EaOrig, Eb, GF, 178), 178), GF), EaOrig, GF), 178);
             YprimeECcalc = ladder2(GprimeEC, mval, Ea, EaOrig, Eb, GF, 178);
             //YprimeECcalc.Item1 == YprimeEC.Item1 && YprimeECcalc.Item2 == YprimeEC.Item2
-            
+
             YprimeEC = addEC(montgToWS(Y, 178), invertEC(montgToWS(ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), RecX, Ea, EaOrig, Eb, GF, 178), 178), GF), EaOrig, GF);
             Console.WriteLine(YprimeEC + " " + scaleEC(GprimeEC, ((x - RecX) / rcum), EaOrig, GF));
-            Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
-            if (Mprime.Equals(BigInteger.Zero)) {
+            BigInteger Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
+            if (Mprime.Equals(BigInteger.Zero))
+            {
                 RecX = rcum - RecX;
                 //YprimeEC = addEC(Y, invertEC(scaleEC(G, RecX, EaOrig, GF), GF), EaOrig, GF);
                 YprimeEC = addEC(montgToWS(Y, 178), invertEC(montgToWS(ladder2(new Tuple<BigInteger, BigInteger>(Gx, Gy), RecX, Ea, EaOrig, Eb, GF, 178), 178), GF), EaOrig, GF);
@@ -5904,9 +6135,17 @@ namespace Cryptopals
                 Mprime = PollardKangarooECmontg(0, TwistOrd / rcum, 23, GprimeEC, EaOrig, Ea, Eb, GF, YprimeEC, 178); //(q - 1) / rcum is 43 bits in this case, 26 could also be good
             }
             Console.WriteLine("8.60 Secret key recovered: " + (RecX + Mprime * rcum) + " " + HexEncode((RecX + Mprime * rcum).ToByteArray()));
-
-        //SET 8 CHALLENGE 61
-        //p61:
+            return false;
+        }
+        static public bool Challenge61()
+        {
+            //SET 8 CHALLENGE 61
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
+            int EaOrig = -95051;
+            BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"), 
+                GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743");
+            Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
             BigInteger d;
             SHA1 hf = SHA1.Create();
             do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
@@ -5918,21 +6157,23 @@ namespace Cryptopals
             BigInteger dprime;
             do { dprime = Crypto.GetNextRandomBig(rng, BPOrd); } while (dprime <= 1);
             BigInteger tmp = u1 + u2 * dprime;
-            GprimeEC = scaleEC(addEC(scaleEC(G, u1, EaOrig, GF), scaleEC(Q, u2, EaOrig, GF), EaOrig, GF), modInverse(tmp, BPOrd), EaOrig, GF);
+            Tuple<BigInteger, BigInteger> GprimeEC = scaleEC(addEC(scaleEC(G, u1, EaOrig, GF), scaleEC(Q, u2, EaOrig, GF), EaOrig, GF), modInverse(tmp, BPOrd), EaOrig, GF);
             Tuple<BigInteger, BigInteger> Qprime = scaleEC(GprimeEC, dprime, EaOrig, GF);
             Console.WriteLine("Q and Q' verify: " + verifyECDSA(hm, res, Q, BPOrd, G, EaOrig, GF) + " " + verifyECDSA(hm, res, Qprime, BPOrd, GprimeEC, EaOrig, GF));
-            //goto p62;
             //RSA
             //sign: s=pad(m)^d mod N
             BigInteger _p;
             BigInteger _q;
             BigInteger et;
-            do {
-                do {
+            do
+            {
+                do
+                {
                     _p = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_p, 64));
                 _p = BigInteger.Parse("252919978488117916147778994275562072491");
-                do {
+                do
+                {
                     _q = GetPivotRandom(rng, 128);
                 } while (!IsProbablePrime(_q, 64));
                 _q = BigInteger.Parse("212353757101997844028225694411779588517");
@@ -5954,21 +6195,24 @@ namespace Cryptopals
                 rsq = PollardRhoAll(pprime - 1); //check smoothness with Pollard's rho
                 if (rsq.Count == 0 || rsq.Max() > (1 << 24)) continue;
                 int i = 0;
-                for (; i < rsq.Count; i++) {
+                for (; i < rsq.Count; i++)
+                {
                     if (BigInteger.ModPow(s, (pprime - 1) / rsq[i], pprime).Equals(BigInteger.One)) break;
                 }
                 if (i == rsq.Count) break;
             } while (true);
-            rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
+            List<int> rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
             do
             {
-                do {
+                do
+                {
                     qprime = GetPivotRandom(rng, 128);
                     if (pprime * qprime <= n) continue;
                 } while (!IsProbablePrime(qprime, 64));
                 qprime = BigInteger.Parse("266237645118740561410025069955757680311");
                 int i = 0;
-                for (; i < rs.Count; i++) {
+                for (; i < rs.Count; i++)
+                {
                     if (rs[i] != 2 && BigInteger.Remainder(qprime - 1, rs[i]) == 0) break;
                 }
                 if (i != rs.Count) continue;
@@ -5981,14 +6225,17 @@ namespace Cryptopals
                 }
                 if (i == rsq.Count) break;
             } while (true);
-            bs = new List<int>(); rcum = 1;
+            List<int>bs = new List<int>(); BigInteger rcum = 1;
             BigInteger nprime = pprime * qprime, npp = qprime - 1, npq = pprime - 1, ep = BigInteger.Zero, eq = BigInteger.Zero;
             //Pohlig-Hellman s^e=pad(m) mod n, s^ep=pad(m) mod p, s^eq=pad(m) mod q
-            for (curr = 0; curr < rs.Count; curr++) {
+            for (int curr = 0; curr < rs.Count; curr++)
+            {
                 BigInteger gprime = BigInteger.ModPow(s, (pprime - 1) / rs[curr], pprime);
                 BigInteger hprime = BigInteger.ModPow(hm, (pprime - 1) / rs[curr], pprime);
-                for (int i = 0; i < rs[curr]; i++) {
-                    if (BigInteger.ModPow(gprime, i, pprime).Equals(hprime)) {
+                for (int i = 0; i < rs[curr]; i++)
+                {
+                    if (BigInteger.ModPow(gprime, i, pprime).Equals(hprime))
+                    {
                         bs.Add(i); rcum *= rs[curr]; break;
                     }
                 }
@@ -6002,11 +6249,14 @@ namespace Cryptopals
             bs.Clear(); rcum = 1;
             List<int> rso = rs;
             rs = rsq.ConvertAll((BigInteger X) => (int)X); rsq.Clear();
-            for (curr = 0; curr < rs.Count; curr++) {
+            for (int curr = 0; curr < rs.Count; curr++)
+            {
                 BigInteger gprime = BigInteger.ModPow(s, (qprime - 1) / rs[curr], qprime);
                 BigInteger hprime = BigInteger.ModPow(hm, (qprime - 1) / rs[curr], qprime);
-                for (int i = 0; i < rs[curr]; i++) {
-                    if (BigInteger.ModPow(gprime, i, qprime).Equals(hprime)) {
+                for (int i = 0; i < rs[curr]; i++)
+                {
+                    if (BigInteger.ModPow(gprime, i, qprime).Equals(hprime))
+                    {
                         bs.Add(i); rcum *= rs[curr]; break;
                     }
                 }
@@ -6033,7 +6283,7 @@ namespace Cryptopals
                     quot = BigInteger.DivRem(eprime, rso[i], out rem);
                 }
             }*/
-            Console.WriteLine("eprime for ep and eq: " + BigInteger.Remainder(eprime, pprime-1).Equals(ep) + " " + BigInteger.Remainder(eprime, qprime-1).Equals(eq));
+            Console.WriteLine("eprime for ep and eq: " + BigInteger.Remainder(eprime, pprime - 1).Equals(ep) + " " + BigInteger.Remainder(eprime, qprime - 1).Equals(eq));
             //eprime must be coprime with npp * npq!!!
             //eprime = BigInteger.Remainder(ep * npp * modInverse(npp, npq) + eq * npq * modInverse(pprime, npp), npq * npp);
             dprime = modInverse(eprime / 2, npp * npq);
@@ -6053,10 +6303,18 @@ namespace Cryptopals
                 BigInteger.Remainder(TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime) + " " +
                 BigInteger.Remainder((pprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, pprime), pprime)) * qprime * modInverse(qprime, pprime) + (qprime - TonelliShanks(rng, BigInteger.ModPow(BigInteger.ModPow(s, 3, n), dprime, qprime), qprime)) * pprime * modInverse(pprime, qprime), pprime * qprime));
             Console.WriteLine("8.61");
-
-        //SET 8 CHALLENGE 62
-        //p62:
-            //goto p63;
+            return false;
+        }
+        static public bool Challenge62()
+        {
+            //SET 8 CHALLENGE 62
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            SHA1 hf = SHA1.Create();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
+            int EaOrig = -95051;
+            BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"), 
+                GF = BigInteger.Parse("233970423115425145524320034830162017933"), BPOrd = BigInteger.Parse("29246302889428143187362802287225875743");
+            Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
             List<List<Tuple<BigInteger, BigInteger>>> Result = LLL(new List<List<Tuple<BigInteger, BigInteger>>> { new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(1, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(3, 1), new Tuple<BigInteger, BigInteger>(5, 1), new Tuple<BigInteger, BigInteger>(6, 1) }},
@@ -6073,19 +6331,21 @@ namespace Cryptopals
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(-2, 1), new Tuple<BigInteger, BigInteger>(1, 2) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-1, 2), new Tuple<BigInteger, BigInteger>(0, 1), new Tuple<BigInteger, BigInteger>(1, 1), new Tuple<BigInteger, BigInteger>(2, 1) },
                 new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(-3, 2), new Tuple<BigInteger, BigInteger>(-1, 1), new Tuple<BigInteger, BigInteger>(2, 1), new Tuple<BigInteger, BigInteger>(0, 1) }}, (r1, r2) => r1.SequenceEqual(r2)).All((b) => b));
-
+            BigInteger d;
             do { d = Crypto.GetNextRandomBig(rng, BPOrd); } while (d <= 1);
-            Q = scaleEC(G, d, EaOrig, GF);
-            hm = BytesToBigInt(hf.ComputeHash(m));
+            Tuple<BigInteger, BigInteger> Q = scaleEC(G, d, EaOrig, GF);
+            BigInteger hm = BytesToBigInt(hf.ComputeHash(m));
             List<List<Tuple<BigInteger, BigInteger>>> Basis = new List<List<Tuple<BigInteger, BigInteger>>>();
             const int trials = 20; //20 is possible per problem guidance
-            for (int i = 0; i < trials; i++) {
+            for (int i = 0; i < trials; i++)
+            {
                 Basis.Add(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), i).Concat(new List<Tuple<BigInteger, BigInteger>> { new Tuple<BigInteger, BigInteger>(BPOrd, 1) }).Concat(Enumerable.Repeat(new Tuple<BigInteger, BigInteger>(0, 1), trials + 2 - 1 - i)).ToList());
             }
             List<Tuple<BigInteger, BigInteger>> bt = new List<Tuple<BigInteger, BigInteger>>();
             List<Tuple<BigInteger, BigInteger>> bu = new List<Tuple<BigInteger, BigInteger>>();
-            for (int i = 0; i < trials; i++) {
-                res = signECDSAbiased(rng, hm, d, BPOrd, G, EaOrig, GF);
+            for (int i = 0; i < trials; i++)
+            {
+                Tuple<BigInteger, BigInteger> res = signECDSAbiased(rng, hm, d, BPOrd, G, EaOrig, GF);
                 //t = r / ( s * (1 << 8)), u = H(m) / (-s * (1 << 8))
                 bt.Add(new Tuple<BigInteger, BigInteger>(BigInteger.Remainder(res.Item1 * modInverse(res.Item2 * (1 << 8), BPOrd), BPOrd), 1));
                 bu.Add(new Tuple<BigInteger, BigInteger>(posRemainder(hm * modInverse(posRemainder(-res.Item2 * (1 << 8), BPOrd), BPOrd), BPOrd), 1));
@@ -6101,18 +6361,24 @@ namespace Cryptopals
             bu.Add(new Tuple<BigInteger, BigInteger>(0, 1)); bu.Add(cu);
             Basis.Add(bt); Basis.Add(bu);
             LLL(Basis, new Tuple<BigInteger, BigInteger>(99, 100)); //about an hour with 22 vector basis, 3 minutes for 14 vector basis, 8 minutes for 16 vector basis
-            dprime = BigInteger.Zero;
-            for (int i = 0; i < trials + 2; i++) {
-                if (Basis[i][trials + 1].Equals(cu)) {
+            BigInteger dprime = BigInteger.Zero;
+            for (int i = 0; i < trials + 2; i++)
+            {
+                if (Basis[i][trials + 1].Equals(cu))
+                {
                     //reducFrac(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2).Item1 == 1
                     dprime = posRemainder(reducFrac(new Tuple<BigInteger, BigInteger>(-Basis[i][trials].Item1 * (1 << 8), Basis[i][trials].Item2)).Item1, BPOrd);
                     break;
                 }
             }
             Console.WriteLine("8.62 d recovered: " + (d == dprime));
-
-        //SET 8 CHALLENGE 63
-        //p63:
+            return false;
+        }
+        static public bool Challenge63()
+        {
+            //SET 8 CHALLENGE 63
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
             //BouncyCastle
             //BCryptEncrypt https://docs.microsoft.com/en-us/windows/desktop/api/bcrypt/nf-bcrypt-bcryptencrypt
             //https://archive.codeplex.com/?p=clrsecurity
@@ -6127,7 +6393,6 @@ namespace Cryptopals
             //https://tools.ietf.org/html/rfc7714#section-16.1.1
             byte[] authData = System.Text.Encoding.ASCII.GetBytes("OFFICIAL SECRET: 12345678AB");
             BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
-            //goto p64;
             //authData = new byte[] { 0x80, 0x40, 0xf1, 0x7b, 0x80, 0x41, 0xf8, 0xd3, 0x55, 0x01, 0xa0, 0xb2 };
             //m = new byte[] { 0x47, 0x61, 0x6c, 0x6c, 0x69, 0x61, 0x20, 0x65, 0x73, 0x74, 0x20, 0x6f, 0x6d, 0x6e, 0x69, 0x73,
             //    0x20, 0x64, 0x69, 0x76, 0x69, 0x73, 0x61, 0x20, 0x69, 0x6e, 0x20, 0x70, 0x61, 0x72, 0x74, 0x65,
@@ -6145,11 +6410,13 @@ namespace Cryptopals
             byte[] padAuthData = authData.Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
             byte[] padAuthDataRev = authData.Reverse().Concat(Enumerable.Repeat((byte)0, (16 - (authData.Length % 16)) % 16)).ToArray();
             BigInteger[] coeff = new BigInteger[padAuthData.Length / 16 + (cyphData.Length + 15) / 16 + 2];
-            for (int ctr = 0; ctr < padAuthData.Length; ctr += 16) { //zero pad to block align
+            for (int ctr = 0; ctr < padAuthData.Length; ctr += 16)
+            { //zero pad to block align
                 coeff[ctr / 16] = addGF2(new BigInteger(padAuthData.Skip((int)ctr).Take(Math.Min(padAuthData.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
                     new BigInteger(padAuthDataRev.Skip((int)ctr).Take(Math.Min(padAuthDataRev.Length - (int)ctr, 16)).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             }
-            for (int ctr = 0; ctr < cyphData.Length; ctr += 16) { //zero pad to block align
+            for (int ctr = 0; ctr < cyphData.Length; ctr += 16)
+            { //zero pad to block align
                 coeff[padAuthData.Length / 16 + ctr / 16] = addGF2(new BigInteger(cyphData.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()),
                     new BigInteger(cyphData2.Skip((int)ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()));
             }
@@ -6159,7 +6426,8 @@ namespace Cryptopals
             String str = String.Empty;
             BigInteger Sum = BigInteger.Zero;
             BigInteger hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
-            for (int i = 0; i < coeff.Length; i++) {
+            for (int i = 0; i < coeff.Length; i++)
+            {
                 str += "K.fetch_int(" + coeff[i].ToString() + ")" + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
                 //str += new BigInteger(coeff[i].ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
                 //str += new BigInteger(coeff[i].ToByteArray().Reverse().Concat(new byte[] { 0 }).ToArray()).ToString() + ((i != coeff.Length - 1) ? "*x^" + (coeff.Length - 1 - i).ToString() + "+" : "");
@@ -6197,32 +6465,37 @@ namespace Cryptopals
             BigInteger multiplier = modinvGF2k(coeff[0], M); //dividing by first coefficient means multiplying by its inverse!!!
             //319133248887973560380385766776623898219
             //Tuple<BigInteger[], BigInteger[]> monTup = divmodGFE2k(coeff, new BigInteger[] { coeff[0] });
-            BigInteger [] monic = mulGFE2k(coeff, new BigInteger[] { multiplier });
+            BigInteger[] monic = mulGFE2k(coeff, new BigInteger[] { multiplier });
             //BigInteger [] reslt = divmodGFE2k(monic, new BigInteger[] { BigInteger.One, BigInteger.Parse("74290645703835062417165689337537425287"), BigInteger.Parse("35413549109971219848440623448364065564"), BigInteger.Parse("79510262696675812766390810347978617508") }).Item1;
             //BigInteger[] monic = addGFE2k(monTup.Item1, mulGFE2k(new BigInteger[] { coeff[0] }, monTup.Item2));
             List<BigInteger[]> sqrF = sqrFree(monic);
             Tuple<BigInteger[], int>[] ddfRes = sqrF.SelectMany((sq) => ddf(sq)).ToArray();
             List<BigInteger> keyPosbl = new List<BigInteger>();
-            for (int i = 0; i < ddfRes.Length; i++) {
+            for (int i = 0; i < ddfRes.Length; i++)
+            {
                 if (ddfRes[i].Item2 == 1)
                 { //a degree one factor will be the key
                     BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
-                    for (int l = 0; l < edfRes.Length; l++) {
+                    for (int l = 0; l < edfRes.Length; l++)
+                    {
                         keyPosbl.Add(edfRes[l].Last());
                     }
                 }
             }
 
-            if (keyPosbl.Count != 1) {
+            if (keyPosbl.Count != 1)
+            {
                 byte[] cyphDataOth = crypt_gcm(nonce, key, Enumerable.Repeat((byte)0, cyphData2.Length).ToArray());
                 BigInteger tagOth = calc_gcm_tag(nonce, key, cyphDataOth, authData.Reverse().ToArray());
                 //make forgery, query oracle for validity
                 //forgery must have same length cypher text and authentication data or cannot be made with authentication key and must reverse AES key which is not possible
-                for (int i = 0; i < keyPosbl.Count; i++) {
+                for (int i = 0; i < keyPosbl.Count; i++)
+                {
                     BigInteger stag = calc_gcm_s(nonce, keyPosbl[i], cyphData, authData, tag);
                     //try a forgery making sure the cypher data and authentication are the same length, the only way to forge
                     BigInteger trytag = calc_gcm_s(nonce, keyPosbl[i], cyphDataOth, authData, stag);
-                    if (trytag == tagOth) { //oracle function
+                    if (trytag == tagOth)
+                    { //oracle function
                         Console.WriteLine("Authentication Key found by forgery: " + keyPosbl[i]); break;
                     }
                 }
@@ -6252,34 +6525,51 @@ namespace Cryptopals
                 monic = mulGFE2k(coeff, new BigInteger[] { multiplier });
                 sqrF = sqrFree(monic);
                 ddfRes = sqrF.SelectMany((sq) => ddf(sq)).ToArray();
-                for (int i = 0; i < ddfRes.Length; i++) {
+                for (int i = 0; i < ddfRes.Length; i++)
+                {
                     if (ddfRes[i].Item2 == 1)
                     { //a degree one factor will be the key
                         BigInteger[][] edfRes = edf(rng, ddfRes[i].Item1, ddfRes[i].Item2);
-                        for (int l = 0; l < edfRes.Length; l++) {
-                            if (keyPosbl.Contains(edfRes[l].Last())) {
+                        for (int l = 0; l < edfRes.Length; l++)
+                        {
+                            if (keyPosbl.Contains(edfRes[l].Last()))
+                            {
                                 Console.WriteLine("Authentication Key found by 3rd same nonce message: " + edfRes[l].Last());
                                 break;
                             }
                         }
                     }
                 }
-            } else {
+            }
+            else
+            {
                 Console.WriteLine("Authentication Key found: " + keyPosbl[0]);
             }
             Console.WriteLine("8.63");
-
+            return false;
+        }
+        static public bool Challenge64()
+        {
             //SET 8 CHALLENGE 64
-            //p64:
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
+            BigInteger M = BigInteger.Parse("0100000000000000000000000000000087", System.Globalization.NumberStyles.HexNumber); //00E1000000000000000000000000000000 00E100000000000000000000000000000080 0100000000000000000000000000000087
+            byte[] key = new byte[16];
+            rng.GetBytes(key);
+            byte[] nonce = new byte[12]; // || 0^31 || 1
+            rng.GetBytes(nonce);
+            nonce = new byte[] { 0x51, 0x75, 0x3c, 0x65, 0x80, 0xc2, 0x72, 0x6f, 0x20, 0x71, 0x84, 0x14 };
+            key = new byte[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+
             //https://csrc.nist.gov/csrc/media/projects/block-cipher-techniques/documents/bcm/comments/cwc-gcm/ferguson2.pdf
             //messages of 2^17 blocks which are 128 bits each
             int nSize = 17; //too slow for now with 17 ~ 7 minutes for crypt_gcm and calc_gcm_tag, probably need GCM MAC library
-            m = new byte[16 * (1 << nSize)];
+            byte[] m = new byte[16 * (1 << nSize)];
             rng.GetBytes(m);
 
-            cyphtag = crypt_gcm_fastlib(nonce, key, m, new byte[] { });
-            cyphData = cyphDataVerify = cyphtag.Item1;
-            tag = cyphtag.Item2 & 0xFFFFFFFF; //32-bit MAC
+            Tuple<byte[], BigInteger> cyphtag = crypt_gcm_fastlib(nonce, key, m, new byte[] { });
+            byte[] cyphDataVerify = cyphtag.Item1;
+            byte[] cyphData = cyphtag.Item1;
+            BigInteger tag = cyphtag.Item2 & 0xFFFFFFFF; //32-bit MAC
             //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData) & 0xFFFFFFFF; //32-bit MAC;
             //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData) & 0xFFFFFFFF; //32-bit MAC;
 
@@ -6287,25 +6577,28 @@ namespace Cryptopals
             //tag = calc_gcm_tag(nonce, key, cyphData, new byte[] { }) & 0xFFFFFFFF; //32-bit MAC
             //tgComp = tag.ToByteArray().Select((byte b) => ReverseBitsWith4Operations(b)).ToArray();
 
-            hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
+            BigInteger hkey = new BigInteger(encrypt_ecb(key, Enumerable.Repeat((byte)0, 16).ToArray()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray()); //authentication key
             Console.WriteLine("Secret key: " + hkey);
-            bool [,] Ms = new bool[128, 128];
-            bool [][,] Msis = new bool[nSize][,];
-            bool [,] Ad = new bool[128, 128];
+            bool[,] Ms = new bool[128, 128];
+            bool[][,] Msis = new bool[nSize][,];
+            bool[,] Ad = new bool[128, 128];
             //can 0 out (n*128) / (ncols(X)) per operation, start with 16+1 non-zero row
             bool[,] T = null;
-            bool [,] NT, Km = null, Xm = null;
+            bool[,] NT, Km = null, Xm = null;
             //compute Ms=1^2, x^2, (x^2)^2, ..., (x^127)^2
-            for (int i = 0; i < 128; i++) {
+            for (int i = 0; i < 128; i++)
+            {
                 BigInteger sqr = modmulGF2k(BigInteger.One << i, BigInteger.One << i, M);
-                for (int row = 0; row < 128; row++) {
+                for (int row = 0; row < 128; row++)
+                {
                     Ms[row, i] = (sqr & (BigInteger.One << row)) != 0;
                 }
             }
             //compute Ms^i
             Msis[0] = Ms;
-            for (int ct = 1; ct < nSize; ct++) {
-                Msis[ct] = matmul(Msis[ct-1], Ms);
+            for (int ct = 1; ct < nSize; ct++)
+            {
+                Msis[ct] = matmul(Msis[ct - 1], Ms);
             }
             //verify Ms*y=y^2
             /*for (int ct = 1; ct < nSize + 1; ct++) {
@@ -6360,19 +6653,23 @@ namespace Cryptopals
                 int numcols = AdX.GetLength(1);
                 int numrows = (Xm == null ? (nSize - 1) : Math.Min((nSize * 128) / numcols, 32 - 1 - 10));
                 T = new bool[numrows * AdX.GetLength(1), nSize * 128];
-                for (int c = 1; c < nSize + 1; c++) {
+                for (int c = 1; c < nSize + 1; c++)
+                {
                     int ctr = 16 * ((1 << c) - 1);
                     //Console.WriteLine(c);
-                    for (int flip = 0; flip < 128; flip++) {
+                    for (int flip = 0; flip < 128; flip++)
+                    {
                         byte[] cyphDataTest = cyphData.ToArray(); //make copy
                         cyphDataTest[cyphDataTest.Length - ctr + (flip / 8)] ^= (byte)(1 << (flip % 8));
                         BigInteger di = new BigInteger(cyphDataTest.Skip(cyphDataTest.Length - ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
                         //BigInteger olddi = new BigInteger(cyphData.Skip(cyphData.Length - ctr).Take(16).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
                         bool[,] Mdic = new bool[128, 128];
                         //int bit = (flip / 8) * 8 + 7 - (flip % 8);
-                        for (int i = 0; i < 128; i++) {
+                        for (int i = 0; i < 128; i++)
+                        {
                             BigInteger cnst = modmulGF2k(di, BigInteger.One << i, M);
-                            for (int row = 0; row < 128; row++) {
+                            for (int row = 0; row < 128; row++)
+                            {
                                 Mdic[row, i] = (cnst & (BigInteger.One << row)) != 0;
                             }
                         }
@@ -6380,8 +6677,10 @@ namespace Cryptopals
                         if (Xm != null) FlipAd = matmul(FlipAd, Xm);
                         //bool[,] Mdit = calcAd(nSize, cyphDataTest, M, Msis).Item1;
                         //each row represents a cell of Ad (reading left-to-right, top-to-bottom)
-                        for (int row = 0; row < numrows; row++) { //first (n-1)*128 cells of Ad
-                            for (int col = 0; col < numcols; col++) {
+                        for (int row = 0; row < numrows; row++)
+                        { //first (n-1)*128 cells of Ad
+                            for (int col = 0; col < numcols; col++)
+                            {
                                 //if (Mdit[row, col] != ((FlipAd[row, col] == Adn[c][row, col]) ? Ad[row, col] : !Ad[row, col])) {
                                 //    throw new ArgumentException();
                                 //}
@@ -6450,20 +6749,26 @@ namespace Cryptopals
                 numcols = NT.GetLength(1);
                 byte[] rnd = new byte[numrows];
                 int totalTries = 0;
-                while (true) {
+                while (true)
+                {
                     totalTries++;
                     bool[,] testBits = new bool[numcols, 1]; //new bool[solutionBits.GetLength(0), solutionBits.GetLength(1)]; //(bool[,])solutionBits.Clone();
                     rng.GetBytes(rnd);
-                    for (int ci = 0; ci < numrows; ci++) {
-                        if ((rnd[ci] & 1) != 0) { //odd byte means inclusion
-                            for (int col = 0; col < numcols; col++) {
+                    for (int ci = 0; ci < numrows; ci++)
+                    {
+                        if ((rnd[ci] & 1) != 0)
+                        { //odd byte means inclusion
+                            for (int col = 0; col < numcols; col++)
+                            {
                                 testBits[col, 0] ^= NT[ci, col];
                             }
                         }
                     }
                     byte[] cyphDataTest = cyphData.ToArray(); //make copy
-                    for (int bit = 0; bit < numcols; bit++) {
-                        if (testBits[bit, 0]) {
+                    for (int bit = 0; bit < numcols; bit++)
+                    {
+                        if (testBits[bit, 0])
+                        {
                             int c = bit / 128 + 1;
                             int flip = bit % 128;
                             int ctr = 16 * ((1 << c) - 1);
@@ -6475,7 +6780,8 @@ namespace Cryptopals
                     BigInteger tagtest = calc_gcm_tag_fastlib(M, nonce, key, cyphDataTest) & 0xFFFFFFFF;
                     //tag = calc_gcm_tag_fastlib(M, nonce, key, cyphData) & 0xFFFFFFFF;
                     //tag & 0xFFFF == tagtest & 0xFFFF
-                    if (tag == tagtest) {
+                    if (tag == tagtest)
+                    {
                         //recompute Ad with flipped bits
                         //matsum(calcAd(nSize, cyphDataTest, M, Msis).Item1, Ad);
                         Ad = matsum(calcAd(nSize, cyphDataTest, M, Msis).Item1, Ad);
@@ -6497,9 +6803,11 @@ namespace Cryptopals
                 }
                 matmul(Ad, tagm);*/
                 numcols = AdX.GetLength(1);
-                for (int i = 0; i < 32; i++) {
+                for (int i = 0; i < 32; i++)
+                {
                     int col;
-                    for (col = 0; col < numcols; col++) {
+                    for (col = 0; col < numcols; col++)
+                    {
                         if (AdX[i, col]) break;
                     }
                     if (col == numcols) continue;
@@ -6509,8 +6817,10 @@ namespace Cryptopals
                 bool[,] KmNew = new bool[CurRow + AdRows.Count, Ad.GetLength(1)];
                 if (Km != null) Array.Copy(Km, KmNew, Km.GetLength(0) * Km.GetLength(1));
                 Km = KmNew;
-                foreach (int i in AdRows) {
-                    for (int col = 0; col < Ad.GetLength(1); col++) {
+                foreach (int i in AdRows)
+                {
+                    for (int col = 0; col < Ad.GetLength(1); col++)
+                    {
                         Km[CurRow, col] = Ad[i, col];
                     }
                     CurRow++;
@@ -6534,8 +6844,7 @@ namespace Cryptopals
             }
             Console.WriteLine("Key found: " + keyrecv);
             //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
-            Console.WriteLine("8.64");
-
+            Console.WriteLine("8.64"); return false;
         }
         static bool fault(Tuple<BigInteger, BigInteger> Q1, Tuple<BigInteger, BigInteger> Q2)
         {
@@ -6590,12 +6899,10 @@ namespace Cryptopals
             }
             catch (ArgumentException) { return count; }
         }
-        static void Set9()
+        static public bool Challenge65()
         {
-
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             byte[] m = System.Text.Encoding.ASCII.GetBytes("crazy flamboyant for the rap enjoyment");
-            //goto p66;
             Tuple<byte[], BigInteger> cyphtag;
             byte[] cyphDataVerify;
             byte[] cyphData;
@@ -6757,30 +7064,38 @@ namespace Cryptopals
                 bool[,] solutionBits = new bool[T.GetLength(1), 1];
                 bool[,] Adt = new bool[128, 128];
                 bool[,] AdtX;
-                if (padLengthMode) {
+                if (padLengthMode)
+                {
                     bool[,] solveT = new bool[T.GetLength(0), T.GetLength(1) + 1];
-                    for (int row = 0; row < T.GetLength(0); row++) {
-                        for (int col = 0; col < T.GetLength(1); col++) {
+                    for (int row = 0; row < T.GetLength(0); row++)
+                    {
+                        for (int col = 0; col < T.GetLength(1); col++)
+                        {
                             solveT[row, col] = T[row, col];
                         }
                     }
                     BigInteger dit = new BigInteger(BitConverter.GetBytes((ulong)0).Reverse().Concat(BitConverter.GetBytes((ulong)cyphData.Length * 8).Reverse()).Select((byte b) => ReverseBitsWith4Operations(b)).Concat(new byte[] { 0 }).ToArray());
-                    for (int i = 0; i < 128; i++) {
+                    for (int i = 0; i < 128; i++)
+                    {
                         BigInteger cnst = modmulGF2k(dit, BigInteger.One << i, M);
-                        for (int row = 0; row < 128; row++) {
+                        for (int row = 0; row < 128; row++)
+                        {
                             Adt[row, i] = (cnst & (BigInteger.One << row)) != 0;
                         }
                     }
-                    AdtX = (Xm != null)  ? matmul(Adt, Xm) : Adt;
-                    for (int row = 0; row < numrows; row++) {
-                        for (int col = 0; col < numcols; col++) {
+                    AdtX = (Xm != null) ? matmul(Adt, Xm) : Adt;
+                    for (int row = 0; row < numrows; row++)
+                    {
+                        for (int col = 0; col < numcols; col++)
+                        {
                             solveT[col + row * numcols, solveT.GetLength(1) - 1] = (AdtX[row, col] != AdnX[0][row, col]);
                         }
                     }
                     solveT = gaussianElim(solveT);
                     int ct = 0;
                     //last column is now the solution
-                    for (int row = 0; row < solveT.GetLength(0); row++) {
+                    for (int row = 0; row < solveT.GetLength(0); row++)
+                    {
                         while (!solveT[row, ct]) ct++;
                         solutionBits[ct, 0] = solveT[row, solveT.GetLength(1) - 1];
                         ct++;
@@ -6846,24 +7161,34 @@ namespace Cryptopals
                 {
                     totalTries++;
                     bool[,] testBits = padLengthMode ? (bool[,])solutionBits.Clone() : new bool[numcols, 1]; //new bool[solutionBits.GetLength(0), solutionBits.GetLength(1)];
-                    if (numrows <= 16) { //exhaustive search before toggling mode and moving on to non-length padding mode
-                        if (padLengthMode && totalTries == (1 << numrows)) {
+                    if (numrows <= 16)
+                    { //exhaustive search before toggling mode and moving on to non-length padding mode
+                        if (padLengthMode && totalTries == (1 << numrows))
+                        {
                             padLengthMode = !padLengthMode;
                             totalTries = -1;
                             break;
                         }
-                        for (int ci = 0; ci < numrows; ci++) {
-                            if (((1 << ci) & totalTries) != 0) { //totalTries bits indicate combinations
-                                for (int col = 0; col < numcols; col++) {
+                        for (int ci = 0; ci < numrows; ci++)
+                        {
+                            if (((1 << ci) & totalTries) != 0)
+                            { //totalTries bits indicate combinations
+                                for (int col = 0; col < numcols; col++)
+                                {
                                     testBits[col, 0] ^= NT[ci, col];
                                 }
                             }
                         }
-                    } else {
+                    }
+                    else
+                    {
                         rng.GetBytes(rnd);
-                        for (int ci = 0; ci < numrows; ci++) {
-                            if ((rnd[ci] & 1) != 0) { //odd byte means inclusion
-                                for (int col = 0; col < numcols; col++) {
+                        for (int ci = 0; ci < numrows; ci++)
+                        {
+                            if ((rnd[ci] & 1) != 0)
+                            { //odd byte means inclusion
+                                for (int col = 0; col < numcols; col++)
+                                {
                                     testBits[col, 0] ^= NT[ci, col];
                                 }
                             }
@@ -6893,9 +7218,12 @@ namespace Cryptopals
                         //matsum(calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1, Ad);
                         if (!padLengthMode) cyphDataTest = cyphDataTest.Concat(Enumerable.Repeat((byte)0, (16 - (cyphDataTest.Length % 16)) % 16)).ToArray();
                         Ad = matsum(calcAd(nSize, cyphDataTest, M, Msis, cyphData.Length - 8).Item1, Ad);
-                        if (padLengthMode) {
-                            for (int ci = 0; ci < Adt.GetLength(0); ci++) {
-                                for (int col = 0; col < Adt.GetLength(1); col++) {
+                        if (padLengthMode)
+                        {
+                            for (int ci = 0; ci < Adt.GetLength(0); ci++)
+                            {
+                                for (int col = 0; col < Adt.GetLength(1); col++)
+                                {
                                     Ad[ci, col] ^= (Adt[ci, col] != Adn[0][ci, col]);
                                 }
                             }
@@ -6914,7 +7242,8 @@ namespace Cryptopals
                 //update K
                 List<int> AdRows = new List<int>();
                 bool[,] tagm = new bool[128, 1];
-                for (int i = 0; i < 128; i++) {
+                for (int i = 0; i < 128; i++)
+                {
                     tagm[i, 0] = (hkey & (BigInteger.One << i)) != 0;
                 }
                 matmul(Ad, tagm);
@@ -6933,8 +7262,10 @@ namespace Cryptopals
                 bool[,] KmNew = new bool[CurRow + AdRows.Count, Ad.GetLength(1)];
                 if (Km != null) Array.Copy(Km, KmNew, Km.GetLength(0) * Km.GetLength(1));
                 Km = KmNew;
-                foreach (int i in AdRows) {
-                    for (int col = 0; col < Ad.GetLength(1); col++) {
+                foreach (int i in AdRows)
+                {
+                    for (int col = 0; col < Ad.GetLength(1); col++)
+                    {
                         Km[CurRow, col] = Ad[i, col];
                     }
                     CurRow++;
@@ -6960,7 +7291,11 @@ namespace Cryptopals
             Console.WriteLine("Key found: " + keyrecv);
             //maximally zero out (1 << 17) * 128 / ncols(X) rows, 16 bits of each tag to start
             Console.WriteLine("9.65");
-        //p66:
+            return false;
+        }
+        static public bool Challenge66()
+        {
+            RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
             //start with code from #59, addEC/scaleEC to inject fault
             int EaOrig = -95051, Ea = EaOrig, Eb = 11279326;
             BigInteger Gx = 182, Gy = BigInteger.Parse("85518893674295321206118380980485522083"),
@@ -7037,6 +7372,7 @@ namespace Cryptopals
                 knownKey |= BigInteger.One;
             Console.WriteLine("Secret key determined: " + knownKey);
             Console.WriteLine("9.66");
+            return false;
         }
     }
 }
