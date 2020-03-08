@@ -348,7 +348,207 @@ class MersenneTwister:
     self.index = i + 1
     df = ((((v ^ e) & 0xFF3A58AD) << 7) & 0xFFFFFFFF) ^ v ^ e
     return (((df & 0xFFFFDF8C) << 15) & 0xFFFFFFFF) ^ df ^ (((((df & 0xFFFFDF8C) << 15) & 0xFFFFFFFF) ^ df) >> 18)
-
+  
+class SHA1Context:
+  def __init__(self):
+    self.intermediate_hash = [0] * (SHA1_Algo.hashSize // 4)
+    self.length_low = 0
+    self.length_high = 0
+    self.message_block_index = 0
+    self.message_block = bytearray(64)
+    self.computed = 0
+    self. corrupted = 0
+class SHA1_Algo:
+  hashSize = 20
+  shaSuccess = 0
+  shaNull = 1
+  shaInputTooLong = 2
+  shaStateError = 3
+  def resetFromHashLen(context, h, blocks):
+    if context is None: return SHA1_Algo.shaNull
+    context.length_low = blocks * 64 * 8
+    context.length_high = 0
+    context.message_block_index = 0
+    context.intermediate_hash[0] = int.from_bytes(h[:4], byteorder='big')
+    context.intermediate_hash[1] = int.from_bytes(h[4:8], byteorder='big')
+    context.intermediate_hash[2] = int.from_bytes(h[8:12], byteorder='big')
+    context.intermediate_hash[3] = int.from_bytes(h[12:16], byteorder='big')
+    context.intermediate_hash[4] = int.from_bytes(h[16:], byteorder='big')
+    context.computed = 0
+    context.corrupted = 0
+    return SHA1_Algo.shaSuccess
+  def pad(message_array, prior_blocks=0):  
+    r = len(message_array) % 64
+    return message_array + bytes([0x80] + [0] * ((64 if r >= 56 else 0) + 55 - r)) + (len(message_array) * 8 + prior_blocks * 64 * 8).to_bytes(8, 'big')
+  def reset(context):
+    if context is None: return SHA1_Algo.shaNull
+    context.length_low = 0
+    context.length_high = 0
+    context.message_block_index = 0
+    context.intermediate_hash[0] = 0x67452301
+    context.intermediate_hash[1] = 0xEFCDAB89
+    context.intermediate_hash[2] = 0x98BADCFE
+    context.intermediate_hash[3] = 0x10325476
+    context.intermediate_hash[4] = 0xC3D2E1F0
+    context.computed = 0
+    context.corrupted = 0
+    return SHA1_Algo.shaSuccess
+  def input(context, message_array):
+    l = len(message_array)
+    if l == 0: return SHA1_Algo.shaSuccess
+    if context is None or message_array is None: return SHA1_Algo.shaNull
+    if context.computed != 0:
+      context.corrupted = SHA1_Algo.shaStateError
+    if context.corrupted != 0:
+      return context.corrupted
+    i = 0
+    while l != 0 and context.corrupted == 0:
+      l -= 1
+      context.message_block[context.message_block_index] = message_array[i] & 0xFF
+      context.message_block_index += 1
+      context.length_low = (context.length_low + 8) & 0xFFFFFFFF
+      if context.length_low == 0:
+        context.length_high = (context.length_high + 1) & 0xFFFFFFFF
+        if context.length_high == 0:
+          context.corrupted = SHA1_Algo.shaInputTooLong
+      if context.message_block_index == 64: SHA1_Algo.processMessageBlock(context)
+      i += 1
+    return SHA1_Algo.shaSuccess
+  def processMessageBlock(context):
+    k = [0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xCA62C1D6]
+    w = [0] * 80
+    for t in range(16):
+      w[t] = (context.message_block[t * 4] << 24) & 0xFFFFFFFF
+      w[t] |= (context.message_block[t * 4 + 1] << 16) & 0xFFFFFFFF
+      w[t] |= (context.message_block[t * 4 + 2] << 8) & 0xFFFFFFFF
+      w[t] |= (context.message_block[t * 4 + 3]) & 0xFFFFFFFF
+    for t in range(16, 80):
+      w[t] = SHA1_Algo.circularShift(1, w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16])
+    a, b, c, d, e = (context.intermediate_hash[0], context.intermediate_hash[1],
+                     context.intermediate_hash[2], context.intermediate_hash[3],
+                     context.intermediate_hash[4])
+    for t in range(20):
+      temp = (SHA1_Algo.circularShift(5, a) + ((b & c) | ((~b) & d)) + e + w[t] + k[0]) & 0xFFFFFFFF
+      e, d, c, b, a = d, c, SHA1_Algo.circularShift(30, b), a, temp
+    for t in range(20, 40):
+      temp = (SHA1_Algo.circularShift(5, a) + (b ^ c ^ d) + e + w[t] + k[1]) & 0xFFFFFFFF
+      e, d, c, b, a = d, c, SHA1_Algo.circularShift(30, b), a, temp     
+    for t in range(40, 60):
+      temp = (SHA1_Algo.circularShift(5, a) + ((b & c) | (b & d) | (c & d)) + e + w[t] + k[2]) & 0xFFFFFFFF
+      e, d, c, b, a = d, c, SHA1_Algo.circularShift(30, b), a, temp
+    for t in range(60, 80):
+      temp = (SHA1_Algo.circularShift(5, a) + (b ^ c ^ d) + e + w[t] + k[3]) & 0xFFFFFFFF
+      e, d, c, b, a = d, c, SHA1_Algo.circularShift(30, b), a, temp
+    context.intermediate_hash[0] = (context.intermediate_hash[0] + a) & 0xFFFFFFFF
+    context.intermediate_hash[1] = (context.intermediate_hash[1] + b) & 0xFFFFFFFF
+    context.intermediate_hash[2] = (context.intermediate_hash[2] + c) & 0xFFFFFFFF
+    context.intermediate_hash[3] = (context.intermediate_hash[3] + d) & 0xFFFFFFFF
+    context.intermediate_hash[4] = (context.intermediate_hash[4] + e) & 0xFFFFFFFF
+    context.message_block_index = 0
+  def padMessage(context):
+    context.message_block[context.message_block_index] = 0x80
+    context.message_block_index += 1
+    if context.message_block_index > 55:
+      while context.message_block_index < 64:
+        context.message_block[context.message_block_index] = 0
+        context.message_block_index += 1
+      SHA1_Algo.processMessageBlock(context)
+    while context.message_block_index < 56:
+      context.message_block[context.message_block_index] = 0
+      context.message_block_index += 1
+    context.message_block[56:60] = context.length_high.to_bytes(4, 'big')
+    context.message_block[60:64] = context.length_low.to_bytes(4, 'big')
+    SHA1_Algo.processMessageBlock(context)
+  def result(context, message_digest):
+    if context is None or message_digest is None: return SHA1_Algo.shaNull
+    if context.corrupted != 0: return context.corrupted
+    if context.computed == 0:
+      SHA1_Algo.padMessage(context)
+      for i in range(64): context.message_block[i] = 0
+      context.length_low = 0
+      context.length_high = 0
+      context.computed = 1
+    for i in range(SHA1_Algo.hashSize):
+      message_digest[i] = (context.intermediate_hash[i >> 2] >> 8 * (3 - (i & 0x03))) & 0xFF
+    return SHA1_Algo.shaSuccess
+  def circularShift(bits, word):
+    return ((word << bits) & 0xFFFFFFFF) | (word >> (32 - bits))
+    
+class MD4:
+  def __init__(self):
+    self.x = [0] * 16
+    self.dontInit = False
+    self.initialize()
+  def initFromHashLen(self, h, blocks):
+    self.a = int.from_bytes(h[:4], 'little')
+    self.b = int.from_bytes(h[4:8], 'little')
+    self.c = int.from_bytes(h[8:12], 'little')
+    self.d = int.from_bytes(h[12:], 'little')
+    self.bytesProcessed = blocks * 64
+    self.dontInit = True
+  def pad(message_array, priorBlocks=0):
+    r = len(message_array) % 64
+    return message_array + bytes([0x80] + [0] * (55 - r)) + (len(message_array) * 8 + priorBlocks * 64 * 8).to_bytes(8, 'little')
+  def initialize(self):
+    if not self.dontInit:
+      self.a = 0x67452301
+      self.b = 0xefcdab89
+      self.c = 0x98badcfe
+      self.d = 0x10325476
+      self.bytesProcessed = 0
+    else: self.dontInit = False
+  def computeHash(self, buffer):
+    if buffer is None: return None
+    self.hashCore(buffer, 0, len(buffer))
+    res = self.hashFinal()
+    self.initialize()
+    return res
+  def hashCore(self, array, offset, length):
+    self.processMessage(array[offset:offset+length])
+  def hashFinal(self):
+    self.processMessage(self.padding())
+    res = self.a.to_bytes(4, 'little') + self.b.to_bytes(4, 'little') + self.c.to_bytes(4, 'little') + self.d.to_bytes(4, 'little')
+    self.initialize()
+    return res
+  def processMessage(self, bytes):
+    for b in bytes:
+      c = self.bytesProcessed & 63
+      i = c >> 2
+      s = (c & 3) << 3
+      self.x[i] = (self.x[i] & ~(255 << s)) | (b << s)
+      if c == 63: self.process16WordBlock()
+      self.bytesProcessed += 1
+  def padding(self):
+    return bytes([0x80] + [0] * (((self.bytesProcessed + 8) & 0x7fffffc0) + 55 - self.bytesProcessed)) + (self.bytesProcessed << 3).to_bytes(8, 'little')
+  def process16WordBlock(self):
+    aa, bb, cc, dd = self.a, self.b, self.c, self.d
+    for k in [0, 4, 8, 12]:
+      aa = MD4.round1Operation(aa, bb, cc, dd, self.x[k], 3)
+      dd = MD4.round1Operation(dd, aa, bb, cc, self.x[k + 1], 7)
+      cc = MD4.round1Operation(cc, dd, aa, bb, self.x[k + 2], 11)
+      bb = MD4.round1Operation(bb, cc, dd, aa, self.x[k + 3], 19)
+    for k in [0, 1, 2, 3]:
+      aa = MD4.round2Operation(aa, bb, cc, dd, self.x[k], 3)
+      dd = MD4.round2Operation(dd, aa, bb, cc, self.x[k + 4], 5)
+      cc = MD4.round2Operation(cc, dd, aa, bb, self.x[k + 8], 9)
+      bb = MD4.round2Operation(bb, cc, dd, aa, self.x[k + 12], 13)      
+    for k in [0, 2, 1, 3]:
+      aa = MD4.round3Operation(aa, bb, cc, dd, self.x[k], 3)
+      dd = MD4.round3Operation(dd, aa, bb, cc, self.x[k + 8], 9)
+      cc = MD4.round3Operation(cc, dd, aa, bb, self.x[k + 4], 11)
+      bb = MD4.round3Operation(bb, cc, dd, aa, self.x[k + 12], 15)
+    self.a = (self.a + aa) & 0xFFFFFFFF
+    self.b = (self.b + bb) & 0xFFFFFFFF
+    self.c = (self.c + cc) & 0xFFFFFFFF
+    self.d = (self.d + dd) & 0xFFFFFFFF
+  def rol(value, numberOfBits):
+    return ((value << numberOfBits) & 0xFFFFFFFF) | (value >> (32 - numberOfBits))
+  def round1Operation(a, b, c, d, xk, s):
+    return MD4.rol((a + ((b & c) | (~b & d)) + xk) & 0xFFFFFFFF, s)
+  def round2Operation(a, b, c, d, xk, s):
+    return MD4.rol((a + ((b & c) | (b & d) | (c & d)) + xk + 0x5a827999) & 0xFFFFFFFF, s)
+  def round3Operation(a, b, c, d, xk, s):
+    return MD4.rol((a + (b ^ c ^ d) + xk + 0x6ed9eba1) & 0xFFFFFFFF, s)
 def testUtility():
   def testHexPartToInt():
     for i in range(0, 256):

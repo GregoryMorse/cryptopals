@@ -30,14 +30,54 @@ def challenge27():
   return key == xorBins(o[:16], o[32:48])
   
 def challenge28():
-  pass
+  key = bytes("YELLOW SUBMARINE", "utf-8")
+  sc = SHA1Context()
+  SHA1_Algo.reset(sc)
+  b = bytes("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon", "utf-8")
+  SHA1_Algo.input(sc, key + b)
+  o = bytearray(SHA1_Algo.hashSize)
+  SHA1_Algo.result(sc, o)
+  import hashlib
+  m = hashlib.sha1()
+  m.update(key + b)
+  if o.hex() != m.digest().hex(): return False
+  return o.hex() == "08cb9f974e3141954f5b09a648fac55f20427d57"
 
 def challenge29():
-  pass
+  key = bytes("YELLOW SUBMARINE", "utf-8")
+  o = bytearray(SHA1_Algo.hashSize)
+  b = bytes("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon", "utf-8")
+  sc = SHA1Context()
+  SHA1_Algo.reset(sc)
+  SHA1_Algo.input(sc, key + b)
+  SHA1_Algo.result(sc, o)
+  pad = SHA1_Algo.pad(key + b)
+  blocks = len(pad) // 64
+  SHA1_Algo.resetFromHashLen(sc, o, blocks)
+  extra = bytes(";admin=true", "utf-8")
+  SHA1_Algo.input(sc, extra)
+  md = bytearray(SHA1_Algo.hashSize)
+  SHA1_Algo.result(sc, md)
+  SHA1_Algo.reset(sc)
+  SHA1_Algo.input(sc, pad + extra)
+  SHA1_Algo.result(sc, o)
+  return md == o
   
 def challenge30():
-  pass
-  
+  key = bytes("YELLOW SUBMARINE", "utf-8")
+  b = bytes("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon", "utf-8")
+  extra = bytes(";admin=true", "utf-8")
+  md4 = MD4()
+  o = md4.computeHash(key + b)
+  import hashlib
+  m = hashlib.new("md4", key + b)
+  if o.hex() != m.digest().hex(): return False
+  pad = MD4.pad(key + b)
+  md4.initFromHashLen(o, len(pad) // 64)
+  md = md4.computeHash(extra)
+  o = md4.computeHash(pad + extra)
+  return md == o
+
 def challenge31():
   pass
   
