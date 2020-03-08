@@ -582,5 +582,260 @@ namespace Cryptopals
                 return ((def & 0xFFFFDF8C) << 15) ^ def ^ ((((def & 0xFFFFDF8Cu) << 15) ^ def) >> 18);
             }
         }
+        public class SHA1Context
+        {
+            /* This structure will hold context information for the SHA-1 hashing operation  */
+            static UInt32 SHA1HashSize = 20;
+            public UInt32[] Intermediate_Hash = new UInt32[SHA1HashSize / 4]; /* Message Digest  */
+            public UInt32 Length_Low;                        /* Message length in bits      */
+            public UInt32 Length_High;                       /* Message length in bits      */
+            public int Message_Block_Index;                  /* Index into message block array   */
+            public byte[] Message_Block = new byte[64];      /* 512-bit message blocks      */
+            public int Computed;                             /* Is the digest computed?         */
+            public int Corrupted;                            /* Is the message digest corrupted? */
+        }
+        public class SHA1_Algo
+        {
+            static UInt32 SHA1HashSize = 20;
+            enum SHA_enum
+            {
+                shaSuccess = 0,
+                shaNull,            /* Null pointer parameter */
+                shaInputTooLong,    /* input data too long */
+                shaStateError       /* called Input after Result */
+            };
+
+            static public int SHA1ResetFromHashLen(SHA1Context context, byte[] h, int blocks)
+            {
+                if (context == null)
+                {
+                    return (int)SHA_enum.shaNull;
+                }
+
+                context.Length_Low = (uint)blocks * 64 * 8;
+                context.Length_High = 0;
+                context.Message_Block_Index = 0;
+
+                context.Intermediate_Hash[0] = BitConverter.ToUInt32(h.Reverse().ToArray(), 16);
+                context.Intermediate_Hash[1] = BitConverter.ToUInt32(h.Reverse().ToArray(), 12);
+                context.Intermediate_Hash[2] = BitConverter.ToUInt32(h.Reverse().ToArray(), 8);
+                context.Intermediate_Hash[3] = BitConverter.ToUInt32(h.Reverse().ToArray(), 4);
+                context.Intermediate_Hash[4] = BitConverter.ToUInt32(h.Reverse().ToArray(), 0);
+
+                context.Computed = 0;
+                context.Corrupted = 0;
+                return (int)SHA_enum.shaSuccess;
+            }
+
+            static public byte[] SHA1Pad(byte[] message_array, int PriorBlocks = 0)
+            {
+                int r = message_array.Length % 64;
+                return message_array.Concat(new byte[] { 0x80 }).Concat(Enumerable.Repeat((byte)0, (r >= 56 ? 64 : 0) + 55 - r)).Concat(BitConverter.GetBytes((ulong)(message_array.Length * 8 + PriorBlocks * 64 * 8)).Reverse()).ToArray();
+            }
+
+            static public int SHA1Reset(SHA1Context context)
+            {
+                if (context == null)
+                {
+                    return (int)SHA_enum.shaNull;
+                }
+
+                context.Length_Low = 0;
+                context.Length_High = 0;
+                context.Message_Block_Index = 0;
+
+                context.Intermediate_Hash[0] = 0x67452301;
+                context.Intermediate_Hash[1] = 0xEFCDAB89;
+                context.Intermediate_Hash[2] = 0x98BADCFE;
+                context.Intermediate_Hash[3] = 0x10325476;
+                context.Intermediate_Hash[4] = 0xC3D2E1F0;
+
+                context.Computed = 0;
+                context.Corrupted = 0;
+                return (int)SHA_enum.shaSuccess;
+            }
+
+            static public int SHA1Input(SHA1Context context, byte[] message_array)
+            {
+                uint length = (uint)message_array.Length;
+                if (length == 0) { return (int)SHA_enum.shaSuccess; }
+                if (context == null || message_array == null) { return (int)SHA_enum.shaNull; }
+
+                if (context.Computed != 0)
+                {
+                    context.Corrupted = (int)SHA_enum.shaStateError;
+                    return (int)SHA_enum.shaStateError;
+                }
+
+                if (context.Corrupted != 0) { return context.Corrupted; }
+
+                int i = 0;
+                while (length != 0 && context.Corrupted == 0)
+                {
+                    length--;
+                    context.Message_Block[context.Message_Block_Index++] = (byte)(message_array[i] & 0xFF);
+                    context.Length_Low += 8;
+                    if (context.Length_Low == 0)
+                    {
+                        context.Length_High++;
+                        if (context.Length_High == 0)
+                        {
+                            /* Message is too long */
+                            context.Corrupted = 1;
+                        }
+                    }
+
+                    if (context.Message_Block_Index == 64) { SHA1ProcessMessageBlock(context); }
+                    i++;
+                }
+                return (int)SHA_enum.shaSuccess;
+            }
+
+            static void SHA1ProcessMessageBlock(SHA1Context context)
+            {
+                UInt32[] K = { 0x5A827999, 0x6ED9EBA1, 0x8F1BBCDC, 0xCA62C1D6 };
+                int t;                        /* Loop counter                */
+                UInt32 temp;                  /* Temporary word value        */
+                UInt32[] W = new UInt32[80];  /* Word sequence               */
+                UInt32 A, B, C, D, E;         /* Word buffers                */
+
+                /* Initialize the first 16 words in the array W    */
+                for (t = 0; t < 16; t++)
+                {
+                    W[t] = ((UInt32)context.Message_Block[t * 4]) << 24;
+                    W[t] |= (UInt32)context.Message_Block[t * 4 + 1] << 16;
+                    W[t] |= (UInt32)context.Message_Block[t * 4 + 2] << 8;
+                    W[t] |= (UInt32)context.Message_Block[t * 4 + 3];
+                }
+
+                for (t = 16; t < 80; t++)
+                {
+                    W[t] = SHA1CircularShift(1, W[t - 3] ^ W[t - 8] ^ W[t - 14] ^ W[t - 16]);
+                }
+
+                A = context.Intermediate_Hash[0];
+                B = context.Intermediate_Hash[1];
+                C = context.Intermediate_Hash[2];
+                D = context.Intermediate_Hash[3];
+                E = context.Intermediate_Hash[4];
+
+                for (t = 0; t < 20; t++)
+                {
+                    temp = SHA1CircularShift(5, A) + ((B & C) | ((~B) & D)) + E + W[t] + K[0];
+                    E = D;
+                    D = C;
+                    C = SHA1CircularShift(30, B);
+                    B = A;
+                    A = temp;
+                }
+
+                for (t = 20; t < 40; t++)
+                {
+                    temp = SHA1CircularShift(5, A) + (B ^ C ^ D) + E + W[t] + K[1];
+                    E = D;
+                    D = C;
+                    C = SHA1CircularShift(30, B);
+                    B = A;
+                    A = temp;
+                }
+
+                for (t = 40; t < 60; t++)
+                {
+                    temp = SHA1CircularShift(5, A) + ((B & C) | (B & D) | (C & D)) + E + W[t] + K[2];
+                    E = D;
+                    D = C;
+                    C = SHA1CircularShift(30, B);
+                    B = A;
+                    A = temp;
+                }
+
+                for (t = 60; t < 80; t++)
+                {
+                    temp = SHA1CircularShift(5, A) + (B ^ C ^ D) + E + W[t] + K[3];
+                    E = D;
+                    D = C;
+                    C = SHA1CircularShift(30, B);
+                    B = A;
+                    A = temp;
+                }
+
+                context.Intermediate_Hash[0] += A;
+                context.Intermediate_Hash[1] += B;
+                context.Intermediate_Hash[2] += C;
+                context.Intermediate_Hash[3] += D;
+                context.Intermediate_Hash[4] += E;
+
+                context.Message_Block_Index = 0;
+            }
+
+            static void SHA1PadMessage(SHA1Context context)
+            {
+                if (context.Message_Block_Index > 55)
+                {
+                    context.Message_Block[context.Message_Block_Index++] = 0x80;
+                    while (context.Message_Block_Index < 64)
+                    {
+                        context.Message_Block[context.Message_Block_Index++] = 0;
+                    }
+                    SHA1ProcessMessageBlock(context);
+                    while (context.Message_Block_Index < 56)
+                    {
+                        context.Message_Block[context.Message_Block_Index++] = 0;
+                    }
+                }
+                else
+                {
+                    context.Message_Block[context.Message_Block_Index++] = 0x80;
+                    while (context.Message_Block_Index < 56)
+                    {
+                        context.Message_Block[context.Message_Block_Index++] = 0;
+                    }
+                }
+
+                /*  Store the message length as the last 8 octets     */
+                context.Message_Block[56] = (byte)(context.Length_High >> 24);
+                context.Message_Block[57] = (byte)(context.Length_High >> 16);
+                context.Message_Block[58] = (byte)(context.Length_High >> 8);
+                context.Message_Block[59] = (byte)(context.Length_High);
+                context.Message_Block[60] = (byte)(context.Length_Low >> 24);
+                context.Message_Block[61] = (byte)(context.Length_Low >> 16);
+                context.Message_Block[62] = (byte)(context.Length_Low >> 8);
+                context.Message_Block[63] = (byte)(context.Length_Low);
+
+                SHA1ProcessMessageBlock(context);
+            }
+
+            static public int SHA1Result(SHA1Context context, byte[] Message_Digest)
+            {
+                int i;
+
+                if (context == null || Message_Digest == null) { return (int)SHA_enum.shaNull; }
+                if (context.Corrupted != 0) { return context.Corrupted; }
+
+                if (context.Computed == 0)
+                {
+                    SHA1PadMessage(context);
+                    for (i = 0; i < 64; ++i)
+                    {
+                        /* message may be sensitive, clear it out */
+                        context.Message_Block[i] = 0;
+                    }
+                    context.Length_Low = 0;    /* and clear length */
+                    context.Length_High = 0;
+                    context.Computed = 1;
+                }
+
+                for (i = 0; i < SHA1HashSize; ++i)
+                {
+                    Message_Digest[i] = (byte)(context.Intermediate_Hash[i >> 2] >> 8 * (3 - (i & 0x03)));
+                }
+                return (int)SHA_enum.shaSuccess;
+            }
+
+            static UInt32 SHA1CircularShift(Int32 bits, UInt32 word)
+            {
+                return ((word << bits) | (word >> (32 - bits)));
+            }
+        }
     }
 }

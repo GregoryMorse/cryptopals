@@ -55,13 +55,23 @@ namespace Cryptopals
             new Tuple<Func<bool>, int>(Challenge23, 23),
             new Tuple<Func<bool>, int>(Challenge24, 24)
         };
+        static Tuple<Func<bool>, int>[] Set4 = {
+            new Tuple<Func<bool>, int>(Challenge25, 25),
+            new Tuple<Func<bool>, int>(Challenge26, 26),
+            new Tuple<Func<bool>, int>(Challenge27, 27),
+            new Tuple<Func<bool>, int>(Challenge28, 28),
+            new Tuple<Func<bool>, int>(Challenge29, 29),
+            new Tuple<Func<bool>, int>(Challenge30, 30),
+            new Tuple<Func<bool>, int>(Challenge31, 31),
+            new Tuple<Func<bool>, int>(Challenge32, 32)
+        };
         static void Main(string[] args)
         {
             //testMul();
             //RunSet(1, Set1);
             //RunSet(2, Set2);
-            RunSet(3, Set3);
-            //Set3();
+            //RunSet(3, Set3);
+            RunSet(4, Set4);
             //Set4();
             //Set5();
             //Set6();

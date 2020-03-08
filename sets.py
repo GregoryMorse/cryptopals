@@ -14,6 +14,7 @@ exec(open(os.path.join(curDir, 'utility.py')).read())
 exec(open(os.path.join(curDir, '1.py')).read())
 exec(open(os.path.join(curDir, '2.py')).read())
 exec(open(os.path.join(curDir, '3.py')).read())
+exec(open(os.path.join(curDir, '4.py')).read())
 
 #def loadImp(name):
 #  import imp
@@ -51,7 +52,12 @@ set3 = [(challenge17, 17), (challenge18, 18), (challenge19, 19),
         (challenge20, 20), (challenge21, 21), (challenge22, 22),
         (challenge23, 23), (challenge24, 24)]
 
+set4 = [(challenge25, 25), (challenge26, 26), (challenge27, 27),
+        (challenge28, 28), (challenge29, 29), (challenge30, 30),
+        (challenge31, 31), (challenge32, 32)]
+
 testUtility()
 #runSet(1, set1)
 #runSet(2, set2)
-runSet(3, set3)
+#runSet(3, set3)
+runSet(4, set4)
