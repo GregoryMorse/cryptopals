@@ -2380,63 +2380,84 @@ namespace Cryptopals
         {
             //SET 7 CHALLENGE 55
             RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
-            uint[] m1 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
-            uint[] m1prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 };
-            uint[] m2 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
-            uint[] m2prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
+            byte[] m1 = (new uint[] { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] m1prime = (new uint[] { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0x2794bf08, 0xb9e8c3e9 }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] m2 = (new uint[] { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] m2prime = (new uint[] { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] h1 = (new uint[] { 0x5f5c1a0d, 0x71b36046, 0x1b5435da, 0x9b0d807a }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] hstar1 = (new uint[] { 0x4d7e6a1d, 0xefa93d2d, 0xde05b45d, 0x864c429b }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] h2 = (new uint[] { 0xe0f76122, 0xc429c56c, 0xebb5e256, 0xb809793 }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
+            byte[] hstar2 = (new uint[] { 0xc6f3b3fe, 0x1f4833e0, 0x697340fb, 0x214fb9ea }).SelectMany((d) => BitConverter.GetBytes(d)).ToArray();
             MD4 md4 = new MD4();
+            md4._dontPad = true; //unpadded little-endian
             //without multi-step modification, the probability is 2^-25
-            byte[] forgery = MD4.WangsAttack(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), true, false);
-            Console.WriteLine("7.55 Verify paper hash meets first round conditions: " + (new ByteArrayComparer().Equals(forgery, m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            Console.WriteLine("Verify paper differential: " + (new ByteArrayComparer().Equals(MD4.ApplyWangDifferential(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray()), m1prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            forgery = MD4.WangsAttack(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), true, false);
-            Console.WriteLine("Verify second paper hash meets first round conditions: " + (new ByteArrayComparer().Equals(forgery, m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            Console.WriteLine("Verify second paper differential: " + (new ByteArrayComparer().Equals(MD4.ApplyWangDifferential(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray()), m2prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            //HexDecode("4d7e6a1defa93d2dde05b45d864c429b");
-            Console.WriteLine("Hash of paper message: " + HexEncode(md4.ComputeHash(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            Console.WriteLine("Hash of paper differential message: " + HexEncode(md4.ComputeHash(m1prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            //HexDecode("c6f3b3fe1f4833e0697340fb214fb9ea");
-            Console.WriteLine("Hash of second paper message: " + HexEncode(md4.ComputeHash(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            Console.WriteLine("Hash of second paper differential message: " + HexEncode(md4.ComputeHash(m2prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
+            if (!MD4.ApplyWangDifferential(m1).SequenceEqual(m1prime)) return false;
+            if (!md4.ComputeHash(m1).SequenceEqual(md4.ComputeHash(m1prime))) return false;
+            if (!md4.ComputeHash(m1).SequenceEqual(h1)) return false;
+            if (!MD4.ApplyWangDifferential(m2).SequenceEqual(m2prime)) return false;
+            if (!md4.ComputeHash(m2).SequenceEqual(md4.ComputeHash(m2prime))) return false;
+            if (!md4.ComputeHash(m2).SequenceEqual(h2)) return false;
+            md4._dontPad = false;
+            md4._bigEndian = true;
+            if (!md4.ComputeHash(m1).SequenceEqual(hstar1)) return false; //padded big-endian
+            if (!md4.ComputeHash(m1prime).SequenceEqual(hstar1)) return false;
+            if (!md4.ComputeHash(m2).SequenceEqual(hstar2)) return false;
+            if (!md4.ComputeHash(m2prime).SequenceEqual(hstar2)) return false;
+            byte[] mRandom = BigInteger.Parse("24ce9d37de4dfca0a3b88fc39c9f9e5c92ee86ada2c9e8b088f3a020c5368a690e503cc80c2368f978ff57bf21a1762ad018afb8daa431e9308bf382806a18a1", System.Globalization.NumberStyles.HexNumber).ToByteArray().Reverse().ToArray();
+            mRandom = Enumerable.Range(0, mRandom.Length >> 2).Select(i => mRandom.Skip(i * 4).Take(4).Reverse().ToArray()).SelectMany(x => x).ToArray();
+            byte[] m1Naito = BigInteger.Parse("368b9d377e2dfc60b5b88fcb0c8fbe5601a6662d9ecc3929aa35aabf887f929f2740a2c8c8c12039bbb401bdc1983331e45e1f61c150d565ee27d04af1dfec4c", System.Globalization.NumberStyles.HexNumber).ToByteArray().Reverse().ToArray();
+            m1Naito = Enumerable.Range(0, m1Naito.Length >> 2).Select(i => m1Naito.Skip(i * 4).Take(4).Reverse().ToArray()).SelectMany(x => x).ToArray();
+            byte[] m1primeNaito = BigInteger.Parse("368b9d37fe2dfc6025b88fcb0c8fbe5601a6662d9ecc3929aa35aabf887f929f2740a2c8c8c12039bbb401bdc1983331e45d1f61c150d565ee27d04af1dfec4c", System.Globalization.NumberStyles.HexNumber).ToByteArray().Reverse().ToArray();
+            m1primeNaito = Enumerable.Range(0, m1primeNaito.Length >> 2).Select(i => m1primeNaito.Skip(i * 4).Take(4).Reverse().ToArray()).SelectMany(x => x).ToArray();
+            byte[] hNaito = BigInteger.Parse(new string("26a280327c3068532de33b679d022e59".Reverse().ToArray()), System.Globalization.NumberStyles.HexNumber).ToByteArray();
+            hNaito = Enumerable.Range(0, hNaito.Length >> 2).Select(i => hNaito.Skip(i * 4).Take(4).Reverse().ToArray()).SelectMany(x => x).ToArray();
+            if (!MD4.ApplyWangDifferential(m1Naito).SequenceEqual(m1primeNaito)) return false;
+            md4._dontPad = true;
+            if (!md4.ComputeHash(m1Naito).SequenceEqual(hNaito)) return false;
+            //Console.WriteLine(HexEncode(MD4.WangsAttack(mRandom, true, true)));
+            byte[] forgery;
             byte[] key = new byte[64];
-            int n;
-            //byte[] twowords = new byte[8];
-            for (int i = 0; i < 20; i++)
+            int n, total = 0;
+            md4._bigEndian = false;
+            for (int i = 0; i < 5000; i++) {
+                n = 0;
+                byte[] check;
+                do {
+                    n++;
+                    rng.GetBytes(key);
+                    check = MD4.WangsAttack(key, true, false);
+                    if (check != null) key = check;
+                    forgery = (check != null) ? MD4.ApplyWangDifferential(key) : null;
+                    if (check != null && !(md4.ComputeHash(key).SequenceEqual(md4.ComputeHash(forgery)))) {
+                        //due to two missing sufficient conditions identified by Naito, 3/4 chance this can happen
+                        //throw new ArgumentException();
+                    }
+                } while (check == null || !(md4.ComputeHash(key).SequenceEqual(md4.ComputeHash(forgery))));
+                //correct algorithm will have n == 2^2 = 4 up to n == 2^6 = 64 average tries
+                //Naito exactly computed this as 2^-5.61 which yields 48.84 average tries
+                //Console.WriteLine("Wang et al. paper attack: " + n + " tries " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
+                total += n;
+            }
+            Console.WriteLine("Wang et al. paper attack: " + total + " tries to find 5000 collisions with probability " + ((double)total / 5000));
+            total = 0;
+            for (int i = 0; i < 5000; i++)
             {
                 n = 0;
                 do
                 {
                     n++;
-                    //rng.GetBytes(twowords);
-                    //key = MD4.WangsAttack(key.Take(56).Concat(twowords).ToArray(), false);
                     rng.GetBytes(key);
                     key = MD4.WangsAttack(key, true, true);
-                    //if (!(new ByteArrayComparer().Equals(key, MD4.WangsAttack(key, true, true)))) { }
                     forgery = MD4.ApplyWangDifferential(key);
-                } while (new ByteArrayComparer().Equals(forgery, key) || !(new ByteArrayComparer().Equals(md4.ComputeHash(key), md4.ComputeHash(forgery))));
-                //correct algorithm will have n == 1 (usually) or n == 2
-                //if (n > 2) throw new ArgumentException();
-                Console.WriteLine("Naito et al. improvement: " + n + " tries: " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
+                    if (!(md4.ComputeHash(key).SequenceEqual(md4.ComputeHash(forgery)))) {
+                        throw new ArgumentException();
+                    }
+                } while (!(md4.ComputeHash(key).SequenceEqual(md4.ComputeHash(forgery))));
+                //correct algorithm will have n == 1 almost always
+                //Console.WriteLine("Naito et al. improvement: " + n + " tries " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
+                total += n;
             }
-            //byte[] twowords = new byte[8];
-            for (int i = 0; i < 20; i++)
-            {
-                n = 0;
-                do
-                {
-                    n++;
-                    //rng.GetBytes(twowords);
-                    //key = MD4.WangsAttack(key.Take(56).Concat(twowords).ToArray(), false);
-                    rng.GetBytes(key);
-                    key = MD4.WangsAttack(key, true, false);
-                    //if (!(new ByteArrayComparer().Equals(key, MD4.WangsAttack(key, true, false)))) {}
-                    forgery = MD4.ApplyWangDifferential(key);
-                } while (new ByteArrayComparer().Equals(forgery, key) || !(new ByteArrayComparer().Equals(md4.ComputeHash(key), md4.ComputeHash(forgery))));
-                //correct algorithm will have n == 2^2 = 4 up to n == 2^6 = 64 maximal tries
-                //Naito exactly computed this as 2^-5.61 which yields 48.84 so 49 maximal tries exactly
-                if (n > 49) throw new ArgumentException();
-                Console.WriteLine("Wang et al. paper attack: " + n + " tries: " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
-            }
+            Console.WriteLine("Naito et al. improvement: " + total + " tries to find 5000 collisions with probability " + ((double)total / 5000));
             return false;
         }
         static public bool Challenge56()
