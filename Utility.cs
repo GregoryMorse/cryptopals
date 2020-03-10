@@ -1523,10 +1523,13 @@ namespace Cryptopals
                             x[12] -= (1 << 16);
                             x[15] -= (1 << 16);
                         } else {
-                            x[10] += ((uint)1 << (i - 24));
+                            //x[10] += ((uint)1 << (i - 24));
+                            x[10] = (c3 & ((uint)1 << (i - 13))) == 0 ? x[10] + ((uint)1 << (i - 24)) : x[10] - ((uint)1 << (i - 24));
                             c3 = Round1Operation(c2, d3, a3, b2, x[10], 11);
-                            x[12] -= ((uint)1 << (i - 13));
-                            x[14] -= ((uint)1 << (i - 13));
+                            //x[12] -= ((uint)1 << (i - 13));
+                            x[12] = (c3 & ((uint)1 << (i - 13))) == 0 ? x[12] + ((uint)1 << (i - 13)) : x[12] - ((uint)1 << (i - 13));
+                            //x[14] -= ((uint)1 << (i - 13));
+                            x[14] = (c3 & ((uint)1 << (i - 13))) == 0 ? x[14] + ((uint)1 << (i - 13)) : x[14] - ((uint)1 << (i - 13));
                         }
                         b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
                         if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
@@ -1597,7 +1600,10 @@ namespace Cryptopals
                         x[9] -= (1 << 22);
                         c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
                         x[10] -= (1 << 22);
-                        //if () //if c5,32 and c6,32 are both corrected, an error will occur need to detect and return...
+                        if (b2 != Round1Operation(b1, c2, d2, a2, x[7], 19)) {
+                            //if c5,32 and c6,32 are both corrected, an error will occur need to detect and return...
+                            return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
+                        }
                     }
                     if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
                         throw new ArgumentException();
