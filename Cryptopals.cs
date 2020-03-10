@@ -2385,10 +2385,11 @@ namespace Cryptopals
             uint[] m2 = { 0x4d7a9c83, 0x56cb927a, 0xb9d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dd8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
             uint[] m2prime = { 0x4d7a9c83, 0xd6cb927a, 0x29d5a578, 0x57a7a5ee, 0xde748a3c, 0xdcc366b3, 0xb683a020, 0x3b2a5d9f, 0xc69d71b3, 0xf9e99198, 0xd79f805e, 0xa63bb2e8, 0x45dc8e31, 0x97e31fe5, 0xf713c240, 0xa7b8cf69 };
             MD4 md4 = new MD4();
-            byte[] forgery = MD4.WangsAttack(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), false, false);
+            //without multi-step modification, the probability is 2^-25
+            byte[] forgery = MD4.WangsAttack(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), true, false);
             Console.WriteLine("7.55 Verify paper hash meets first round conditions: " + (new ByteArrayComparer().Equals(forgery, m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             Console.WriteLine("Verify paper differential: " + (new ByteArrayComparer().Equals(MD4.ApplyWangDifferential(m1.SelectMany((d) => BitConverter.GetBytes(d)).ToArray()), m1prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
-            forgery = MD4.WangsAttack(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), false, false);
+            forgery = MD4.WangsAttack(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray(), true, false);
             Console.WriteLine("Verify second paper hash meets first round conditions: " + (new ByteArrayComparer().Equals(forgery, m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             Console.WriteLine("Verify second paper differential: " + (new ByteArrayComparer().Equals(MD4.ApplyWangDifferential(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray()), m2prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             //HexDecode("4d7e6a1defa93d2dde05b45d864c429b");
@@ -2398,10 +2399,11 @@ namespace Cryptopals
             Console.WriteLine("Hash of second paper message: " + HexEncode(md4.ComputeHash(m2.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             Console.WriteLine("Hash of second paper differential message: " + HexEncode(md4.ComputeHash(m2prime.SelectMany((d) => BitConverter.GetBytes(d)).ToArray())));
             byte[] key = new byte[64];
-            int n = 0;
+            int n;
             //byte[] twowords = new byte[8];
             for (int i = 0; i < 20; i++)
             {
+                n = 0;
                 do
                 {
                     n++;
@@ -2412,12 +2414,14 @@ namespace Cryptopals
                     //if (!(new ByteArrayComparer().Equals(key, MD4.WangsAttack(key, true, true)))) { }
                     forgery = MD4.ApplyWangDifferential(key);
                 } while (new ByteArrayComparer().Equals(forgery, key) || !(new ByteArrayComparer().Equals(md4.ComputeHash(key), md4.ComputeHash(forgery))));
+                //correct algorithm will have n == 1 (usually) or n == 2
+                //if (n > 2) throw new ArgumentException();
                 Console.WriteLine("Naito et al. improvement: " + n + " tries: " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
             }
-            n = 0;
             //byte[] twowords = new byte[8];
             for (int i = 0; i < 20; i++)
             {
+                n = 0;
                 do
                 {
                     n++;
@@ -2428,6 +2432,9 @@ namespace Cryptopals
                     //if (!(new ByteArrayComparer().Equals(key, MD4.WangsAttack(key, true, false)))) {}
                     forgery = MD4.ApplyWangDifferential(key);
                 } while (new ByteArrayComparer().Equals(forgery, key) || !(new ByteArrayComparer().Equals(md4.ComputeHash(key), md4.ComputeHash(forgery))));
+                //correct algorithm will have n == 2^2 = 4 up to n == 2^6 = 64 maximal tries
+                //Naito exactly computed this as 2^-5.61 which yields 48.84 so 49 maximal tries exactly
+                if (n > 49) throw new ArgumentException();
                 Console.WriteLine("Wang et al. paper attack: " + n + " tries: " + HexEncode(key) + " " + HexEncode(forgery) + " -> " + HexEncode(md4.ComputeHash(key)));
             }
             return false;

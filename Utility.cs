@@ -1029,9 +1029,99 @@ namespace Cryptopals
                 }
                 return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
             }
-            public static bool VerifyConditions(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a1, uint b1, uint c1, uint d1, uint a2, uint b2, uint c2, uint d2, uint a3, uint b3, uint c3, uint d3, uint a4, uint b4, uint c4, uint d4)
+            public static bool VerifyConditions3(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a9, uint b9, uint c9, uint d9, uint a10)
             {
-                return a1 == Round1Operation(a0, b0, c0, d0, x[0], 3) &&
+                uint a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
+                uint d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
+                uint c1 = Round1Operation(c0, d1, a1, b0, x[2], 11);
+                uint b1 = Round1Operation(b0, c1, d1, a1, x[3], 19);
+                uint a2 = Round1Operation(a1, b1, c1, d1, x[4], 3);
+                uint d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
+                uint c2 = Round1Operation(c1, d2, a2, b1, x[6], 11);
+                uint b2 = Round1Operation(b1, c2, d2, a2, x[7], 19);
+                uint a3 = Round1Operation(a2, b2, c2, d2, x[8], 3);
+                uint d3 = Round1Operation(d2, a3, b2, c2, x[9], 7);
+                uint c3 = Round1Operation(c2, d3, a3, b2, x[10], 11);
+                uint b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
+                uint a4 = Round1Operation(a3, b3, c3, d3, x[12], 3);
+                uint d4 = Round1Operation(d3, a4, b3, c3, x[13], 7);
+                uint c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
+                uint b4 = Round1Operation(b3, c4, d4, a4, x[15], 19);
+                uint a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
+                uint d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
+                uint c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
+                uint b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
+                uint a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
+                uint d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
+                uint c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
+                uint b6 = Round2Operation(b5, c6, d6, a6, x[13], 13);
+                uint a7 = Round2Operation(a6, b6, c6, d6, x[2], 3);
+                uint d7 = Round2Operation(d6, a7, b6, c6, x[6], 5);
+                uint c7 = Round2Operation(c6, d7, a7, b6, x[10], 9);
+                uint b7 = Round2Operation(b6, c7, d7, a7, x[14], 13);
+                uint a8 = Round2Operation(a7, b7, c7, d7, x[3], 3);
+                uint d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);
+                uint c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
+                uint b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
+                if (!(a9 == Round3Operation(a8, b8, c8, d8, x[0], 3) &&
+                    d9 == Round3Operation(d8, a9, b8, c8, x[8], 9) &&
+                    c9 == Round3Operation(c8, d9, a9, b8, x[4], 11) &&
+                    b9 == Round3Operation(b8, c9, d9, a9, x[12], 15) &&
+                    a10 == Round3Operation(a9, b9, c9, d9, x[2], 3))) return false;
+                return ((b9 & ((uint)1 << 31)) != 0 && (a10 & ((uint)1 << 31)) != 0);
+            }
+            public static bool VerifyConditions2(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a5, uint b5, uint c5, uint d5, uint a6, uint b6, uint c6, uint d6, uint a7, uint b7, uint c7, uint d7, uint a8, uint b8, uint c8, uint d8, bool bNaito, int stage)
+            {
+                uint a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
+                uint d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
+                uint c1 = Round1Operation(c0, d1, a1, b0, x[2], 11);
+                uint b1 = Round1Operation(b0, c1, d1, a1, x[3], 19);
+                uint a2 = Round1Operation(a1, b1, c1, d1, x[4], 3);
+                uint d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
+                uint c2 = Round1Operation(c1, d2, a2, b1, x[6], 11);
+                uint b2 = Round1Operation(b1, c2, d2, a2, x[7], 19);
+                uint a3 = Round1Operation(a2, b2, c2, d2, x[8], 3);
+                uint d3 = Round1Operation(d2, a3, b2, c2, x[9], 7);
+                uint c3 = Round1Operation(c2, d3, a3, b2, x[10], 11);
+                uint b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
+                uint a4 = Round1Operation(a3, b3, c3, d3, x[12], 3);
+                uint d4 = Round1Operation(d3, a4, b3, c3, x[13], 7);
+                uint c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
+                uint b4 = Round1Operation(b3, c4, d4, a4, x[15], 19);
+                if (!((a5 & (1 << 18)) == (c4 & (1 << 18)) && (a5 & (1 << 25)) != 0 && (a5 & (1 << 28)) != 0 && (a5 & ((uint)1 << 31)) != 0 && (a5 & (1 << 26)) == 0 && (!bNaito || ((a5 & (1 << 19)) == (b4 & (1 << 19)) && (a5 & (1 << 21)) == (b4 & (1 << 21)))))) return false;
+                if (stage == 1) return true;
+                if (!((d5 & (1 << 18)) == (a5 & (1 << 18)) && (d5 & (1 << 25)) == (b4 & (1 << 25)) && (d5 & (1 << 26)) == (b4 & (1 << 26)) && (d5 & (1 << 28)) == (b4 & (1 << 28)) &&
+                            (d5 & ((uint)1 << 31)) == (b4 & ((uint)1 << 31)))) return false;
+                if (stage == 2) return true;
+                if (!((c5 & (1 << 25)) == (d5 & (1 << 25)) && (c5 & (1 << 26)) == (d5 & (1 << 26)) && (c5 & (1 << 28)) == (d5 & (1 << 28)) && (c5 & (1 << 29)) == (d5 & (1 << 29)) && (c5 & ((uint)1 << 31)) == (d5 & ((uint)1 << 31)))) return false;
+                if (stage == 3) return true;
+                if (!((b5 & (1 << 28)) == (c5 & (1 << 28)) && (b5 & (1 << 29)) != 0 && (b5 & ((uint)1 << 31)) == 0)) return false;
+                if (stage == 4) return true;
+                if (!((a6 & (1 << 28)) != 0 && (!bNaito || (a6 & (1 << 29)) == 0) && (a6 & ((uint)1 << 31)) != 0)) return false;
+                if (stage == 5) return true;
+                if (!((d6 & (1 << 28)) == (b5 & (1 << 28)))) return false;
+                if (stage == 6) return true;
+                if (!(a5 == Round2Operation(a4, b4, c4, d4, x[0], 3) &&
+                    d5 == Round2Operation(d4, a5, b4, c4, x[4], 5) &&
+                    c5 == Round2Operation(c4, d5, a5, b4, x[8], 9) &&
+                    b5 == Round2Operation(b4, c5, d5, a5, x[12], 13) &&
+                    a6 == Round2Operation(a5, b5, c5, d5, x[1], 3) &&
+                    d6 == Round2Operation(d5, a6, b5, c5, x[5], 5) &&
+                    c6 == Round2Operation(c5, d6, a6, b5, x[9], 9) &&
+                    b6 == Round2Operation(b5, c6, d6, a6, x[13], 13) &&
+                    a7 == Round2Operation(a6, b6, c6, d6, x[2], 3) &&
+                    d7 == Round2Operation(d6, a7, b6, c6, x[6], 5) &&
+                    c7 == Round2Operation(c6, d7, a7, b6, x[10], 9) &&
+                    b7 == Round2Operation(b6, c7, d7, a7, x[14], 13) &&
+                    a8 == Round2Operation(a7, b7, c7, d7, x[3], 3) &&
+                    d8 == Round2Operation(d7, a8, b7, c7, x[7], 5) &&
+                    c8 == Round2Operation(c7, d8, a8, b7, x[11], 9) &&
+                    b8 == Round2Operation(b7, c8, d8, a8, x[15], 13))) return false;
+                return ((c6 & (1 << 28)) == (d6 & (1 << 28)) && (c6 & (1 << 29)) != (d6 & (1 << 29)) && (c6 & (1 << 31)) != (d6 & (1 << 31)));
+            }
+            public static bool VerifyConditions(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a1, uint b1, uint c1, uint d1, uint a2, uint b2, uint c2, uint d2, uint a3, uint b3, uint c3, uint d3, uint a4, uint b4, uint c4, uint d4, bool bMulti, bool bNaito)
+            {
+                if (!(a1 == Round1Operation(a0, b0, c0, d0, x[0], 3) &&
                     d1 == Round1Operation(d0, a1, b0, c0, x[1], 7) &&
                     c1 == Round1Operation(c0, d1, a1, b0, x[2], 11) &&
                     b1 == Round1Operation(b0, c1, d1, a1, x[3], 19) &&
@@ -1046,8 +1136,8 @@ namespace Cryptopals
                     a4 == Round1Operation(a3, b3, c3, d3, x[12], 3) &&
                     d4 == Round1Operation(d3, a4, b3, c3, x[13], 7) &&
                     c4 == Round1Operation(c3, d4, a4, b3, x[14], 11) &&
-                    b4 == Round1Operation(b3, c4, d4, a4, x[15], 19) &&
-                    ((a1 & (1 << 6)) == (b0 & (1 << 6))) &&
+                    b4 == Round1Operation(b3, c4, d4, a4, x[15], 19))) return false;
+                if (!(((a1 & (1 << 6)) == (b0 & (1 << 6))) &&
                     (d1 & (1 << 6)) == 0 && (d1 & (1 << 7)) == (a1 & (1 << 7)) && (d1 & (1 << 10)) == (a1 & (1 << 10)) &&
                     (c1 & (1 << 6)) != 0 && (c1 & (1 << 7)) != 0 && (c1 & (1 << 10)) == 0 && (c1 & (1 << 25)) == (d1 & (1 << 25)) &&
                     (b1 & (1 << 6)) != 0 && (b1 & (1 << 7)) == 0 && (b1 & (1 << 10)) == 0 && (b1 & (1 << 25)) == 0 &&
@@ -1062,10 +1152,35 @@ namespace Cryptopals
                     (a4 & (1 << 29)) != 0 && (a4 & (1 << 22)) == 0 && (a4 & (1 << 25)) == 0 && (a4 & ((uint)1 << 31)) == 0 && (a4 & (1 << 26)) == (b3 & (1 << 26)) && (a4 & (1 << 28)) == (b3 & (1 << 28)) &&
                     (d4 & (1 << 22)) == 0 && (d4 & (1 << 25)) == 0 && (d4 & (1 << 29)) == 0 && (d4 & (1 << 26)) != 0 && (d4 & (1 << 28)) != 0 && (d4 & ((uint)1 << 31)) != 0 &&
                     (c4 & (1 << 26)) == 0 && (c4 & (1 << 28)) == 0 && (c4 & (1 << 29)) == 0 && (c4 & (1 << 22)) != 0 && (c4 & (1 << 25)) != 0 && (c4 & (1 << 18)) == (d4 & (1 << 18)) &&
-                    (b4 & (1 << 25)) != 0 && (b4 & (1 << 26)) != 0 && (b4 & (1 << 28)) != 0 && (b4 & (1 << 18)) == 0 && (b4 & (1 << 29)) == 0 && (b4 & (1 << 25)) == (c4 & (1 << 25));
+                    (b4 & (1 << 25)) != 0 && (b4 & (1 << 26)) != 0 && (b4 & (1 << 28)) != 0 && (b4 & (1 << 18)) == 0 && (b4 & (1 << 29)) == 0 && (b4 & (1 << 25)) == (c4 & (1 << 25)))) return false;
+                if (!bMulti) return true;
+                return true;
+                if (!((d2 & (1 << (25 - 9))) == 0 && (a2 & (1 << (25 - 9))) == (b1 & (1 << (25 - 9))) && (c2 & (1 << (25 - 9))) == 0 && (b2 & (1 << (25 - 9))) == 0 &&
+                    (d2 & (1 << (26 - 9))) == 0 && (a2 & (1 << (26 - 9))) == (b1 & (1 << (26 - 9))) && (c2 & (1 << (26 - 9))) == 0 && (b2 & (1 << (26 - 9))) == 0 &&
+                    (c3 & (1 << 15)) == 0 && (d3 & (1 << 15)) == (a3 & (1 << 15)) && (b3 & (1 << 15)) != 0 && (a4 & (1 << 15)) != 0 &&
+                    (c3 & (1 << 18)) == 0 && (d3 & (1 << 18)) == (a3 & (1 << 18)) && (b3 & (1 << 18)) != 0 && (a4 & (1 << 18)) != 0) &&
+                    (b3 & (1 << 16)) == 0 && (a4 & (1 << 16)) == 0 && (d4 & (1 << 16)) != 0 &&
+                    (b1 & (1 << 0)) != 0 && (b1 & (1 << 3)) != 0 && (b2 & (1 << 30)) != 0 && (b3 & (1 << 26)) != 0 && (b3 & (1 << 27)) != 0 &&
+                    (c2 & (1 << 22)) == 0 && (d2 & (1 << 22)) == (a2 & (1 << 22)) && (b2 & (1 << 22)) == 0) return false;
+                if (bNaito) return (d1 & (1 << 13)) == 0 && (a1 & (1 << 13)) == (b0 & (1 << 13)) && (c1 & (1 << 13)) == 0 && (b1 & (1 << 13)) == 0 &&
+                                   (c4 & (1 << 19)) == 0 && (d4 & (1 << 19)) == (a4 & (1 << 19)) && (b4 & (1 << 19)) == (d4 & (1 << 19)) &&
+                                   (c4 & (1 << 21)) == 0 && (d4 & (1 << 21)) == (a4 & (1 << 21)) && (b4 & (1 << 21)) == (d4 & (1 << 21)) &&
+                                   (b1 & (1 << 1)) != 0 &&
+                                   (c3 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) ==
+                                   (d3 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) &&
+                                   (a4 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) == 0 &&
+                                   (d4 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) == 0;
+                else return (d2 & (1 << (28 - 9))) == 0 && (a2 & (1 << (28 - 9))) == (b1 & (1 << (28 - 9))) && (c2 & (1 << (28 - 9))) == 0 && (b2 & (1 << (28 - 9))) == 0 &&
+                            (d2 & (1 << (31 - 9))) == 0 && (a2 & (1 << (31 - 9))) == (b1 & (1 << (31 - 9))) && (c2 & (1 << (31 - 9))) == 0 && (b2 & (1 << (31 - 9))) == 0;
             }
             public static byte[] WangsAttack(byte[] bytes, bool bMulti, bool bNaito)
             {
+                //if (!bNaito) return bytes;
+                //Naito et al. improvements: Add two sufficient conditions b4,32 = c4,32 and a6,30 = 0 probability 1/4
+                //Change the modification method of d5,19 so that both of d5,19 = a5,19 and c5,26 = d5,26 can be corrected probability 7/8
+                //wrong correction of c5,29 probability 1/2
+                //Change the modification method of c5,32 so that both of c5,32 = d5,32 and c6,32 = d6,32 + 1 can be corrected probability 3/4
+                //satisfying condition in 3rd round probability 1/4
                 uint[] x = new uint[16];
                 int processed = 0;
                 //padding can be added for short messages...
@@ -1122,7 +1237,7 @@ namespace Cryptopals
                 //extra condition to allow correcting d5,19 in 2nd round
                 if (bMulti && bNaito) b1 &= ~(uint)(1 << 13);
                 //extra condition to allow correcting a6,29, a6,30, a6,32 in 2nd round
-                if (bMulti && bNaito) b1 |= (1 << 0) | (1 << 1) | (1 << 3);
+                if (bMulti) b1 |= (1 << 0) | (uint)(bNaito ? (1 << 1) : 0) | (1 << 3);
                 x[3] = Unround1Operation(b0, c1, d1, a1, b1, 19);
 
                 //a2,8 = 1, a2,11 = 1, a2,26 = 0, a2,14 = b1,14
@@ -1131,7 +1246,7 @@ namespace Cryptopals
                 a2 &= ~(uint)(1 << 25);
                 a2 ^= (a2 & (1 << 13)) ^ (b1 & (1 << 13));
                 //extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
-                if (bMulti) a2 ^= (a2 & (1 << (25 - 9))) ^ (b1 & (1 << (25 - 9))) ^ (a2 & (1 << (26 - 9))) ^ (b1 & (1 << (26 - 9))) ^ (bNaito ? 0 : (a2 & (1 << (28 - 9))) ^ (b1 & (1 << (28 - 9))) ^ (a2 & (1 << (31 - 9))) ^ (b1 & (1 << (31 - 9))));
+                if (bMulti) a2 ^= (a2 & (1 << (25 - 9))) ^ (b1 & (1 << (25 - 9))) ^ (a2 & (1 << (26 - 9))) ^ (b1 & (1 << (26 - 9))) ^ (bNaito ? (a2 & (1 << (30 - 9))) ^ (b1 & (1 << (30 - 9))) : (a2 & (1 << (28 - 9))) ^ (b1 & (1 << (28 - 9))) ^ (a2 & (1 << (31 - 9))) ^ (b1 & (1 << (31 - 9))));
                 x[4] = Unround1Operation(a1, b1, c1, d1, a2, 3);
 
                 //d2,14 = 0, d2,19 = a2,19, d2,20 = a2,20, d2,21 = a2,21, d2,22 = a2,22, d2,26 = 1
@@ -1140,9 +1255,12 @@ namespace Cryptopals
                 d2 |= (1 << 25);
                 d2 ^= (d2 & (1 << 18)) ^ (a2 & (1 << 18)) ^ (d2 & (1 << 19)) ^ (a2 & (1 << 19)) ^ (d2 & (1 << 20)) ^ (a2 & (1 << 20)) ^ (d2 & (1 << 21)) ^ (a2 & (1 << 21));
                 //extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
-                if (bMulti) d2 &= ~(uint)((1 << (25 - 9)) | (1 << (26 - 9)) | (bNaito ? 0 : (1 << (28 - 9)) | (1 << (31 - 9))));
+                //(d2 & (1 << 19)) ^ (a2 & (1 << 19)) conflicts with (1 << (28 - 9))
+                //if (bMulti) d2 &= ~(uint)((1 << (25 - 9)) | (1 << (26 - 9)) | (bNaito ? 0 : (1 << (28 - 9)) | (1 << (31 - 9))));
+                if (bMulti) d2 &= ~(uint)((1 << (25 - 9)) | (1 << (26 - 9)) | (bNaito ? 0 : (1 << (31 - 9))));
                 //extra condition to allow correcting c6,32 in 2nd round
-                if (bMulti && bNaito) d2 ^= (d2 & (1 << 22)) ^ (a2 & (1 << 22));
+                //(1 << (31 - 9)) conflicts with (d2 & (1 << 22)) ^ (a2 & (1 << 22))
+                if (bMulti) d2 ^= (d2 & (1 << 22)) ^ (a2 & (1 << 22));
                 x[5] = Unround1Operation(d1, a2, b1, c1, d2, 7);
 
                 //c2,13 = d2,13, c2,14 = 0, c2,15 = d2,15, c2,19 = 0, c2,20 = 0, c2,21 = 1, c2,22 = 0
@@ -1153,7 +1271,7 @@ namespace Cryptopals
                 //extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
                 if (bMulti) c2 &= ~(uint)((1 << (25 - 9)) | (1 << (26 - 9)) | (bNaito ? 0 : (1 << (28 - 9)) | (1 << (31 - 9))));
                 //extra condition to allow correcting c6,32 in 2nd round
-                if (bMulti && bNaito) c2 &= ~(uint)(1 << 22);
+                if (bMulti) c2 &= ~(uint)(1 << 22);
                 x[6] = Unround1Operation(c1, d2, a2, b1, c2, 11);
 
                 //b2,13 = 1, b2,14 = 1, b2,15 = 0, b2,17 = c2,17, b2,19 = 0, b2,20 = 0, b2,21 = 0, b2,22 = 0
@@ -1162,11 +1280,12 @@ namespace Cryptopals
                 b2 &= ~(uint)((1 << 14) | (1 << 18) | (1 << 19) | (1 << 20) | (1 << 21));
                 b2 ^= (b2 & (1 << 16)) ^ (c2 & (1 << 16));
                 //extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
+                //(b2 & (1 << 16)) ^ (c2 & (1 << 16)) conflicts with (1 << (25 - 9))
                 if (bMulti) b2 &= ~(uint)((1 << (25 - 9)) | (1 << (26 - 9)) | (bNaito ? 0 : (1 << (28 - 9)) | (1 << (31 - 9))));
                 //extra condition to allow correcting d6,29 in 2nd round
-                if (bMulti && bNaito) b2 |= (1 << 30);
+                if (bMulti) b2 |= (1 << 30);
                 //extra condition to allow correcting c6,32 in 2nd round
-                if (bMulti && bNaito) b2 &= ~(uint)(1 << 22);
+                if (bMulti) b2 &= ~(uint)(1 << 22);
                 x[7] = Unround1Operation(b1, c2, d2, a2, b2, 19);
 
                 //a3,13 = 1, a3,14 = 1, a3,15 = 1, a3,17 = 0, a3,19 = 0, a3,20 = 0, a3,21 = 0, a3,23 = b2,23, a3,22 = 1, a3,26 = b2,26
@@ -1182,7 +1301,7 @@ namespace Cryptopals
                 d3 |= (1 << 12) | (1 << 13) | (1 << 14) | (1 << 20 | (1 << 21) | (1 << 25));
                 d3 ^= (d3 & (1 << 29)) ^ (a3 & (1 << 29));
                 //extra condition to allow correcting b5,29, b5,32 in 2nd round
-                if (bMulti && bNaito) d3 ^= (d3 & (1 << 15)) ^ (a3 & (1 << 15)) ^ (d3 & (1 << 18)) ^ (a3 & (1 << 18));
+                if (bMulti) d3 ^= (d3 & (1 << 15)) ^ (a3 & (1 << 15)) ^ (d3 & (1 << 18)) ^ (a3 & (1 << 18));
                 x[9] = Unround1Operation(d2, a3, b2, c2, d3, 7);
 
                 //c3,17 = 1, c3,20 = 0, c3,21 = 0, c3,22 = 0, c3,23 = 0, c3,26 = 0, c3,30 = 1, c3,32 = d3,32
@@ -1190,23 +1309,25 @@ namespace Cryptopals
                 c3 &= ~(uint)((1 << 19) | (1 << 20) | (1 << 21) | (1 << 22) | (1 << 25));
                 c3 |= (1 << 16) | (1 << 29);
                 c3 ^= (c3 & ((uint)1 << 31)) ^ (d3 & ((uint)1 << 31));
-                //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                if (bMulti && bNaito) c3 &= ~(uint)((1 << 15) | (1 << 18));
+                //extra condition to allow correcting b5,29, b5,32 in 2nd round
+                if (bMulti) c3 &= ~(uint)((1 << 15) | (1 << 18));
                 //extra conditions to allow 3rd round corrections in x[11]
-                if (bMulti && bNaito) c3 ^= (c3 & (1 << 0)) ^ (c3 & (1 << 1)) ^ (c3 & (1 << 2)) ^ (c3 & (1 << 3)) ^ (c3 & (1 << 4)) ^ (c3 & (1 << 5)) ^ (c3 & (1 << 6)) ^ (c3 & (1 << 7)) ^ (c3 & (1 << 8)) ^ (c3 & (1 << 9)) ^ (c3 & (1 << 10)) ^ (c3 & (1 << 11)) ^ (c3 & (1 << 12)) ^ (c3 & (1 << 13)) ^ (c3 & (1 << 14)) ^ (c3 & (1 << 17)) ^ (c3 & (1 << 23)) ^ (c3 & (1 << 24)) ^ (c3 & (1 << 30)) ^ (d3 & (1 << 0)) ^ (d3 & (1 << 1)) ^ (d3 & (1 << 2)) ^ (d3 & (1 << 3)) ^ (d3 & (1 << 4)) ^ (d3 & (1 << 5)) ^ (d3 & (1 << 6)) ^ (d3 & (1 << 7)) ^ (d3 & (1 << 8)) ^ (d3 & (1 << 9)) ^ (d3 & (1 << 10)) ^ (d3 & (1 << 11)) ^ (d3 & (1 << 12)) ^ (d3 & (1 << 13)) ^ (d3 & (1 << 14)) ^ (d3 & (1 << 17)) ^ (d3 & (1 << 23)) ^ (d3 & (1 << 24)) ^ (d3 & (1 << 30));
+                if (bMulti && bNaito) c3 ^= (c3 & (1 << 0)) ^ (c3 & (1 << 1)) ^ (c3 & (1 << 2)) ^ (c3 & (1 << 3)) ^ (c3 & (1 << 4)) ^ (c3 & (1 << 5)) ^ (c3 & (1 << 6)) ^ (c3 & (1 << 7)) ^ (c3 & (1 << 8)) ^ (c3 & (1 << 9)) ^ (c3 & (1 << 10)) ^ (c3 & (1 << 11)) ^ (c3 & (1 << 12)) ^ (c3 & (1 << 13)) ^ (c3 & (1 << 14)) ^ (c3 & (1 << 17)) ^ (c3 & (1 << 23)) ^ (c3 & (1 << 24)) ^ (c3 & (1 << 30)) ^
+                                            (d3 & (1 << 0)) ^ (d3 & (1 << 1)) ^ (d3 & (1 << 2)) ^ (d3 & (1 << 3)) ^ (d3 & (1 << 4)) ^ (d3 & (1 << 5)) ^ (d3 & (1 << 6)) ^ (d3 & (1 << 7)) ^ (d3 & (1 << 8)) ^ (d3 & (1 << 9)) ^ (d3 & (1 << 10)) ^ (d3 & (1 << 11)) ^ (d3 & (1 << 12)) ^ (d3 & (1 << 13)) ^ (d3 & (1 << 14)) ^ (d3 & (1 << 17)) ^ (d3 & (1 << 23)) ^ (d3 & (1 << 24)) ^ (d3 & (1 << 30));
                 x[10] = Unround1Operation(c2, d3, a3, b2, c3, 11);
 
+                //b3 uses 7 + 5 = 12 not 13 but b3,29 comes from a4,29 and d4,29 - b3,16, b3,17, b3,19, b3,20, b3,21, b3,22, b3,23, b3,26, b3,27, b3,28, b3,29, b3,30, b3,32
                 //b3,20 = 0, b3,21 = 1, b3,22 = 1, b3,23 = c3,23, b3,26 = 1, b3,30 = 0, b3,32 = 0
                 b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
                 b3 |= (1 << 20) | (1 << 21) | (1 << 25);
                 b3 &= ~(uint)((1 << 19) | (1 << 29) | ((uint)1 << 31));
                 b3 ^= (b3 & (1 << 22)) ^ (c3 & (1 << 22));
-                //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                if (bMulti && bNaito) b3 |= (1 << 15) | (1 << 18);
+                //extra condition to allow correcting b5,29, b5,32 in 2nd round
+                if (bMulti) b3 |= (1 << 15) | (1 << 18);
                 //extra condition to allow correcting b5,30 in 2nd round
-                if (bMulti && bNaito) b3 &= ~(uint)(1 << 16);
+                if (bMulti) b3 &= ~(uint)(1 << 16);
                 //extra condition to allow correcting c6,29, c6,30 in 2nd round
-                if (bMulti && bNaito) b3 |= (1 << 26) | (1 << 27);
+                if (bMulti) b3 |= (1 << 26) | (1 << 27);
                 x[11] = Unround1Operation(b2, c3, d3, a3, b3, 19);
 
                 //a4,23 = 0, a4,26 = 0, a4,27 = b3,27, a4,29 = b3,29, a4,30 = 1, a4,32 = 0
@@ -1214,10 +1335,10 @@ namespace Cryptopals
                 a4 |= (1 << 29);
                 a4 &= ~(uint)((1 << 22) | (1 << 25) | ((uint)1 << 31));
                 a4 ^= (a4 & (1 << 26)) ^ (b3 & (1 << 26)) ^ (a4 & (1 << 28)) ^ (b3 & (1 << 28));
-                //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                if (bMulti && bNaito) a4 |= (1 << 15) | (1 << 18);
+                //extra condition to allow correcting b5,29, b5,32 in 2nd round
+                if (bMulti) a4 |= (1 << 15) | (1 << 18);
                 //extra condition to allow correcting b5,30 in 2nd round
-                if (bMulti && bNaito) a4 &= ~(uint)(1 << 16);
+                if (bMulti) a4 &= ~(uint)(1 << 16);
                 //extra conditions to allow 3rd round corrections in x[11]
                 if (bMulti && bNaito) a4 &= ~(uint)((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30));
                 x[12] = Unround1Operation(a3, b3, c3, d3, a4, 3);
@@ -1227,9 +1348,9 @@ namespace Cryptopals
                 d4 &= ~(uint)((1 << 22) | (1 << 25) | (1 << 29));
                 d4 |= (1 << 26) | (1 << 28) | ((uint)1 << 31);
                 //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                if (bMulti && bNaito) d4 ^= (d4 & (1 << 19)) ^ (a4 & (1 << 19)) ^ (d4 & (1 << 22)) ^ (a4 & (1 << 22));
+                if (bMulti && bNaito) d4 ^= (d4 & (1 << 19)) ^ (a4 & (1 << 19)) ^ (d4 & (1 << 21)) ^ (a4 & (1 << 21));
                 //extra condition to allow correcting b5,30 in 2nd round
-                if (bMulti && bNaito) d4 |= (1 << 16);
+                if (bMulti) d4 |= (1 << 16);
                 //extra conditions to allow 3rd round corrections in x[11]
                 if (bMulti && bNaito) d4 &= ~(uint)((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30));
                 x[13] = Unround1Operation(d3, a4, b3, c3, d4, 7);
@@ -1240,7 +1361,7 @@ namespace Cryptopals
                 c4 |= (1 << 22) | (1 << 25);
                 c4 ^= (c4 & (1 << 18)) ^ (d4 & (1 << 18));
                 //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                if (bMulti && bNaito) c4 &= ~(uint)((1 << 19) | (1 << 22)); //Note: this is a problem with the c5,32 correction in Naito where we stomp on a first round condition which is required now to be correct in the second round but not guaranteed!
+                if (bMulti && bNaito) c4 &= ~(uint)((1 << 19) | (1 << 21));
                 x[14] = Unround1Operation(c3, d4, a4, b3, c4, 11);
 
                 //b4,19 = 0, b4,26 = c4,26 = 1, b4,27 = 1, b4,29 = 1, b4,30 = 0
@@ -1251,449 +1372,323 @@ namespace Cryptopals
                 //newly discovered condition: b4,32 = c4,32
                 if (bNaito) b4 ^= (b4 & ((uint)1 << 31)) ^ (c4 & ((uint)1 << 31));
                 //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                if (bMulti && bNaito) b4 ^= (b4 & (1 << 19)) ^ (d4 & (1 << 19)) ^ (b4 & (1 << 22)) ^ (d4 & (1 << 22));
+                if (bMulti && bNaito) b4 ^= (b4 & (1 << 19)) ^ (d4 & (1 << 19)) ^ (b4 & (1 << 21)) ^ (d4 & (1 << 21));
                 x[15] = Unround1Operation(b3, c4, d4, a4, b4, 19);
+                if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                    throw new ArgumentException();
 
-                if (bMulti)
+                if (!bMulti) return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
+
+                //round/step 2 and 3 - multi-step modification
+                //must not "stomp" on the first round conditions
+                uint x14save = x[14], x15save = x[15];
+                ulong n = 0;
+                do
                 {
-                    //round/step 2 and 3 - multi-step modification
-                    //must not "stomp" on the first round conditions
-                    int n = 0;
-                    uint[] bk = new uint[10];
-                    if (!bNaito)
-                    {
-                        Array.Copy(x, bk, 10);
-                        //if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4)) { }
-                    }
-                    do
-                    {
-                        //a5,19 = c4,19, a5,26 = 1, a5,27 = 0, a5,29 = 1, a5,32 = 1
-                        //must do these in exact order as arithmetic over and underflows must be handled
+                    //a5,19 = c4,19, a5,26 = 1, a5,27 = 0, a5,29 = 1, a5,32 = 1
+                    //must do these in exact order as arithmetic over and underflows must be handled
+                    a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
+                    d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
+                    c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
+                    b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
+                    a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
+                    d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
+                    c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
+                    b6 = Round2Operation(b5, c6, d6, a6, x[13], 13);
+                    a7 = Round2Operation(a6, b6, c6, d6, x[2], 3);
+                    d7 = Round2Operation(d6, a7, b6, c6, x[6], 5);
+                    c7 = Round2Operation(c6, d7, a7, b6, x[10], 9);
+                    b7 = Round2Operation(b6, c7, d7, a7, x[14], 13);
+                    a8 = Round2Operation(a7, b7, c7, d7, x[3], 3);
+                    d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);
+                    c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
+                    b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
+
+                    int[] a5mods = bNaito ? new int[] { 18, 19, 21, 25, 26, 28, 31 } : new int[] { 18, 25, 26, 28, 31 };
+                    foreach (int i in a5mods) {
+                        if (i == 18 && (a5 & (1 << 18)) == (c4 & (1 << 18)) ||
+                            i == 19 && (a5 & (1 << 19)) == (b4 & (1 << 19)) || //extra conditions to allow correcting c5,29, c5,32
+                            i == 21 && (a5 & (1 << 21)) == (b4 & (1 << 21)) ||
+                            i == 25 && (a5 & (1 << 25)) != 0 ||
+                            i == 26 && (a5 & (1 << 26)) == 0 ||
+                            i == 28 && (a5 & (1 << 28)) != 0 ||
+                            i == 31 && (a5 & ((uint)1 << 31)) != 0) continue;
+                        x[0] = ((a1 & (1 << i)) == 0) ? x[0] + (uint)(1 << (i - 3)) : x[0] - (uint)(1 << (i - 3));
+                        a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
+                        //F(X,Y,Z) = (X & Y) | (!X & Z)
+                        x[1] = ROR(d1, 7) - d0 - ((a1 & b0) | (~a1 & c0));
+                        x[2] = ROR(c1, 11) - c0 - ((d1 & a1) | (~d1 & b0));
+                        x[3] = ROR(b1, 19) - b0 - ((c1 & d1) | (~c1 & a1));
+                        x[4] = ROR(a2, 3) - a1 - ((b1 & c1) | (~b1 & d1));
                         a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                        if ((a5 & (1 << 18)) != (c4 & (1 << 18)) || (a5 & (1 << 25)) == 0 || (a5 & (1 << 28)) == 0 || (a5 & ((uint)1 << 31)) == 0 || (a5 & (1 << 26)) != 0 || (bNaito && ((a5 & (1 << 19)) != (b4 & (1 << 19)) || (a5 & (1 << 22)) != (b4 & (1 << 22)))))
-                        {
-                            if ((a5 & (1 << 18)) != (c4 & (1 << 18)))
-                            {
-                                x[0] = ((a1 & (1 << 18)) == 0) ? x[0] + (1 << 15) : x[0] - (1 << 15);
-                                a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                            }
-                            //extra condition to allow correcting c5,29, c5,32
-                            if (bNaito)
-                            {
-                                if ((a5 & (1 << 19)) != (b4 & (1 << 19)))
-                                {
-                                    x[0] = ((a1 & (1 << 19)) == 0) ? x[0] + (1 << 16) : x[0] - (1 << 16);
-                                    a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                                }
-                                if ((a5 & (1 << 22)) != (b4 & (1 << 22)))
-                                {
-                                    x[0] = ((a1 & (1 << 22)) == 0) ? x[0] + (1 << 19) : x[0] - (1 << 19);
-                                    a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                                }
-                            }
-                            if ((a5 & (1 << 25)) == 0)
-                            {
-                                x[0] = x[0] + (1 << 22);
-                                a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                            }
-                            if ((a5 & (1 << 26)) != 0)
-                            {
-                                x[0] = x[0] - (1 << 23);
-                                a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                            }
-                            if ((a5 & (1 << 28)) == 0)
-                            {
-                                x[0] = x[0] + (1 << 25);
-                                a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                            }
-                            if ((a5 & ((uint)1 << 31)) == 0)
-                            {
-                                x[0] = x[0] + (1 << 28);
-                                a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                            }
-                            a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
-                            x[1] = Unround1Operation(d0, a1, b0, c0, d1, 7);
-                            x[2] = Unround1Operation(c0, d1, a1, b0, c1, 11);
-                            x[3] = Unround1Operation(b0, c1, d1, a1, b1, 19);
-                            x[4] = Unround1Operation(a1, b1, c1, d1, a2, 3);
-                        }
-                        //x[0] = Unround2Operation(a4, b4, c4, d4, a5, 3);
-
-                        //d5,19 = a5,19, d5,26 = b4,26, d5,27 = b4,27, d5,29 = b4,29, d5,32 = b4,32
-                        d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
-                        if ((d5 & (1 << 18)) != (a5 & (1 << 18)) || (d5 & (1 << 25)) != (b4 & (1 << 25)) || (d5 & (1 << 26)) != (b4 & (1 << 26)) || (d5 & (1 << 28)) != (b4 & (1 << 28)) ||
-                            (bNaito && (d5 & ((uint)1 << 31)) != (b4 & ((uint)1 << 31))))
-                        {
-                            if ((d5 & (1 << 18)) != (a5 & (1 << 18)))
-                            {
-                                if (bNaito)
-                                {
-                                    x[1] = (d1 & (1 << 13)) == 0 ? x[1] + (1 << 6) : x[1] - (1 << 6);
-                                    d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
-                                    x[4] = Unround1Operation(a1, b1, c1, d1, a2, 3);
-                                }
-                                else
-                                {
-                                    x[4] = ((a2 & (1 << 16)) == 0) ? x[4] + (1 << 13) : x[4] - (1 << 13);
-                                }
-                                d5 = Round2Operation(d4, a5, b4, c4, x[4], 5); //stomps on c5,26 extra condition a2,17=b2,17 if d5,19 not properly modified
-                            }
-                            if ((d5 & (1 << 25)) != (b4 & (1 << 25)))
-                            {
-                                x[4] = ((a2 & (1 << 23)) == 0) ? x[4] + (1 << 20) : x[4] - (1 << 20);
-                                d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
-                            }
-                            if ((d5 & (1 << 26)) != (b4 & (1 << 26)))
-                            {
-                                x[4] = ((a2 & (1 << 24)) == 0) ? x[4] + (1 << 21) : x[4] - (1 << 21);
-                                d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
-                            }
-                            if ((d5 & (1 << 28)) != (b4 & (1 << 28)))
-                            {
-                                x[4] = ((a2 & (1 << 26)) == 0) ? x[4] + (1 << 23) : x[4] - (1 << 23);
-                                d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
-                            }
-                            if (bNaito)
-                            {
-                                if ((d5 & ((uint)1 << 31)) != (b4 & ((uint)1 << 31)))
-                                {
-                                    x[4] = ((a2 & (1 << 29)) == 0) ? x[4] + (1 << 26) : x[4] - (1 << 26);
-                                    d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
-                                }
-                            }
-                            a2 = Round1Operation(a1, b1, c1, d1, x[4], 3);
-                            x[5] = Unround1Operation(d1, a2, b1, c1, d2, 7);
-                            x[6] = Unround1Operation(c1, d2, a2, b1, c2, 11);
-                            x[7] = Unround1Operation(b1, c2, d2, a2, b2, 19);
-                            x[8] = Unround1Operation(a2, b2, c2, d2, a3, 3);
-                        }
-                        //d5 ^= (d5 & ((uint)1 << 31)) ^ (b4 & ((uint)1 << 31));
-                        //x[4] = Unround2Operation(d4, a5, b4, c4, d5, 5);
-
-                        //c5,26 = d5,26, c5,27 = d5,27, c5,29 = d5,29, c5,30 = d5,30, c5,32 = d5,32
-                        c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                        //c5,26 when not equal to d5,19 and c5,29 are stomping on first round conditions and must have more modifications to correct
-                        if ((c5 & (1 << 25)) != (d5 & (1 << 25)))
-                        {
-                            x[5] = x[5] + (1 << 9);
-                            d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                            x[8] = Unround1Operation(a2, b2, c2, d2, a3, 3);
-                            c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                        }
-                        if ((c5 & (1 << 26)) != (d5 & (1 << 26)))
-                        {
-                            x[5] = x[5] + (1 << 10);
-                            d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                            x[8] = Unround1Operation(a2, b2, c2, d2, a3, 3);
-                            c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                        }
-                        if (bNaito)
-                        {
-                            if ((c5 & (1 << 28)) != (d5 & (1 << 28)))
-                            {
-                                x[14] = x[14] + (1 << 8);
-                                c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
-                                c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                            }
-                            if ((c5 & (1 << 29)) != (d5 & (1 << 29)))
-                            {
-                                if ((c5 & (1 << 29)) != (d5 & (1 << 29))) x[8] = ((a3 & (1 << 23)) == 0) ? x[8] + (1 << 20) : x[8] - (1 << 20);
-                                a3 = Round1Operation(a2, b2, c2, d2, x[8], 3);
-                                //x[9] = Unround1Operation(d2, a3, b2, c2, d3, 7);
-                                x[10] = Unround1Operation(c2, d3, a3, b2, c3, 11);
-                                x[11] = Unround1Operation(b2, c3, d3, a3, b3, 19);
-                                x[12] = Unround1Operation(a3, b3, c3, d3, a4, 3);
-                                c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                            }
-                            if ((c5 & ((uint)1 << 31)) != (d5 & ((uint)1 << 31)))
-                            {
-                                x[14] = x[14] + (1 << 11);
-                                c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
-                                c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                            }
-                        }
-                        else
-                        {
-                            //Naito already has this corrected by prior modifications
-                            if ((c5 & (1 << 28)) != (d5 & (1 << 28)))
-                            {
-                                x[5] = x[5] + (1 << 12);
-                                d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                                x[8] = Unround1Operation(a2, b2, c2, d2, a3, 3);
-                                c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                            }
-                            if ((c5 & (1 << 31)) != (d5 & (1 << 31)))
-                            {
-                                x[5] = x[5] + (1 << 15);
-                                d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                                x[8] = Unround1Operation(a2, b2, c2, d2, a3, 3);
-                                c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                            }
-                        }
-                        d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                        x[9] = Unround1Operation(d2, a3, b2, c2, d3, 7);
-                        //c5 ^= (c5 & (1 << 29)) ^ (d5 & (1 << 29));
-                        //x[8] = Unround2Operation(c4, d5, a5, b4, c5, 9);
-
-                        if (!bNaito)
-                        {
-                            b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
-                            a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
-                            d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
-                            c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
-                            b6 = Round2Operation(b5, c6, d6, a6, x[13], 13);
-                            a7 = Round2Operation(a6, b6, c6, d6, x[2], 3);
-                            d7 = Round2Operation(d6, a7, b6, c6, x[6], 5);
-                            c7 = Round2Operation(c6, d7, a7, b6, x[10], 9);
-                            b7 = Round2Operation(b6, c7, d7, a7, x[14], 13);
-                            a8 = Round2Operation(a7, b7, c7, d7, x[3], 3);
-                            d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);
-                            c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
-                            b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
-                            a9 = Round3Operation(a8, b8, c8, d8, x[0], 3);
-                            d9 = Round3Operation(d8, a9, b8, c8, x[8], 9);
-                            c9 = Round3Operation(c8, d9, a9, b8, x[4], 11);
-                            b9 = Round3Operation(b8, c9, d9, a9, x[12], 15);
-                            a10 = Round3Operation(a9, b9, c9, d9, x[2], 3);
-                            if (((a5 & (1 << 18)) != (c4 & (1 << 18)) || (a5 & (1 << 25)) == 0 || (a5 & (1 << 28)) == 0 || (a5 & ((uint)1 << 31)) == 0 || (a5 & (1 << 26)) != 0 || (bNaito && ((a5 & (1 << 19)) != (b4 & (1 << 19)) || (a5 & (1 << 22)) != (b4 & (1 << 22))))) ||
-        ((d5 & (1 << 18)) != (a5 & (1 << 18)) || (d5 & (1 << 25)) != (b4 & (1 << 25)) || (d5 & (1 << 26)) != (b4 & (1 << 26)) || (d5 & (1 << 28)) != (b4 & (1 << 28)) ||
-            (bNaito && (d5 & ((uint)1 << 31)) != (b4 & ((uint)1 << 31)))) ||
-        ((c5 & (1 << 25)) != (d5 & (1 << 25)) || (c5 & (1 << 26)) != (d5 & (1 << 26)) || (c5 & (1 << 28)) != (d5 & (1 << 28)) || (c5 & (1 << 29)) != (d5 & (1 << 29)) || (c5 & ((uint)1 << 31)) != (d5 & ((uint)1 << 31))) ||
-        ((b5 & (1 << 28)) != (c5 & (1 << 28)) || (b5 & (1 << 29)) == 0 || (b5 & ((uint)1 << 31)) != 0) ||
-        ((a6 & (1 << 28)) == 0 || (a6 & (1 << 29)) != 0 || (a6 & ((uint)1 << 31)) == 0) ||
-        (d6 & (1 << 28)) != (b5 & (1 << 28)) ||
-        ((c6 & (1 << 28)) != (d6 & (1 << 28)) || (c6 & (1 << 29)) == (d6 & (1 << 29)) || (c6 & (1 << 31)) == (d6 & (1 << 31))) ||
-        ((b9 & ((uint)1 << 31)) == 0 || (a10 & ((uint)1 << 31)) == 0) ||
-        !VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4)
-        )
-                            {
-                                Array.Copy(bk, x, 10); //restore x[0]-x[9]
-                                a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
-                                a2 = Round1Operation(a1, b1, c1, d1, x[4], 3);
-                                d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                                RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider();
-                                byte[] b = new byte[8];
-                                rng.GetBytes(b);
-                                x[14] = BitConverter.ToUInt32(b, 0);
-                                x[15] = BitConverter.ToUInt32(b, 4);
-                                //c4,19 = d4,19, c4,23 = 1, c4,26 = 1, c4,27 = 0, c4,29 = 0, c4,30 = 0
-                                c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
-                                c4 &= ~(uint)((1 << 26) | (1 << 28) | (1 << 29));
-                                c4 |= (1 << 22) | (1 << 25);
-                                c4 ^= (c4 & (1 << 18)) ^ (d4 & (1 << 18));
-                                //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                                if (bMulti && bNaito) c4 &= ~(uint)((1 << 19) | (1 << 22));
-                                x[14] = Unround1Operation(c3, d4, a4, b3, c4, 11);
-
-                                //b4,19 = 0, b4,26 = c4,26 = 1, b4,27 = 1, b4,29 = 1, b4,30 = 0
-                                b4 = Round1Operation(b3, c4, d4, a4, x[15], 19);
-                                b4 |= (1 << 25) | (1 << 26) | (1 << 28);
-                                b4 &= ~(uint)((1 << 18) | (1 << 29));
-                                b4 ^= (b4 & (1 << 25)) ^ (c4 & (1 << 25));
-                                //newly discovered condition: b4,32 = c4,32
-                                if (bNaito) b4 ^= (b4 & ((uint)1 << 31)) ^ (c4 & ((uint)1 << 31));
-                                //extra condition to allow correcting c5,29, c5,32 in 2nd round
-                                if (bMulti && bNaito) b4 ^= (b4 & (1 << 19)) ^ (d4 & (1 << 19)) ^ (b4 & (1 << 22)) ^ (d4 & (1 << 22));
-                                x[15] = Unround1Operation(b3, c4, d4, a4, b4, 19);
-                                n++;
-                            }
-                            else { Console.WriteLine(n); break; }
-                        }
-                    } while (!bNaito);
-                    if (bNaito)
-                    {
-                        //b5,29 = c5,29, b5,30 = 1, b5,32 = 0
-                        b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
-                        if ((b5 & (1 << 28)) != (c5 & (1 << 28)))
-                        {
-                            x[10] = (c3 & (1 << 15)) == 0 ? x[10] + (1 << 4) : x[10] - (1 << 4);
-                            c3 = Round1Operation(c2, d3, a3, b2, x[10], 11);
-                            x[12] = Unround1Operation(a3, b3, c3, d3, a4, 3);
-                            b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
-                            x[14] = Unround1Operation(c3, d4, a4, b3, c4, 11);
-                        }
-                        if ((b5 & (1 << 29)) == 0)
-                        {
-                            x[11] = x[11] + (1 << 29);
-                            b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
-                            x[12] = Unround1Operation(a3, b3, c3, d3, a4, 3);
-                            b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
-                            x[15] = Unround1Operation(b3, c4, d4, a4, b4, 19);
-                        }
-                        if ((b5 & ((uint)1 << 31)) != 0)
-                        {
-                            x[10] = (c3 & (1 << 18)) == 0 ? x[10] + (1 << 7) : x[10] - (1 << 7);
-                            c3 = Round1Operation(c2, d3, a3, b2, x[10], 11);
-                            x[12] = Unround1Operation(a3, b3, c3, d3, a4, 3);
-                            b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
-                            x[14] = Unround1Operation(c3, d4, a4, b3, c4, 11);
-                        }
-
-                        //b5 |= (1 << 29);
-                        //b5 &= ~(uint)(((uint)1 << 31));
-                        //b5 ^= (b5 & (1 << 28)) ^ (c5 & (1 << 28));
-                        //x[12] = Unround2Operation(b4, c5, d5, a5, b5, 13);
-
-                        //a6,29 = 1, a6,32 = 1
-                        //newly discovered condition: a6,30 = 0
-                        a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
-                        if ((a6 & (1 << 28)) == 0)
-                        {
-                            x[1] = (d1 & (1 << 0)) == 0 ? x[1] + (1 << 25) : x[1] - (1 << 25);
-                            d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
-                            a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
-                            x[2] = Unround1Operation(c0, d1, a1, b0, c1, 11);
-                            x[3] = Unround1Operation(b0, c1, d1, a1, b1, 19);
-                            x[5] = Unround1Operation(d1, a2, b1, c1, d2, 7);
-                        }
-                        if ((a6 & (1 << 29)) != 0)
-                        {
-                            x[1] = (d1 & (1 << 1)) == 0 ? x[1] + (1 << 26) : x[1] - (1 << 26);
-                            d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
-                            a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
-                            x[2] = Unround1Operation(c0, d1, a1, b0, c1, 11);
-                            x[3] = Unround1Operation(b0, c1, d1, a1, b1, 19);
-                            x[5] = Unround1Operation(d1, a2, b1, c1, d2, 7);
-                        }
-                        if ((a6 & ((uint)1 << 31)) == 0)
-                        {
-                            x[1] = (d1 & (1 << 3)) == 0 ? x[1] + (1 << 28) : x[1] - (1 << 28);
-                            d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
-                            a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
-                            x[2] = Unround1Operation(c0, d1, a1, b0, c1, 11);
-                            x[3] = Unround1Operation(b0, c1, d1, a1, b1, 19);
-                            x[5] = Unround1Operation(d1, a2, b1, c1, d2, 7);
-                        }
-                        //a6 |= (1 << 28) | ((uint)1 << 31);
-                        //x[1] = Unround2Operation(a5, b5, c5, d5, a6, 3);
-
-                        //d6,29 = b5,29
-                        d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
-                        if ((d6 & (1 << 28)) != (b5 & (1 << 28)))
-                        {
-                            x[5] = ((d2 & (1 << 30)) == 0) ? x[5] + (1 << 23) : x[5] - (1 << 23);
-                            d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
-                            d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
-                            x[6] = Unround1Operation(c1, d2, a2, b1, c2, 11);
-                            x[7] = Unround1Operation(b1, c2, d2, a2, b2, 19);
-                            x[9] = Unround1Operation(d2, a3, b2, c2, d3, 7);
-                        }
-                        //d6 ^= (d6 & (1 << 28)) ^ (b5 & (1 << 28));
-                        //x[5] = Unround2Operation(d5, a6, b5, c5, d6, 5);
-
-                        //c6,29 = d6,29, c6,30 = d6,30 + 1, c6,32 = d6,32 + 1
-                        c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
-                        if ((c6 & (1 << 28)) != (d6 & (1 << 28)))
-                        {
-                            x[9] = (d3 & (1 << 26)) == 0 ? x[9] + (1 << 19) : x[9] - (1 << 19);
-                            d3 = Round1Operation(d2, a3, b2, c2, x[9], 7);
-                            c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
-                            x[10] = Unround1Operation(c2, d3, a3, b2, c3, 11);
-                            x[11] = Unround1Operation(b2, c3, d3, a3, b3, 19);
-                            x[13] = Unround1Operation(d3, a4, b3, c3, d4, 7);
-                        }
-                        if ((c6 & (1 << 29)) == (d6 & (1 << 29)))
-                        {
-                            x[9] = (d3 & (1 << 27)) == 0 ? x[9] + (1 << 20) : x[9] - (1 << 20);
-                            d3 = Round1Operation(d2, a3, b2, c2, x[9], 7);
-                            c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
-                            x[10] = Unround1Operation(c2, d3, a3, b2, c3, 11);
-                            x[11] = Unround1Operation(b2, c3, d3, a3, b3, 19);
-                            x[13] = Unround1Operation(d3, a4, b3, c3, d4, 7);
-                        }
-                        if ((c6 & (1 << 31)) == (d6 & (1 << 31)))
-                        {
-                            x[6] = (c2 & (1 << 22)) == 0 ? x[6] + (1 << 11) : x[6] - (1 << 11);
-                            c2 = Round1Operation(c1, d2, a2, b1, x[6], 11);
-                            x[9] = Unround1Operation(d2, a3, b2, c2, d3, 7);
-                            c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
-                            x[10] = Unround1Operation(c2, d3, a3, b2, c3, 11);
-                        }
-                        //c6 ^= (c6 & (1 << 28)) ^ (d6 & (1 << 28)) ^ (c6 & (1 << 29)) ^ (d6 & (1 << 29)) ^ (1 << 29) ^ (c6 & ((uint)1 << 31)) ^ (d6 & ((uint)1 << 31)) ^ ((uint)1 << 31);
-                        //x[9] = Unround2Operation(c5, d6, a6, b5, c6, 9);
-
-                        //...round 3 modifications for exact collision not known how to hold without stomping on rounds 1 and 2
-                        b6 = Round2Operation(b5, c6, d6, a6, x[13], 13);
-                        a7 = Round2Operation(a6, b6, c6, d6, x[2], 3);
-                        d7 = Round2Operation(d6, a7, b6, c6, x[6], 5);
-                        c7 = Round2Operation(c6, d7, a7, b6, x[10], 9);
-                        b7 = Round2Operation(b6, c7, d7, a7, x[14], 13);
-                        a8 = Round2Operation(a7, b7, c7, d7, x[3], 3);
-                        d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);
-                        c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
-                        b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
-                        a9 = Round3Operation(a8, b8, c8, d8, x[0], 3);
-                        d9 = Round3Operation(d8, a9, b8, c8, x[8], 9);
-                        c9 = Round3Operation(c8, d9, a9, b8, x[4], 11);
-                        if (((a5 & (1 << 18)) != (c4 & (1 << 18)) || (a5 & (1 << 25)) == 0 || (a5 & (1 << 28)) == 0 || (a5 & ((uint)1 << 31)) == 0 || (a5 & (1 << 26)) != 0 || (bNaito && ((a5 & (1 << 19)) != (b4 & (1 << 19)) || (a5 & (1 << 22)) != (b4 & (1 << 22))))) ||
-        ((d5 & (1 << 18)) != (a5 & (1 << 18)) || (d5 & (1 << 25)) != (b4 & (1 << 25)) || (d5 & (1 << 26)) != (b4 & (1 << 26)) || (d5 & (1 << 28)) != (b4 & (1 << 28)) ||
-            (bNaito && (d5 & ((uint)1 << 31)) != (b4 & ((uint)1 << 31)))) ||
-        ((c5 & (1 << 25)) != (d5 & (1 << 25)) || (c5 & (1 << 26)) != (d5 & (1 << 26)) || (c5 & (1 << 28)) != (d5 & (1 << 28)) || (c5 & (1 << 29)) != (d5 & (1 << 29)) || (c5 & ((uint)1 << 31)) != (d5 & ((uint)1 << 31))) ||
-        ((b5 & (1 << 28)) != (c5 & (1 << 28)) || (b5 & (1 << 29)) == 0 || (b5 & ((uint)1 << 31)) != 0) ||
-        ((a6 & (1 << 28)) == 0 || (a6 & (1 << 29)) != 0 || (a6 & ((uint)1 << 31)) == 0) ||
-        (d6 & (1 << 28)) != (b5 & (1 << 28)) ||
-        ((c6 & (1 << 28)) != (d6 & (1 << 28)) || (c6 & (1 << 29)) == (d6 & (1 << 29)) || (c6 & (1 << 31)) == (d6 & (1 << 31))) ||
-        !VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4)
-        )
-                        {
-                            a1++; a1--; return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
-                        }
-                        //return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
-                        //for all values except b3,20, b3,21, b3,22, b3,23, b3,26, b3,30, b3,32 + b3,27, b3,29 + b3,16, b3,17, b3,19, b3,28
-                        //cannot stomp on these first round bit positions either: 10, 12, 29 + 7, 9, 10, 28, 31 + 0, 3, 7, 9, 12, 29
-                        int[] permutebits = new int[] { 4, 5, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30 }; //{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 23, 24, 30 };
-                        uint b3init = b3;
-                        for (int i = 0; i < (1 << 19); i++)
-                        {
-                            //b9,32 = 1
-                            b9 = Round3Operation(b8, c9, d9, a9, x[12], 15);
-                            //b9 |= ((uint)1 << 31);
-                            //x[12] = Unround3Operation(b8, c9, d9, a9, b9, 15);
-
-                            //a10,32 = 1
-                            a10 = Round3Operation(a9, b9, c9, d9, x[2], 3);
-                            //a10 |= ((uint)1 << 31);
-                            //x[2] = Unround3Operation(a9, b9, c9, d9, a10, 3);
-                            if ((b9 & ((uint)1 << 31)) != 0 && (a10 & ((uint)1 << 31)) != 0) break;
-
-                            b3 = b3init;
-                            for (int c = 0; c < 19; c++)
-                            {
-                                if ((i & (1 << c)) != 0)
-                                {
-                                    x[11] = (b3 & ((uint)1 << ((19 + permutebits[c]) % 32))) == 0 ? x[11] + ((uint)1 << (0 + permutebits[c])) : x[11] - ((uint)1 << (0 + permutebits[c]));
-                                    b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
-                                }
-                            }
-                            x[15] = Unround1Operation(b3, c4, d4, a4, b4, 19);
-                            if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4))
-                            {
-                                a1++; a1--;
-                            }
-                            /*a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
-                            d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
-                            c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
-                            b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
-                            a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
-                            d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
-                            c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
-                            b6 = Round2Operation(b5, c6, d6, a6, x[13], 13);
-                            a7 = Round2Operation(a6, b6, c6, d6, x[2], 3);
-                            d7 = Round2Operation(d6, a7, b6, c6, x[6], 5);
-                            c7 = Round2Operation(c6, d7, a7, b6, x[10], 9);
-                            b7 = Round2Operation(b6, c7, d7, a7, x[14], 13);
-                            a8 = Round2Operation(a7, b7, c7, d7, x[3], 3);
-                            d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);*/
-                            c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
-                            b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
-                            a9 = Round3Operation(a8, b8, c8, d8, x[0], 3);
-                            d9 = Round3Operation(d8, a9, b8, c8, x[8], 9);
-                            c9 = Round3Operation(c8, d9, a9, b8, x[4], 11);
-                        }
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
                     }
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 1))
+                        throw new ArgumentException();
 
+                    //d5,19 = a5,19, d5,26 = b4,26, d5,27 = b4,27, d5,29 = b4,29, d5,32 = b4,32
+                    d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
+                    int[] d5mods = new int[] { 18, 25, 26, 28, 31 };
+                    foreach (int i in d5mods)
+                    {
+                        if (i == 18 && (d5 & (1 << 18)) == (a5 & (1 << 18)) ||
+                            i == 25 && (d5 & (1 << 25)) == (b4 & (1 << 25)) ||
+                            i == 26 && (d5 & (1 << 26)) == (b4 & (1 << 26)) ||
+                            i == 28 && (d5 & (1 << 28)) == (b4 & (1 << 28)) ||
+                            i == 31 && (d5 & ((uint)1 << 31)) == (b4 & ((uint)1 << 31))) continue;
+                        if (bNaito && i == 18) {
+                            x[1] = (d1 & (1 << 13)) == 0 ? x[1] + (1 << 6) : x[1] - (1 << 6);
+                            d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
+                            x[4] -= (1 << 13);
+                            x[5] -= (1 << 13);
+                        } else {
+                            x[4] = ((a2 & (1 << (i - 2))) == 0) ? x[4] + (uint)(1 << (i - 5)) : x[4] - (uint)(1 << (i - 5));
+                            a2 = Round1Operation(a1, b1, c1, d1, x[4], 3);
+                            //F(X,Y,Z) = (X & Y) | (!X & Z)
+                            x[5] = ROR(d2, 7) - d1 - ((a2 & b1) | (~a2 & c1));
+                            x[6] = ROR(c2, 11) - c1 - ((d2 & a2) | (~d2 & b1));
+                            x[7] = ROR(b2, 19) - b1 - ((c2 & d2) | (~c2 & a2));
+                            x[8] = ROR(a3, 3) - a2 - ((b2 & c2) | (~b2 & d2));
+                        }
+                        d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
+                    }
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 2))
+                        throw new ArgumentException();
+
+                    //c5,26 = d5,26, c5,27 = d5,27, c5,29 = d5,29, c5,30 = d5,30, c5,32 = d5,32
+                    c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
+                    int[] c5mods = bNaito ? new int[] { 25, 26, 28, 29, 30, 31 } :
+                        new int[] { 25, 26, 28, 29, 31 };
+                    foreach (int i in c5mods)
+                    {
+                        if (i == 25 && (c5 & (1 << 25)) == (d5 & (1 << 25)) ||
+                            i == 26 && (c5 & (1 << 26)) == (d5 & (1 << 26)) ||
+                            i == 28 && (c5 & (1 << 28)) == (d5 & (1 << 28)) ||
+                            i == 29 && (c5 & (1 << 29)) == (d5 & (1 << 29)) ||
+                            i == 30 && (c5 & (1 << 30)) != 0 ||
+                            i == 31 && (c5 & (1 << 31)) == (d5 & (1 << 31))) continue;
+                        if (i == 29 || i == 30)
+                        {
+                            x[8] = ((a3 & ((uint)1 << (i - 6))) == 0) ? x[8] + ((uint)1 << (i - 9)) : x[8] - ((uint)1 << (i - 9));
+                            a3 = Round1Operation(a2, b2, c2, d2, x[8], 3);
+                            //F(X,Y,Z) = (X & Y) | (!X & Z)
+                            x[9] = ROR(d3, 7) - d2 - ((a3 & b2) | (~a3 & c2));
+                            x[10] = ROR(c3, 11) - c2 - ((d3 & a3) | (~d3 & b2));
+                            x[11] = ROR(b3, 19) - b2 - ((c3 & d3) | (~c3 & a3));
+                            x[12] = ROR(a4, 3) - a3 - ((b3 & c3) | (~b3 & d3));
+                        } else if ((i == 28 || i == 31) && bNaito) {
+                            if (i == 28) x[14] += ((uint)1 << (i - 20));
+                            else x[14] += ((uint)1 << (i - 21));
+                            c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
+                            c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
+                        } else {
+                            //x[5] += (uint)(1 << (i - 16));
+                            x[5] = (d2 & ((uint)1 << (i - 9))) == 0 ? x[5] + (uint)(1 << (i - 16)) : x[5] - (uint)(1 << (i - 16));
+                            d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
+                            //x[8] -= (uint)(1 << (i - 9));
+                            x[8] = (d2 & ((uint)1 << (i - 9))) == 0 ? x[8] + (uint)(1 << (i - 9)) : x[8] - (uint)(1 << (i - 9));
+                            //x[9] -= (uint)(1 << (i - 9));
+                            x[9] = (d2 & ((uint)1 << (i - 9))) == 0 ? x[9] + (uint)(1 << (i - 9)) : x[9] - (uint)(1 << (i - 9));
+                            //if i == 25 and d5,19 was corrected, then c2 is broken and c2 != Round1Operation(c1, d2, a2, b1, x[6], 11)
+                            if (i == 25 && c2 != Round1Operation(c1, d2, a2, b1, x[6], 11)) {
+                                //probability 1/8 that we have to abort and no forgery can be found using Wang's method
+                                //however if d6,26 is additionally corrected then c2 will be fixed but Wang did not include this
+                                return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
+                            } else if (i == 28 && (d2 & (1 << 19)) != (a2 & (1 << 19))) { //c5,29 can break a first round condition and will never succeed if it occurs
+                                return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
+                            }
+                        }
+                        c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
+                    }
+                    //c5,26 when not equal to d5,19 and c5,29 are stomping on first round conditions and must have more modifications to correct
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 3))
+                        throw new ArgumentException();
+
+                    //b5,29 = c5,29, b5,30 = 1, b5,32 = 0
+                    b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
+                    int[] b5mods = new int[] { 28, 29, 31 };
+                    foreach (int i in b5mods)
+                    {
+                        if (i == 28 && (b5 & (1 << 28)) == (c5 & (1 << 28)) ||
+                            i == 29 && (b5 & (1 << 29)) != 0 ||
+                            i == 31 && (b5 & ((uint)1 << 31)) == 0) continue;
+                        if (i == 29) {
+                            x[11] += (1 << 29);
+                            b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
+                            x[12] -= (1 << 16);
+                            x[15] -= (1 << 16);
+                        } else {
+                            x[10] += ((uint)1 << (i - 24));
+                            c3 = Round1Operation(c2, d3, a3, b2, x[10], 11);
+                            x[12] -= ((uint)1 << (i - 13));
+                            x[14] -= ((uint)1 << (i - 13));
+                        }
+                        b5 = Round2Operation(b4, c5, d5, a5, x[12], 13);
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
+                    }
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 4))
+                        throw new ArgumentException();
+
+                    //a6,29 = 1, a6,32 = 1
+                    //newly discovered condition: a6,30 = 0
+                    a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
+                    int[] a6mods = bNaito ? new int[] { 28, 29, 31 } : new int[] { 28, 31 };
+                    foreach (int i in a6mods)
+                    {
+                        if (i == 28 && (a6 & (1 << 28)) != 0 ||
+                            i == 29 && (a6 & (1 << 29)) == 0 ||
+                            i == 31 && (a6 & ((uint)1 << 31)) != 0) continue;
+                        x[1] = ((d1 & (1 << ((i + 4) % 32))) == 0) ? x[1] + (uint)(1 << (i - 3)) : x[1] - (uint)(1 << (i - 3));
+                        d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
+                        //F(X,Y,Z) = (X & Y) | (!X & Z)
+                        x[2] = ROR(c1, 11) - c0 - ((d1 & a1) | (~d1 & b0));
+                        x[3] = ROR(b1, 19) - b0 - ((c1 & d1) | (~c1 & a1));
+                        x[5] = ROR(d2, 7) - d1 - ((a2 & b1) | (~a2 & c1));
+                        a6 = Round2Operation(a5, b5, c5, d5, x[1], 3);
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
+                    }
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 5))
+                        throw new ArgumentException();
+
+                    //d6,29 = b5,29
+                    d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
+                    if ((d6 & (1 << 28)) != (b5 & (1 << 28)))
+                    {
+                        x[5] = ((d2 & (1 << 30)) == 0) ? x[5] + (1 << 23) : x[5] - (1 << 23);
+                        d2 = Round1Operation(d1, a2, b1, c1, x[5], 7);
+                        d6 = Round2Operation(d5, a6, b5, c5, x[5], 5);
+                        x[6] = ROR(c2, 11) - c1 - ((d2 & a2) | (~d2 & b1));
+                        x[7] = ROR(b2, 19) - b1 - ((c2 & d2) | (~c2 & a2));
+                        x[9] = ROR(d3, 7) - d2 - ((a3 & b2) | (~a3 & c2));
+                    }
+                    if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                        throw new ArgumentException();
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 6))
+                        throw new ArgumentException();
+
+                    //c6,29 = d6,29, c6,30 = d6,30 + 1, c6,32 = d6,32 + 1
+                    c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
+                    int[] c6mods = new int[] { 28, 29 };
+                    foreach (int i in c6mods)
+                    {
+                        if (i == 28 && (c6 & (1 << 28)) == (d6 & (1 << 28)) ||
+                            i == 29 && (c6 & (1 << 29)) != (d6 & (1 << 29))) continue;
+                        x[9] = ((d3 & (1 << (i - 2))) == 0) ? x[9] + (uint)(1 << (i - 9)) : x[9] - (uint)(1 << (i - 9));
+                        d3 = Round1Operation(d2, a3, b2, c2, x[9], 7);
+                        //F(X,Y,Z) = (X & Y) | (!X & Z)
+                        x[10] = ROR(c3, 11) - c2 - ((d3 & a3) | (~d3 & b2));
+                        x[11] = ROR(b3, 19) - b2 - ((c3 & d3) | (~c3 & a3));
+                        x[13] = ROR(d4, 7) - d3 - ((a4 & b3) | (~a4 & c3));
+                        c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
+                    }
+                    if ((c6 & (1 << 31)) == (d6 & (1 << 31)))
+                    {
+                        x[6] = (c2 & (1 << 22)) == 0 ? x[6] + (1 << 11) : x[6] - (1 << 11);
+                        c2 = Round1Operation(c1, d2, a2, b1, x[6], 11);
+                        x[9] -= (1 << 22);
+                        c6 = Round2Operation(c5, d6, a6, b5, x[9], 9);
+                        x[10] -= (1 << 22);
+                        //if () //if c5,32 and c6,32 are both corrected, an error will occur need to detect and return...
+                    }
+                    if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                        throw new ArgumentException();
+
+                    b6 = Round2Operation(b5, c6, d6, a6, x[13], 13);
+                    a7 = Round2Operation(a6, b6, c6, d6, x[2], 3);
+                    d7 = Round2Operation(d6, a7, b6, c6, x[6], 5);
+                    c7 = Round2Operation(c6, d7, a7, b6, x[10], 9);
+                    b7 = Round2Operation(b6, c7, d7, a7, x[14], 13);
+                    a8 = Round2Operation(a7, b7, c7, d7, x[3], 3);
+                    d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);
+                    c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
+                    b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
+                    a9 = Round3Operation(a8, b8, c8, d8, x[0], 3);
+                    d9 = Round3Operation(d8, a9, b8, c8, x[8], 9);
+                    c9 = Round3Operation(c8, d9, a9, b8, x[4], 11);
+                    b9 = Round3Operation(b8, c9, d9, a9, x[12], 15);
+                    a10 = Round3Operation(a9, b9, c9, d9, x[2], 3);
+                    if (!VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 7))
+                        throw new ArgumentException();
+                    if (VerifyConditions3(x, a0, b0, c0, d0, a9, b9, c9, d9, a10))
+                        return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
+                    if (!bNaito) {
+                        n++;
+                        if (n == 0) return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray(); //nothing found after 2^64 search...
+                        x[14] = x14save ^ (uint)(n & 0xFFFFFFFF);
+                        x[15] = x15save ^ (uint)(n >> 32);
+                        //c4,19 = d4,19, c4,23 = 1, c4,26 = 1, c4,27 = 0, c4,29 = 0, c4,30 = 0
+                        c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
+                        c4 &= ~(uint)((1 << 26) | (1 << 28) | (1 << 29));
+                        c4 |= (1 << 22) | (1 << 25);
+                        c4 ^= (c4 & (1 << 18)) ^ (d4 & (1 << 18));
+                        //extra condition to allow correcting c5,29, c5,32 in 2nd round
+                        //if (bMulti && bNaito) c4 &= ~(uint)((1 << 19) | (1 << 21));
+                        x[14] = Unround1Operation(c3, d4, a4, b3, c4, 11);
+
+                        //b4,19 = 0, b4,26 = c4,26 = 1, b4,27 = 1, b4,29 = 1, b4,30 = 0
+                        b4 = Round1Operation(b3, c4, d4, a4, x[15], 19);
+                        b4 |= (1 << 25) | (1 << 26) | (1 << 28);
+                        b4 &= ~(uint)((1 << 18) | (1 << 29));
+                        b4 ^= (b4 & (1 << 25)) ^ (c4 & (1 << 25));
+                        //newly discovered condition: b4,32 = c4,32
+                        //if (bNaito) b4 ^= (b4 & ((uint)1 << 31)) ^ (c4 & ((uint)1 << 31));
+                        //extra condition to allow correcting c5,29, c5,32 in 2nd round
+                        //if (bMulti && bNaito) b4 ^= (b4 & (1 << 19)) ^ (d4 & (1 << 19)) ^ (b4 & (1 << 21)) ^ (d4 & (1 << 21));
+                        x[15] = Unround1Operation(b3, c4, d4, a4, b4, 19);
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito))
+                            throw new ArgumentException();
+                    }
+                } while (!bNaito);
+                if (bNaito)
+                {
+                    //...round 3 modifications for exact collision not known how to hold without stomping on rounds 1 and 2
+                    //for all values except b3,20, b3,21, b3,22, b3,23, b3,26, b3,27, b3,28, b3,29, b3,30, b3,32 + b3,16, b3,17, b3,19
+                    //cannot stomp on these first round bit positions either: 10, 12, 29 + 7, 9, 10, 28, 31 + 0, 3, 7, 9, 12, 29
+                    int[] permutebits = new int[] { 4, 5, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30 }; //b3 free bit indexes: { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 23, 24, 30 };
+                    uint b3save = b3, x11save = x[11];
+                    x15save = x[15];
+                    for (int i = 1; i < (1 << 19); i++)
+                    {
+
+                        for (int c = 0; c < 19; c++)
+                        {
+                            if ((i & (1 << c)) != 0)
+                            {
+                                x[11] = (b3 & ((uint)1 << ((19 + permutebits[c]) % 32))) == 0 ? x[11] + ((uint)1 << (permutebits[c])) : x[11] - ((uint)1 << (permutebits[c]));
+                                b3 = Round1Operation(b2, c3, d3, a3, x[11], 19);
+                                c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
+                                x[15] = ROR(b4, 19) - b3 - ((c4 & d4) | (~c4 & a4));
+                            }
+                        }
+                        if (!VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito) ||
+                            !VerifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 7))
+                        {
+                            throw new ArgumentException();
+                        }
+                        //b9,32 = 1
+                        b9 = Round3Operation(b8, c9, d9, a9, x[12], 15);
+                        //b9 |= ((uint)1 << 31);
+                        //x[12] = Unround3Operation(b8, c9, d9, a9, b9, 15);
+
+                        //a10,32 = 1
+                        a10 = Round3Operation(a9, b9, c9, d9, x[2], 3);
+                        //a10 |= ((uint)1 << 31);
+                        //x[2] = Unround3Operation(a9, b9, c9, d9, a10, 3);
+                        if ((b9 & ((uint)1 << 31)) != 0 && (a10 & ((uint)1 << 31)) != 0) break;
+                        b3 = b3save;
+                        x[11] = x11save;
+                        x[15] = x15save;
+                    }
                 }
-
                 return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
             }
         }
