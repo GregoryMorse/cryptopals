@@ -1714,10 +1714,14 @@ namespace Cryptopals
                         {
                             throw new ArgumentException();
                         }
+                        a9 = Round3Operation(a8, b8, c8, d8, x[0], 3);
+                        d9 = Round3Operation(d8, a9, b8, c8, x[8], 9);
+                        c9 = Round3Operation(c8, d9, a9, b8, x[4], 11);
                         //b9,32 = 1
                         b9 = Round3Operation(b8, c9, d9, a9, x[12], 15);
                         //a10,32 = 1
                         a10 = Round3Operation(a9, b9, c9, d9, x[2], 3);
+                        if (VerifyConditions3(x, a0, b0, c0, d0, a9, b9, c9, d9, a10)) return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
                         if ((b9 & ((uint)1 << 31)) != 0 && (a10 & ((uint)1 << 31)) != 0) return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
                         b3 = b3save;
                         x[11] = x11save;
