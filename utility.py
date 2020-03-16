@@ -568,70 +568,28 @@ class MD4:
     x[2] = (x[2] + (1 << 31) - (1 << 28)) & 0xFFFFFFFF
     x[12] = (x[12] - (1 << 16)) & 0xFFFFFFFF
     return bytes([item for sublist in [y.to_bytes(4, 'little') for y in x] for item in sublist])
-  def verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, stage):
-    a1 = MD4.round1Operation(a0, b0, c0, d0, x[0], 3)
-    d1 = MD4.round1Operation(d0, a1, b0, c0, x[1], 7)
-    c1 = MD4.round1Operation(c0, d1, a1, b0, x[2], 11)
-    b1 = MD4.round1Operation(b0, c1, d1, a1, x[3], 19)
-    a2 = MD4.round1Operation(a1, b1, c1, d1, x[4], 3)
-    d2 = MD4.round1Operation(d1, a2, b1, c1, x[5], 7)
-    c2 = MD4.round1Operation(c1, d2, a2, b1, x[6], 11)
-    b2 = MD4.round1Operation(b1, c2, d2, a2, x[7], 19)
-    a3 = MD4.round1Operation(a2, b2, c2, d2, x[8], 3)
-    d3 = MD4.round1Operation(d2, a3, b2, c2, x[9], 7)
-    c3 = MD4.round1Operation(c2, d3, a3, b2, x[10], 11)
-    b3 = MD4.round1Operation(b2, c3, d3, a3, x[11], 19)
-    a4 = MD4.round1Operation(a3, b3, c3, d3, x[12], 3)
-    d4 = MD4.round1Operation(d3, a4, b3, c3, x[13], 7)
-    c4 = MD4.round1Operation(c3, d4, a4, b3, x[14], 11)
-    b4 = MD4.round1Operation(b3, c4, d4, a4, x[15], 19)
-    if (not ((a5 & (1 << 18)) == (c4 & (1 << 18)) and (a5 & (1 << 25)) != 0 and (a5 & (1 << 28)) != 0 and (a5 & (1 << 31)) != 0 and (a5 & (1 << 26)) == 0 and (not bNaito or ((a5 & (1 << 19)) == (b4 & (1 << 19)) and (a5 & (1 << 21)) == (b4 & (1 << 21)))))): return False
-    if (stage == 1): return True
-    if (not ((d5 & (1 << 18)) == (a5 & (1 << 18)) and (d5 & (1 << 25)) == (b4 & (1 << 25)) and (d5 & (1 << 26)) == (b4 & (1 << 26)) and (d5 & (1 << 28)) == (b4 & (1 << 28)) and
-                (d5 & (1 << 31)) == (b4 & (1 << 31)))): return False
-    if (stage == 2): return True
-    if (not ((c5 & (1 << 25)) == (d5 & (1 << 25)) and (c5 & (1 << 26)) == (d5 & (1 << 26)) and (c5 & (1 << 28)) == (d5 & (1 << 28)) and (c5 & (1 << 29)) == (d5 & (1 << 29)) and (c5 & (1 << 31)) == (d5 & (1 << 31)))): return False
-    if (stage == 3): return True
-    if (not ((b5 & (1 << 28)) == (c5 & (1 << 28)) and (b5 & (1 << 29)) != 0 and (b5 & (1 << 31)) == 0)): return False
-    if (stage == 4): return True
-    if (not ((a6 & (1 << 28)) != 0 and (not bNaito or (a6 & (1 << 29)) == 0) and (a6 & (1 << 31)) != 0)): return False
-    if (stage == 5): return True
-    if (not ((d6 & (1 << 28)) == (b5 & (1 << 28)))): return False
-    if (stage == 6): return True
-    if (not (a5 == MD4.round2Operation(a4, b4, c4, d4, x[0], 3) and
-        d5 == MD4.round2Operation(d4, a5, b4, c4, x[4], 5) and
-        c5 == MD4.round2Operation(c4, d5, a5, b4, x[8], 9) and
-        b5 == MD4.round2Operation(b4, c5, d5, a5, x[12], 13) and
-        a6 == MD4.round2Operation(a5, b5, c5, d5, x[1], 3) and
-        d6 == MD4.round2Operation(d5, a6, b5, c5, x[5], 5) and
-        c6 == MD4.round2Operation(c5, d6, a6, b5, x[9], 9) and
-        b6 == MD4.round2Operation(b5, c6, d6, a6, x[13], 13) and
-        a7 == MD4.round2Operation(a6, b6, c6, d6, x[2], 3) and
-        d7 == MD4.round2Operation(d6, a7, b6, c6, x[6], 5) and
-        c7 == MD4.round2Operation(c6, d7, a7, b6, x[10], 9) and
-        b7 == MD4.round2Operation(b6, c7, d7, a7, x[14], 13) and
-        a8 == MD4.round2Operation(a7, b7, c7, d7, x[3], 3) and
-        d8 == MD4.round2Operation(d7, a8, b7, c7, x[7], 5) and
-        c8 == MD4.round2Operation(c7, d8, a8, b7, x[11], 9) and
-        b8 == MD4.round2Operation(b7, c8, d8, a8, x[15], 13))): return False
-    return ((c6 & (1 << 28)) == (d6 & (1 << 28)) and (c6 & (1 << 29)) != (d6 & (1 << 29)) and (c6 & (1 << 31)) != (d6 & (1 << 31)))
-  def verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito):
-    if (not (a1 == MD4.round1Operation(a0, b0, c0, d0, x[0], 3) and
-        d1 == MD4.round1Operation(d0, a1, b0, c0, x[1], 7) and
-        c1 == MD4.round1Operation(c0, d1, a1, b0, x[2], 11) and
-        b1 == MD4.round1Operation(b0, c1, d1, a1, x[3], 19) and
-        a2 == MD4.round1Operation(a1, b1, c1, d1, x[4], 3) and
-        d2 == MD4.round1Operation(d1, a2, b1, c1, x[5], 7) and
-        c2 == MD4.round1Operation(c1, d2, a2, b1, x[6], 11) and
-        b2 == MD4.round1Operation(b1, c2, d2, a2, x[7], 19) and
-        a3 == MD4.round1Operation(a2, b2, c2, d2, x[8], 3) and
-        d3 == MD4.round1Operation(d2, a3, b2, c2, x[9], 7) and
-        c3 == MD4.round1Operation(c2, d3, a3, b2, x[10], 11) and
-        b3 == MD4.round1Operation(b2, c3, d3, a3, x[11], 19) and
-        a4 == MD4.round1Operation(a3, b3, c3, d3, x[12], 3) and
-        d4 == MD4.round1Operation(d3, a4, b3, c3, x[13], 7) and
-        c4 == MD4.round1Operation(c3, d4, a4, b3, x[14], 11) and
-        b4 == MD4.round1Operation(b3, c4, d4, a4, x[15], 19))): return False
+  def hasWangsConditions(x, bNaito, stage = 0):
+    #stage 0 is first round, stages 1-7 around second round per modification variable, stage 8 is third round
+    a0 = 0x67452301
+    b0 = 0xefcdab89
+    c0 = 0x98badcfe
+    d0 = 0x10325476
+    a1 = Round1Operation(a0, b0, c0, d0, x[0], 3)
+    d1 = Round1Operation(d0, a1, b0, c0, x[1], 7)
+    c1 = Round1Operation(c0, d1, a1, b0, x[2], 11)
+    b1 = Round1Operation(b0, c1, d1, a1, x[3], 19)
+    a2 = Round1Operation(a1, b1, c1, d1, x[4], 3)
+    d2 = Round1Operation(d1, a2, b1, c1, x[5], 7)
+    c2 = Round1Operation(c1, d2, a2, b1, x[6], 11)
+    b2 = Round1Operation(b1, c2, d2, a2, x[7], 19)
+    a3 = Round1Operation(a2, b2, c2, d2, x[8], 3)
+    d3 = Round1Operation(d2, a3, b2, c2, x[9], 7)
+    c3 = Round1Operation(c2, d3, a3, b2, x[10], 11)
+    b3 = Round1Operation(b2, c3, d3, a3, x[11], 19)
+    a4 = Round1Operation(a3, b3, c3, d3, x[12], 3)
+    d4 = Round1Operation(d3, a4, b3, c3, x[13], 7)
+    c4 = Round1Operation(c3, d4, a4, b3, x[14], 11)
+    b4 = Round1Operation(b3, c4, d4, a4, x[15], 19)
     if (not (((a1 & (1 << 6)) == (b0 & (1 << 6))) and
         (d1 & (1 << 6)) == 0 and (d1 & (1 << 7)) == (a1 & (1 << 7)) and (d1 & (1 << 10)) == (a1 & (1 << 10)) and
         (c1 & (1 << 6)) != 0 and (c1 & (1 << 7)) != 0 and (c1 & (1 << 10)) == 0 and (c1 & (1 << 25)) == (d1 & (1 << 25)) and
@@ -647,8 +605,95 @@ class MD4:
         (a4 & (1 << 29)) != 0 and (a4 & (1 << 22)) == 0 and (a4 & (1 << 25)) == 0 and (a4 & (1 << 31)) == 0 and (a4 & (1 << 26)) == (b3 & (1 << 26)) and (a4 & (1 << 28)) == (b3 & (1 << 28)) and
         (d4 & (1 << 22)) == 0 and (d4 & (1 << 25)) == 0 and (d4 & (1 << 29)) == 0 and (d4 & (1 << 26)) != 0 and (d4 & (1 << 28)) != 0 and (d4 & (1 << 31)) != 0 and
         (c4 & (1 << 26)) == 0 and (c4 & (1 << 28)) == 0 and (c4 & (1 << 29)) == 0 and (c4 & (1 << 22)) != 0 and (c4 & (1 << 25)) != 0 and (c4 & (1 << 18)) == (d4 & (1 << 18)) and
-        (b4 & (1 << 25)) != 0 and (b4 & (1 << 26)) != 0 and (b4 & (1 << 28)) != 0 and (b4 & (1 << 18)) == 0 and (b4 & (1 << 29)) == 0 and (b4 & (1 << 25)) == (c4 & (1 << 25)))): return False
-    return True
+        (b4 & (1 << 25)) != 0 and (b4 & (1 << 26)) != 0 and (b4 & (1 << 28)) != 0 and (b4 & (1 << 18)) == 0 and (b4 & (1 << 29)) == 0 and (b4 & (1 << 25)) == (c4 & (1 << 25)) and (not bNaito or (b4 & (1 << 31)) == (c4 & (1 << 31))))): return False
+    if (stage == 0): return True
+    a5 = Round2Operation(a4, b4, c4, d4, x[0], 3)
+    d5 = Round2Operation(d4, a5, b4, c4, x[4], 5)
+    c5 = Round2Operation(c4, d5, a5, b4, x[8], 9)
+    b5 = Round2Operation(b4, c5, d5, a5, x[12], 13)
+    a6 = Round2Operation(a5, b5, c5, d5, x[1], 3)
+    d6 = Round2Operation(d5, a6, b5, c5, x[5], 5)
+    c6 = Round2Operation(c5, d6, a6, b5, x[9], 9)
+    b6 = Round2Operation(b5, c6, d6, a6, x[13], 13)
+    a7 = Round2Operation(a6, b6, c6, d6, x[2], 3)
+    d7 = Round2Operation(d6, a7, b6, c6, x[6], 5)
+    c7 = Round2Operation(c6, d7, a7, b6, x[10], 9)
+    b7 = Round2Operation(b6, c7, d7, a7, x[14], 13)
+    a8 = Round2Operation(a7, b7, c7, d7, x[3], 3)
+    d8 = Round2Operation(d7, a8, b7, c7, x[7], 5)
+    c8 = Round2Operation(c7, d8, a8, b7, x[11], 9)
+    b8 = Round2Operation(b7, c8, d8, a8, x[15], 13)
+    if (not ((a5 & (1 << 18)) == (c4 & (1 << 18)) and (a5 & (1 << 25)) != 0 and (a5 & (1 << 28)) != 0 and (a5 & (1 << 31)) != 0 and (a5 & (1 << 26)) == 0 and (not bNaito or ((a5 & (1 << 19)) == (b4 & (1 << 19)) and (a5 & (1 << 21)) == (b4 & (1 << 21)))))): return False
+    if (stage == 1): return True
+    if (not ((d5 & (1 << 18)) == (a5 & (1 << 18)) and (d5 & (1 << 25)) == (b4 & (1 << 25)) and (d5 & (1 << 26)) == (b4 & (1 << 26)) and (d5 & (1 << 28)) == (b4 & (1 << 28)) and
+                (d5 & (1 << 31)) == (b4 & (1 << 31)))): return False
+    if (stage == 2): return True
+    if (not ((c5 & (1 << 25)) == (d5 & (1 << 25)) and (c5 & (1 << 26)) == (d5 & (1 << 26)) and (c5 & (1 << 28)) == (d5 & (1 << 28)) and (c5 & (1 << 29)) == (d5 & (1 << 29)) and (c5 & (1 << 31)) == (d5 & (1 << 31)))): return False
+    if (stage == 3): return True
+    if (not ((b5 & (1 << 28)) == (c5 & (1 << 28)) and (b5 & (1 << 29)) != 0 and (b5 & (1 << 31)) == 0)): return False
+    if (stage == 4): return True
+    if (not ((a6 & (1 << 28)) != 0 and (not bNaito or (a6 & (1 << 29)) == 0) and (a6 & (1 << 31)) != 0)): return False
+    if (stage == 5): return True
+    if (not ((d6 & (1 << 28)) == (b5 & (1 << 28)))): return False
+    if (stage == 6): return True
+    if (not ((c6 & (1 << 28)) == (d6 & (1 << 28)) and (c6 & (1 << 29)) != (d6 & (1 << 29)) and (c6 & (1 << 31)) != (d6 & (1 << 31)))): return False
+    if (stage == 7): return True
+    a9 = Round3Operation(a8, b8, c8, d8, x[0], 3)
+    d9 = Round3Operation(d8, a9, b8, c8, x[8], 9)
+    c9 = Round3Operation(c8, d9, a9, b8, x[4], 11)
+    b9 = Round3Operation(b8, c9, d9, a9, x[12], 15)
+    a10 = Round3Operation(a9, b9, c9, d9, x[2], 3)
+    return ((b9 & (1 << 31)) != 0 and (a10 & (1 << 31)) != 0)
+  def verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8):
+    a1 = Round1Operation(a0, b0, c0, d0, x[0], 3)
+    d1 = Round1Operation(d0, a1, b0, c0, x[1], 7)
+    c1 = Round1Operation(c0, d1, a1, b0, x[2], 11)
+    b1 = Round1Operation(b0, c1, d1, a1, x[3], 19)
+    a2 = Round1Operation(a1, b1, c1, d1, x[4], 3)
+    d2 = Round1Operation(d1, a2, b1, c1, x[5], 7)
+    c2 = Round1Operation(c1, d2, a2, b1, x[6], 11)
+    b2 = Round1Operation(b1, c2, d2, a2, x[7], 19)
+    a3 = Round1Operation(a2, b2, c2, d2, x[8], 3)
+    d3 = Round1Operation(d2, a3, b2, c2, x[9], 7)
+    c3 = Round1Operation(c2, d3, a3, b2, x[10], 11)
+    b3 = Round1Operation(b2, c3, d3, a3, x[11], 19)
+    a4 = Round1Operation(a3, b3, c3, d3, x[12], 3)
+    d4 = Round1Operation(d3, a4, b3, c3, x[13], 7)
+    c4 = Round1Operation(c3, d4, a4, b3, x[14], 11)
+    b4 = Round1Operation(b3, c4, d4, a4, x[15], 19)
+    return (a5 == Round2Operation(a4, b4, c4, d4, x[0], 3) and
+        d5 == Round2Operation(d4, a5, b4, c4, x[4], 5) and
+        c5 == Round2Operation(c4, d5, a5, b4, x[8], 9) and
+        b5 == Round2Operation(b4, c5, d5, a5, x[12], 13) and
+        a6 == Round2Operation(a5, b5, c5, d5, x[1], 3) and
+        d6 == Round2Operation(d5, a6, b5, c5, x[5], 5) and
+        c6 == Round2Operation(c5, d6, a6, b5, x[9], 9) and
+        b6 == Round2Operation(b5, c6, d6, a6, x[13], 13) and
+        a7 == Round2Operation(a6, b6, c6, d6, x[2], 3) and
+        d7 == Round2Operation(d6, a7, b6, c6, x[6], 5) and
+        c7 == Round2Operation(c6, d7, a7, b6, x[10], 9) and
+        b7 == Round2Operation(b6, c7, d7, a7, x[14], 13) and
+        a8 == Round2Operation(a7, b7, c7, d7, x[3], 3) and
+        d8 == Round2Operation(d7, a8, b7, c7, x[7], 5) and
+        c8 == Round2Operation(c7, d8, a8, b7, x[11], 9) and
+        b8 == Round2Operation(b7, c8, d8, a8, x[15], 13))
+  def VerifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4):
+    return (a1 == Round1Operation(a0, b0, c0, d0, x[0], 3) and
+        d1 == Round1Operation(d0, a1, b0, c0, x[1], 7) and
+        c1 == Round1Operation(c0, d1, a1, b0, x[2], 11) and
+        b1 == Round1Operation(b0, c1, d1, a1, x[3], 19) and
+        a2 == Round1Operation(a1, b1, c1, d1, x[4], 3) and
+        d2 == Round1Operation(d1, a2, b1, c1, x[5], 7) and
+        c2 == Round1Operation(c1, d2, a2, b1, x[6], 11) and
+        b2 == Round1Operation(b1, c2, d2, a2, x[7], 19) and
+        a3 == Round1Operation(a2, b2, c2, d2, x[8], 3) and
+        d3 == Round1Operation(d2, a3, b2, c2, x[9], 7) and
+        c3 == Round1Operation(c2, d3, a3, b2, x[10], 11) and
+        b3 == Round1Operation(b2, c3, d3, a3, x[11], 19) and
+        a4 == Round1Operation(a3, b3, c3, d3, x[12], 3) and
+        d4 == Round1Operation(d3, a4, b3, c3, x[13], 7) and
+        c4 == Round1Operation(c3, d4, a4, b3, x[14], 11) and
+        b4 == Round1Operation(b3, c4, d4, a4, x[15], 19))
   def wangsAttack(bts, bMulti, bNaito):
     #Naito et al. improvements: Add two sufficient conditions b4,32 = c4,32 and a6,30 = 0 probability 1/4
     #Change the modification method of d5,19 so that both of d5,19 = a5,19 and c5,26 = d5,26 can be corrected probability 7/8

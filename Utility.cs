@@ -1031,8 +1031,12 @@ namespace Cryptopals
                 }
                 return x.SelectMany((b) => BitConverter.GetBytes(b)).ToArray();
             }
-            public static bool VerifyConditions3(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a9, uint b9, uint c9, uint d9, uint a10)
-            {
+            public static bool HasWangsConditions(uint[] x, bool bNaito, int stage = 0)
+            { //stage 0 is first round, stages 1-7 around second round per modification variable, stage 8 is third round
+                uint a0 = 0x67452301;
+                uint b0 = 0xefcdab89;
+                uint c0 = 0x98badcfe;
+                uint d0 = 0x10325476;
                 uint a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
                 uint d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
                 uint c1 = Round1Operation(c0, d1, a1, b0, x[2], 11);
@@ -1049,6 +1053,23 @@ namespace Cryptopals
                 uint d4 = Round1Operation(d3, a4, b3, c3, x[13], 7);
                 uint c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
                 uint b4 = Round1Operation(b3, c4, d4, a4, x[15], 19);
+                if (!(((a1 & (1 << 6)) == (b0 & (1 << 6))) &&
+                    (d1 & (1 << 6)) == 0 && (d1 & (1 << 7)) == (a1 & (1 << 7)) && (d1 & (1 << 10)) == (a1 & (1 << 10)) &&
+                    (c1 & (1 << 6)) != 0 && (c1 & (1 << 7)) != 0 && (c1 & (1 << 10)) == 0 && (c1 & (1 << 25)) == (d1 & (1 << 25)) &&
+                    (b1 & (1 << 6)) != 0 && (b1 & (1 << 7)) == 0 && (b1 & (1 << 10)) == 0 && (b1 & (1 << 25)) == 0 &&
+                    (a2 & (1 << 7)) != 0 && (a2 & (1 << 10)) != 0 && (a2 & (1 << 25)) == 0 && (a2 & (1 << 13)) == (b1 & (1 << 13)) &&
+                    (d2 & (1 << 13)) == 0 && (d2 & (1 << 25)) != 0 && (d2 & (1 << 18)) == (a2 & (1 << 18)) && (d2 & (1 << 19)) == (a2 & (1 << 19)) && (d2 & (1 << 20)) == (a2 & (1 << 20)) && (d2 & (1 << 21)) == (a2 & (1 << 21)) &&
+                    (c2 & (1 << 13)) == 0 && (c2 & (1 << 18)) == 0 && (c2 & (1 << 19)) == 0 && (c2 & (1 << 21)) == 0 && (c2 & (1 << 20)) != 0 && (c2 & (1 << 12)) == (d2 & (1 << 12)) && (c2 & (1 << 14)) == (d2 & (1 << 14)) &&
+                    (b2 & (1 << 12)) != 0 && (b2 & (1 << 13)) != 0 && (b2 & (1 << 14)) == 0 && (b2 & (1 << 18)) == 0 && (b2 & (1 << 19)) == 0 && (b2 & (1 << 20)) == 0 && (b2 & (1 << 21)) == 0 && (b2 & (1 << 16)) == (c2 & (1 << 16)) &&
+                    (a3 & (1 << 12)) != 0 && (a3 & (1 << 13)) != 0 && (a3 & (1 << 14)) != 0 && (a3 & (1 << 21)) != 0 && (a3 & (1 << 16)) == 0 && (a3 & (1 << 18)) == 0 && (a3 & (1 << 19)) == 0 && (a3 & (1 << 20)) == 0 && (a3 & (1 << 22)) == (b2 & (1 << 22)) && (a3 & (1 << 25)) == (b2 & (1 << 25)) &&
+                    (d3 & (1 << 16)) == 0 && (d3 & (1 << 19)) == 0 && (d3 & (1 << 22)) == 0 && (d3 & (1 << 12)) != 0 && (d3 & (1 << 13)) != 0 && (d3 & (1 << 14)) != 0 && (d3 & (1 << 20)) != 0 && (d3 & (1 << 21)) != 0 && (d3 & (1 << 25)) != 0 && (d3 & (1 << 29)) == (a3 & (1 << 29)) &&
+                    (c3 & (1 << 19)) == 0 && (c3 & (1 << 20)) == 0 && (c3 & (1 << 21)) == 0 && (c3 & (1 << 22)) == 0 && (c3 & (1 << 25)) == 0 && (c3 & (1 << 16)) != 0 && (c3 & (1 << 29)) != 0 && (c3 & ((uint)1 << 31)) == (d3 & ((uint)1 << 31)) &&
+                    (b3 & (1 << 20)) != 0 && (b3 & (1 << 21)) != 0 && (b3 & (1 << 25)) != 0 && (b3 & (1 << 19)) == 0 && (b3 & (1 << 29)) == 0 && (b3 & ((uint)1 << 31)) == 0 && (b3 & (1 << 22)) == (c3 & (1 << 22)) &&
+                    (a4 & (1 << 29)) != 0 && (a4 & (1 << 22)) == 0 && (a4 & (1 << 25)) == 0 && (a4 & ((uint)1 << 31)) == 0 && (a4 & (1 << 26)) == (b3 & (1 << 26)) && (a4 & (1 << 28)) == (b3 & (1 << 28)) &&
+                    (d4 & (1 << 22)) == 0 && (d4 & (1 << 25)) == 0 && (d4 & (1 << 29)) == 0 && (d4 & (1 << 26)) != 0 && (d4 & (1 << 28)) != 0 && (d4 & ((uint)1 << 31)) != 0 &&
+                    (c4 & (1 << 26)) == 0 && (c4 & (1 << 28)) == 0 && (c4 & (1 << 29)) == 0 && (c4 & (1 << 22)) != 0 && (c4 & (1 << 25)) != 0 && (c4 & (1 << 18)) == (d4 & (1 << 18)) &&
+                    (b4 & (1 << 25)) != 0 && (b4 & (1 << 26)) != 0 && (b4 & (1 << 28)) != 0 && (b4 & (1 << 18)) == 0 && (b4 & (1 << 29)) == 0 && (b4 & (1 << 25)) == (c4 & (1 << 25)) && (!bNaito || (b4 & ((uint)1 << 31)) == (c4 & ((uint)1 << 31))))) return false;
+                if (stage == 0) return true;
                 uint a5 = Round2Operation(a4, b4, c4, d4, x[0], 3);
                 uint d5 = Round2Operation(d4, a5, b4, c4, x[4], 5);
                 uint c5 = Round2Operation(c4, d5, a5, b4, x[8], 9);
@@ -1065,14 +1086,29 @@ namespace Cryptopals
                 uint d8 = Round2Operation(d7, a8, b7, c7, x[7], 5);
                 uint c8 = Round2Operation(c7, d8, a8, b7, x[11], 9);
                 uint b8 = Round2Operation(b7, c8, d8, a8, x[15], 13);
-                if (!(a9 == Round3Operation(a8, b8, c8, d8, x[0], 3) &&
-                    d9 == Round3Operation(d8, a9, b8, c8, x[8], 9) &&
-                    c9 == Round3Operation(c8, d9, a9, b8, x[4], 11) &&
-                    b9 == Round3Operation(b8, c9, d9, a9, x[12], 15) &&
-                    a10 == Round3Operation(a9, b9, c9, d9, x[2], 3))) return false;
+                if (!((a5 & (1 << 18)) == (c4 & (1 << 18)) && (a5 & (1 << 25)) != 0 && (a5 & (1 << 28)) != 0 && (a5 & ((uint)1 << 31)) != 0 && (a5 & (1 << 26)) == 0 && (!bNaito || ((a5 & (1 << 19)) == (b4 & (1 << 19)) && (a5 & (1 << 21)) == (b4 & (1 << 21)))))) return false;
+                if (stage == 1) return true;
+                if (!((d5 & (1 << 18)) == (a5 & (1 << 18)) && (d5 & (1 << 25)) == (b4 & (1 << 25)) && (d5 & (1 << 26)) == (b4 & (1 << 26)) && (d5 & (1 << 28)) == (b4 & (1 << 28)) &&
+                            (d5 & ((uint)1 << 31)) == (b4 & ((uint)1 << 31)))) return false;
+                if (stage == 2) return true;
+                if (!((c5 & (1 << 25)) == (d5 & (1 << 25)) && (c5 & (1 << 26)) == (d5 & (1 << 26)) && (c5 & (1 << 28)) == (d5 & (1 << 28)) && (c5 & (1 << 29)) == (d5 & (1 << 29)) && (c5 & ((uint)1 << 31)) == (d5 & ((uint)1 << 31)))) return false;
+                if (stage == 3) return true;
+                if (!((b5 & (1 << 28)) == (c5 & (1 << 28)) && (b5 & (1 << 29)) != 0 && (b5 & ((uint)1 << 31)) == 0)) return false;
+                if (stage == 4) return true;
+                if (!((a6 & (1 << 28)) != 0 && (!bNaito || (a6 & (1 << 29)) == 0) && (a6 & ((uint)1 << 31)) != 0)) return false;
+                if (stage == 5) return true;
+                if (!((d6 & (1 << 28)) == (b5 & (1 << 28)))) return false;
+                if (stage == 6) return true;
+                if (!((c6 & (1 << 28)) == (d6 & (1 << 28)) && (c6 & (1 << 29)) != (d6 & (1 << 29)) && (c6 & (1 << 31)) != (d6 & (1 << 31)))) return false;
+                if (stage == 7) return true;
+                uint a9 = Round3Operation(a8, b8, c8, d8, x[0], 3);
+                uint d9 = Round3Operation(d8, a9, b8, c8, x[8], 9);
+                uint c9 = Round3Operation(c8, d9, a9, b8, x[4], 11);
+                uint b9 = Round3Operation(b8, c9, d9, a9, x[12], 15);
+                uint a10 = Round3Operation(a9, b9, c9, d9, x[2], 3);
                 return ((b9 & ((uint)1 << 31)) != 0 && (a10 & ((uint)1 << 31)) != 0);
             }
-            public static bool VerifyConditions2(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a5, uint b5, uint c5, uint d5, uint a6, uint b6, uint c6, uint d6, uint a7, uint b7, uint c7, uint d7, uint a8, uint b8, uint c8, uint d8, bool bNaito, int stage)
+            public static bool VerifyConditions2(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a5, uint b5, uint c5, uint d5, uint a6, uint b6, uint c6, uint d6, uint a7, uint b7, uint c7, uint d7, uint a8, uint b8, uint c8, uint d8)
             {
                 uint a1 = Round1Operation(a0, b0, c0, d0, x[0], 3);
                 uint d1 = Round1Operation(d0, a1, b0, c0, x[1], 7);
@@ -1090,20 +1126,7 @@ namespace Cryptopals
                 uint d4 = Round1Operation(d3, a4, b3, c3, x[13], 7);
                 uint c4 = Round1Operation(c3, d4, a4, b3, x[14], 11);
                 uint b4 = Round1Operation(b3, c4, d4, a4, x[15], 19);
-                if (!((a5 & (1 << 18)) == (c4 & (1 << 18)) && (a5 & (1 << 25)) != 0 && (a5 & (1 << 28)) != 0 && (a5 & ((uint)1 << 31)) != 0 && (a5 & (1 << 26)) == 0 && (!bNaito || ((a5 & (1 << 19)) == (b4 & (1 << 19)) && (a5 & (1 << 21)) == (b4 & (1 << 21)))))) return false;
-                if (stage == 1) return true;
-                if (!((d5 & (1 << 18)) == (a5 & (1 << 18)) && (d5 & (1 << 25)) == (b4 & (1 << 25)) && (d5 & (1 << 26)) == (b4 & (1 << 26)) && (d5 & (1 << 28)) == (b4 & (1 << 28)) &&
-                            (d5 & ((uint)1 << 31)) == (b4 & ((uint)1 << 31)))) return false;
-                if (stage == 2) return true;
-                if (!((c5 & (1 << 25)) == (d5 & (1 << 25)) && (c5 & (1 << 26)) == (d5 & (1 << 26)) && (c5 & (1 << 28)) == (d5 & (1 << 28)) && (c5 & (1 << 29)) == (d5 & (1 << 29)) && (c5 & ((uint)1 << 31)) == (d5 & ((uint)1 << 31)))) return false;
-                if (stage == 3) return true;
-                if (!((b5 & (1 << 28)) == (c5 & (1 << 28)) && (b5 & (1 << 29)) != 0 && (b5 & ((uint)1 << 31)) == 0)) return false;
-                if (stage == 4) return true;
-                if (!((a6 & (1 << 28)) != 0 && (!bNaito || (a6 & (1 << 29)) == 0) && (a6 & ((uint)1 << 31)) != 0)) return false;
-                if (stage == 5) return true;
-                if (!((d6 & (1 << 28)) == (b5 & (1 << 28)))) return false;
-                if (stage == 6) return true;
-                if (!(a5 == Round2Operation(a4, b4, c4, d4, x[0], 3) &&
+                return (a5 == Round2Operation(a4, b4, c4, d4, x[0], 3) &&
                     d5 == Round2Operation(d4, a5, b4, c4, x[4], 5) &&
                     c5 == Round2Operation(c4, d5, a5, b4, x[8], 9) &&
                     b5 == Round2Operation(b4, c5, d5, a5, x[12], 13) &&
@@ -1118,12 +1141,11 @@ namespace Cryptopals
                     a8 == Round2Operation(a7, b7, c7, d7, x[3], 3) &&
                     d8 == Round2Operation(d7, a8, b7, c7, x[7], 5) &&
                     c8 == Round2Operation(c7, d8, a8, b7, x[11], 9) &&
-                    b8 == Round2Operation(b7, c8, d8, a8, x[15], 13))) return false;
-                return ((c6 & (1 << 28)) == (d6 & (1 << 28)) && (c6 & (1 << 29)) != (d6 & (1 << 29)) && (c6 & (1 << 31)) != (d6 & (1 << 31)));
+                    b8 == Round2Operation(b7, c8, d8, a8, x[15], 13));
             }
-            public static bool VerifyConditions(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a1, uint b1, uint c1, uint d1, uint a2, uint b2, uint c2, uint d2, uint a3, uint b3, uint c3, uint d3, uint a4, uint b4, uint c4, uint d4, bool bMulti, bool bNaito)
+            public static bool VerifyConditions(uint[] x, uint a0, uint b0, uint c0, uint d0, uint a1, uint b1, uint c1, uint d1, uint a2, uint b2, uint c2, uint d2, uint a3, uint b3, uint c3, uint d3, uint a4, uint b4, uint c4, uint d4)
             {
-                if (!(a1 == Round1Operation(a0, b0, c0, d0, x[0], 3) &&
+                return (a1 == Round1Operation(a0, b0, c0, d0, x[0], 3) &&
                     d1 == Round1Operation(d0, a1, b0, c0, x[1], 7) &&
                     c1 == Round1Operation(c0, d1, a1, b0, x[2], 11) &&
                     b1 == Round1Operation(b0, c1, d1, a1, x[3], 19) &&
@@ -1138,24 +1160,7 @@ namespace Cryptopals
                     a4 == Round1Operation(a3, b3, c3, d3, x[12], 3) &&
                     d4 == Round1Operation(d3, a4, b3, c3, x[13], 7) &&
                     c4 == Round1Operation(c3, d4, a4, b3, x[14], 11) &&
-                    b4 == Round1Operation(b3, c4, d4, a4, x[15], 19))) return false;
-                if (!(((a1 & (1 << 6)) == (b0 & (1 << 6))) &&
-                    (d1 & (1 << 6)) == 0 && (d1 & (1 << 7)) == (a1 & (1 << 7)) && (d1 & (1 << 10)) == (a1 & (1 << 10)) &&
-                    (c1 & (1 << 6)) != 0 && (c1 & (1 << 7)) != 0 && (c1 & (1 << 10)) == 0 && (c1 & (1 << 25)) == (d1 & (1 << 25)) &&
-                    (b1 & (1 << 6)) != 0 && (b1 & (1 << 7)) == 0 && (b1 & (1 << 10)) == 0 && (b1 & (1 << 25)) == 0 &&
-                    (a2 & (1 << 7)) != 0 && (a2 & (1 << 10)) != 0 && (a2 & (1 << 25)) == 0 && (a2 & (1 << 13)) == (b1 & (1 << 13)) &&
-                    (d2 & (1 << 13)) == 0 && (d2 & (1 << 25)) != 0 && (d2 & (1 << 18)) == (a2 & (1 << 18)) && (d2 & (1 << 19)) == (a2 & (1 << 19)) && (d2 & (1 << 20)) == (a2 & (1 << 20)) && (d2 & (1 << 21)) == (a2 & (1 << 21)) &&
-                    (c2 & (1 << 13)) == 0 && (c2 & (1 << 18)) == 0 && (c2 & (1 << 19)) == 0 && (c2 & (1 << 21)) == 0 && (c2 & (1 << 20)) != 0 && (c2 & (1 << 12)) == (d2 & (1 << 12)) && (c2 & (1 << 14)) == (d2 & (1 << 14)) &&
-                    (b2 & (1 << 12)) != 0 && (b2 & (1 << 13)) != 0 && (b2 & (1 << 14)) == 0 && (b2 & (1 << 18)) == 0 && (b2 & (1 << 19)) == 0 && (b2 & (1 << 20)) == 0 && (b2 & (1 << 21)) == 0 && (b2 & (1 << 16)) == (c2 & (1 << 16)) &&
-                    (a3 & (1 << 12)) != 0 && (a3 & (1 << 13)) != 0 && (a3 & (1 << 14)) != 0 && (a3 & (1 << 21)) != 0 && (a3 & (1 << 16)) == 0 && (a3 & (1 << 18)) == 0 && (a3 & (1 << 19)) == 0 && (a3 & (1 << 20)) == 0 && (a3 & (1 << 22)) == (b2 & (1 << 22)) && (a3 & (1 << 25)) == (b2 & (1 << 25)) &&
-                    (d3 & (1 << 16)) == 0 && (d3 & (1 << 19)) == 0 && (d3 & (1 << 22)) == 0 && (d3 & (1 << 12)) != 0 && (d3 & (1 << 13)) != 0 && (d3 & (1 << 14)) != 0 && (d3 & (1 << 20)) != 0 && (d3 & (1 << 21)) != 0 && (d3 & (1 << 25)) != 0 && (d3 & (1 << 29)) == (a3 & (1 << 29)) &&
-                    (c3 & (1 << 19)) == 0 && (c3 & (1 << 20)) == 0 && (c3 & (1 << 21)) == 0 && (c3 & (1 << 22)) == 0 && (c3 & (1 << 25)) == 0 && (c3 & (1 << 16)) != 0 && (c3 & (1 << 29)) != 0 && (c3 & ((uint)1 << 31)) == (d3 & ((uint)1 << 31)) &&
-                    (b3 & (1 << 20)) != 0 && (b3 & (1 << 21)) != 0 && (b3 & (1 << 25)) != 0 && (b3 & (1 << 19)) == 0 && (b3 & (1 << 29)) == 0 && (b3 & ((uint)1 << 31)) == 0 && (b3 & (1 << 22)) == (c3 & (1 << 22)) &&
-                    (a4 & (1 << 29)) != 0 && (a4 & (1 << 22)) == 0 && (a4 & (1 << 25)) == 0 && (a4 & ((uint)1 << 31)) == 0 && (a4 & (1 << 26)) == (b3 & (1 << 26)) && (a4 & (1 << 28)) == (b3 & (1 << 28)) &&
-                    (d4 & (1 << 22)) == 0 && (d4 & (1 << 25)) == 0 && (d4 & (1 << 29)) == 0 && (d4 & (1 << 26)) != 0 && (d4 & (1 << 28)) != 0 && (d4 & ((uint)1 << 31)) != 0 &&
-                    (c4 & (1 << 26)) == 0 && (c4 & (1 << 28)) == 0 && (c4 & (1 << 29)) == 0 && (c4 & (1 << 22)) != 0 && (c4 & (1 << 25)) != 0 && (c4 & (1 << 18)) == (d4 & (1 << 18)) &&
-                    (b4 & (1 << 25)) != 0 && (b4 & (1 << 26)) != 0 && (b4 & (1 << 28)) != 0 && (b4 & (1 << 18)) == 0 && (b4 & (1 << 29)) == 0 && (b4 & (1 << 25)) == (c4 & (1 << 25)))) return false;
-                return true;
+                    b4 == Round1Operation(b3, c4, d4, a4, x[15], 19));
             }
             public static byte[] WangsAttack(byte[] bytes, bool bMulti, bool bNaito)
             {
