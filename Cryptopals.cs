@@ -2463,7 +2463,7 @@ namespace Cryptopals
                 total += n;
             }
             Console.WriteLine("Naito et al. improvement: " + total + " tries to find 5000 collisions with probability " + ((double)total / 5000));
-            return false;
+            return total == 5000;
         }
         static public bool Challenge56()
         {

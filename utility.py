@@ -478,6 +478,8 @@ class MD4:
   def __init__(self):
     self.x = [0] * 16
     self.dontInit = False
+    self._dontPad = False
+    self._bigEndian = False
     self.initialize()
   def initFromHashLen(self, h, blocks):
     self.a = int.from_bytes(h[:4], 'little')
@@ -506,8 +508,8 @@ class MD4:
   def hashCore(self, array, offset, length):
     self.processMessage(array[offset:offset+length])
   def hashFinal(self):
-    self.processMessage(self.padding())
-    res = self.a.to_bytes(4, 'little') + self.b.to_bytes(4, 'little') + self.c.to_bytes(4, 'little') + self.d.to_bytes(4, 'little')
+    if not self._dontPad: self.processMessage(self.padding())
+    res = self.a.to_bytes(4, 'big' if self._bigEndian else 'little') + self.b.to_bytes(4, 'big' if self._bigEndian else 'little') + self.c.to_bytes(4, 'big' if self._bigEndian else 'little') + self.d.to_bytes(4, 'big' if self._bigEndian else 'little')
     self.initialize()
     return res
   def processMessage(self, bytes):
@@ -519,7 +521,7 @@ class MD4:
       if c == 63: self.process16WordBlock()
       self.bytesProcessed += 1
   def padding(self):
-    return bytes([0x80] + [0] * (((self.bytesProcessed + 8) & 0x7fffffc0) + 55 - self.bytesProcessed)) + (self.bytesProcessed << 3).to_bytes(8, 'little')
+    return bytes([0x80] + [0] * (((self.bytesProcessed + 8) & 0x7fffffc0) + 55 - self.bytesProcessed)) + (self.bytesProcessed << 3).to_bytes(8, 'little' if self._bigEndian else 'little')
   def process16WordBlock(self):
     aa, bb, cc, dd = self.a, self.b, self.c, self.d
     for k in [0, 4, 8, 12]:
@@ -549,6 +551,638 @@ class MD4:
     return MD4.rol((a + ((b & c) | (b & d) | (c & d)) + xk + 0x5a827999) & 0xFFFFFFFF, s)
   def round3Operation(a, b, c, d, xk, s):
     return MD4.rol((a + (b ^ c ^ d) + xk + 0x6ed9eba1) & 0xFFFFFFFF, s)
+  def ror(value, numberOfBits):
+    return (value >> numberOfBits) | ((value << (32 - numberOfBits)) & 0xFFFFFFFF)
+  def unround1Operation(a, b, c, d, xk, s):
+    return (MD4.ror(xk, s) - a - ((b & c) | (~b & d))) % 0x100000000
+  def applyWangDifferential(bts):
+    x = [0] * 16
+    processed = 0
+    for b in bts:
+      i = processed >> 2
+      s = (processed & 3) << 3
+      x[i] = (x[i] & ~(255 << s)) | (b << s)
+      if processed == 63: break
+      processed += 1
+    x[1] = (x[1] + (1 << 31)) & 0xFFFFFFFF
+    x[2] = (x[2] + (1 << 31) - (1 << 28)) & 0xFFFFFFFF
+    x[12] = (x[12] - (1 << 16)) & 0xFFFFFFFF
+    return bytes([item for sublist in [y.to_bytes(4, 'little') for y in x] for item in sublist])
+  def verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, stage):
+    a1 = MD4.round1Operation(a0, b0, c0, d0, x[0], 3)
+    d1 = MD4.round1Operation(d0, a1, b0, c0, x[1], 7)
+    c1 = MD4.round1Operation(c0, d1, a1, b0, x[2], 11)
+    b1 = MD4.round1Operation(b0, c1, d1, a1, x[3], 19)
+    a2 = MD4.round1Operation(a1, b1, c1, d1, x[4], 3)
+    d2 = MD4.round1Operation(d1, a2, b1, c1, x[5], 7)
+    c2 = MD4.round1Operation(c1, d2, a2, b1, x[6], 11)
+    b2 = MD4.round1Operation(b1, c2, d2, a2, x[7], 19)
+    a3 = MD4.round1Operation(a2, b2, c2, d2, x[8], 3)
+    d3 = MD4.round1Operation(d2, a3, b2, c2, x[9], 7)
+    c3 = MD4.round1Operation(c2, d3, a3, b2, x[10], 11)
+    b3 = MD4.round1Operation(b2, c3, d3, a3, x[11], 19)
+    a4 = MD4.round1Operation(a3, b3, c3, d3, x[12], 3)
+    d4 = MD4.round1Operation(d3, a4, b3, c3, x[13], 7)
+    c4 = MD4.round1Operation(c3, d4, a4, b3, x[14], 11)
+    b4 = MD4.round1Operation(b3, c4, d4, a4, x[15], 19)
+    if (not ((a5 & (1 << 18)) == (c4 & (1 << 18)) and (a5 & (1 << 25)) != 0 and (a5 & (1 << 28)) != 0 and (a5 & (1 << 31)) != 0 and (a5 & (1 << 26)) == 0 and (not bNaito or ((a5 & (1 << 19)) == (b4 & (1 << 19)) and (a5 & (1 << 21)) == (b4 & (1 << 21)))))): return False
+    if (stage == 1): return True
+    if (not ((d5 & (1 << 18)) == (a5 & (1 << 18)) and (d5 & (1 << 25)) == (b4 & (1 << 25)) and (d5 & (1 << 26)) == (b4 & (1 << 26)) and (d5 & (1 << 28)) == (b4 & (1 << 28)) and
+                (d5 & (1 << 31)) == (b4 & (1 << 31)))): return False
+    if (stage == 2): return True
+    if (not ((c5 & (1 << 25)) == (d5 & (1 << 25)) and (c5 & (1 << 26)) == (d5 & (1 << 26)) and (c5 & (1 << 28)) == (d5 & (1 << 28)) and (c5 & (1 << 29)) == (d5 & (1 << 29)) and (c5 & (1 << 31)) == (d5 & (1 << 31)))): return False
+    if (stage == 3): return True
+    if (not ((b5 & (1 << 28)) == (c5 & (1 << 28)) and (b5 & (1 << 29)) != 0 and (b5 & (1 << 31)) == 0)): return False
+    if (stage == 4): return True
+    if (not ((a6 & (1 << 28)) != 0 and (not bNaito or (a6 & (1 << 29)) == 0) and (a6 & (1 << 31)) != 0)): return False
+    if (stage == 5): return True
+    if (not ((d6 & (1 << 28)) == (b5 & (1 << 28)))): return False
+    if (stage == 6): return True
+    if (not (a5 == MD4.round2Operation(a4, b4, c4, d4, x[0], 3) and
+        d5 == MD4.round2Operation(d4, a5, b4, c4, x[4], 5) and
+        c5 == MD4.round2Operation(c4, d5, a5, b4, x[8], 9) and
+        b5 == MD4.round2Operation(b4, c5, d5, a5, x[12], 13) and
+        a6 == MD4.round2Operation(a5, b5, c5, d5, x[1], 3) and
+        d6 == MD4.round2Operation(d5, a6, b5, c5, x[5], 5) and
+        c6 == MD4.round2Operation(c5, d6, a6, b5, x[9], 9) and
+        b6 == MD4.round2Operation(b5, c6, d6, a6, x[13], 13) and
+        a7 == MD4.round2Operation(a6, b6, c6, d6, x[2], 3) and
+        d7 == MD4.round2Operation(d6, a7, b6, c6, x[6], 5) and
+        c7 == MD4.round2Operation(c6, d7, a7, b6, x[10], 9) and
+        b7 == MD4.round2Operation(b6, c7, d7, a7, x[14], 13) and
+        a8 == MD4.round2Operation(a7, b7, c7, d7, x[3], 3) and
+        d8 == MD4.round2Operation(d7, a8, b7, c7, x[7], 5) and
+        c8 == MD4.round2Operation(c7, d8, a8, b7, x[11], 9) and
+        b8 == MD4.round2Operation(b7, c8, d8, a8, x[15], 13))): return False
+    return ((c6 & (1 << 28)) == (d6 & (1 << 28)) and (c6 & (1 << 29)) != (d6 & (1 << 29)) and (c6 & (1 << 31)) != (d6 & (1 << 31)))
+  def verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito):
+    if (not (a1 == MD4.round1Operation(a0, b0, c0, d0, x[0], 3) and
+        d1 == MD4.round1Operation(d0, a1, b0, c0, x[1], 7) and
+        c1 == MD4.round1Operation(c0, d1, a1, b0, x[2], 11) and
+        b1 == MD4.round1Operation(b0, c1, d1, a1, x[3], 19) and
+        a2 == MD4.round1Operation(a1, b1, c1, d1, x[4], 3) and
+        d2 == MD4.round1Operation(d1, a2, b1, c1, x[5], 7) and
+        c2 == MD4.round1Operation(c1, d2, a2, b1, x[6], 11) and
+        b2 == MD4.round1Operation(b1, c2, d2, a2, x[7], 19) and
+        a3 == MD4.round1Operation(a2, b2, c2, d2, x[8], 3) and
+        d3 == MD4.round1Operation(d2, a3, b2, c2, x[9], 7) and
+        c3 == MD4.round1Operation(c2, d3, a3, b2, x[10], 11) and
+        b3 == MD4.round1Operation(b2, c3, d3, a3, x[11], 19) and
+        a4 == MD4.round1Operation(a3, b3, c3, d3, x[12], 3) and
+        d4 == MD4.round1Operation(d3, a4, b3, c3, x[13], 7) and
+        c4 == MD4.round1Operation(c3, d4, a4, b3, x[14], 11) and
+        b4 == MD4.round1Operation(b3, c4, d4, a4, x[15], 19))): return False
+    if (not (((a1 & (1 << 6)) == (b0 & (1 << 6))) and
+        (d1 & (1 << 6)) == 0 and (d1 & (1 << 7)) == (a1 & (1 << 7)) and (d1 & (1 << 10)) == (a1 & (1 << 10)) and
+        (c1 & (1 << 6)) != 0 and (c1 & (1 << 7)) != 0 and (c1 & (1 << 10)) == 0 and (c1 & (1 << 25)) == (d1 & (1 << 25)) and
+        (b1 & (1 << 6)) != 0 and (b1 & (1 << 7)) == 0 and (b1 & (1 << 10)) == 0 and (b1 & (1 << 25)) == 0 and
+        (a2 & (1 << 7)) != 0 and (a2 & (1 << 10)) != 0 and (a2 & (1 << 25)) == 0 and (a2 & (1 << 13)) == (b1 & (1 << 13)) and
+        (d2 & (1 << 13)) == 0 and (d2 & (1 << 25)) != 0 and (d2 & (1 << 18)) == (a2 & (1 << 18)) and (d2 & (1 << 19)) == (a2 & (1 << 19)) and (d2 & (1 << 20)) == (a2 & (1 << 20)) and (d2 & (1 << 21)) == (a2 & (1 << 21)) and
+        (c2 & (1 << 13)) == 0 and (c2 & (1 << 18)) == 0 and (c2 & (1 << 19)) == 0 and (c2 & (1 << 21)) == 0 and (c2 & (1 << 20)) != 0 and (c2 & (1 << 12)) == (d2 & (1 << 12)) and (c2 & (1 << 14)) == (d2 & (1 << 14)) and
+        (b2 & (1 << 12)) != 0 and (b2 & (1 << 13)) != 0 and (b2 & (1 << 14)) == 0 and (b2 & (1 << 18)) == 0 and (b2 & (1 << 19)) == 0 and (b2 & (1 << 20)) == 0 and (b2 & (1 << 21)) == 0 and (b2 & (1 << 16)) == (c2 & (1 << 16)) and
+        (a3 & (1 << 12)) != 0 and (a3 & (1 << 13)) != 0 and (a3 & (1 << 14)) != 0 and (a3 & (1 << 21)) != 0 and (a3 & (1 << 16)) == 0 and (a3 & (1 << 18)) == 0 and (a3 & (1 << 19)) == 0 and (a3 & (1 << 20)) == 0 and (a3 & (1 << 22)) == (b2 & (1 << 22)) and (a3 & (1 << 25)) == (b2 & (1 << 25)) and
+        (d3 & (1 << 16)) == 0 and (d3 & (1 << 19)) == 0 and (d3 & (1 << 22)) == 0 and (d3 & (1 << 12)) != 0 and (d3 & (1 << 13)) != 0 and (d3 & (1 << 14)) != 0 and (d3 & (1 << 20)) != 0 and (d3 & (1 << 21)) != 0 and (d3 & (1 << 25)) != 0 and (d3 & (1 << 29)) == (a3 & (1 << 29)) and
+        (c3 & (1 << 19)) == 0 and (c3 & (1 << 20)) == 0 and (c3 & (1 << 21)) == 0 and (c3 & (1 << 22)) == 0 and (c3 & (1 << 25)) == 0 and (c3 & (1 << 16)) != 0 and (c3 & (1 << 29)) != 0 and (c3 & (1 << 31)) == (d3 & (1 << 31)) and
+        (b3 & (1 << 20)) != 0 and (b3 & (1 << 21)) != 0 and (b3 & (1 << 25)) != 0 and (b3 & (1 << 19)) == 0 and (b3 & (1 << 29)) == 0 and (b3 & (1 << 31)) == 0 and (b3 & (1 << 22)) == (c3 & (1 << 22)) and
+        (a4 & (1 << 29)) != 0 and (a4 & (1 << 22)) == 0 and (a4 & (1 << 25)) == 0 and (a4 & (1 << 31)) == 0 and (a4 & (1 << 26)) == (b3 & (1 << 26)) and (a4 & (1 << 28)) == (b3 & (1 << 28)) and
+        (d4 & (1 << 22)) == 0 and (d4 & (1 << 25)) == 0 and (d4 & (1 << 29)) == 0 and (d4 & (1 << 26)) != 0 and (d4 & (1 << 28)) != 0 and (d4 & (1 << 31)) != 0 and
+        (c4 & (1 << 26)) == 0 and (c4 & (1 << 28)) == 0 and (c4 & (1 << 29)) == 0 and (c4 & (1 << 22)) != 0 and (c4 & (1 << 25)) != 0 and (c4 & (1 << 18)) == (d4 & (1 << 18)) and
+        (b4 & (1 << 25)) != 0 and (b4 & (1 << 26)) != 0 and (b4 & (1 << 28)) != 0 and (b4 & (1 << 18)) == 0 and (b4 & (1 << 29)) == 0 and (b4 & (1 << 25)) == (c4 & (1 << 25)))): return False
+    return True
+  def wangsAttack(bts, bMulti, bNaito):
+    #Naito et al. improvements: Add two sufficient conditions b4,32 = c4,32 and a6,30 = 0 probability 1/4
+    #Change the modification method of d5,19 so that both of d5,19 = a5,19 and c5,26 = d5,26 can be corrected probability 7/8
+    #wrong correction of c5,29 probability 1/2
+    #Change the modification method of c5,32 so that both of c5,32 = d5,32 and c6,32 = d6,32 + 1 can be corrected probability 3/4
+    #satisfying condition in 3rd round probability 1/4
+    x = [0] * 16
+    processed = 0
+    #padding can be added for short messages...
+    #Enumerable.Repeat((byte)128, 1)
+    #.Concat(Enumerable.Repeat((byte)0, (int)(((_bytesProcessed + 8) & 0x7fffffc0) + 55 - _bytesProcessed)))
+    #.Concat(BitConverter.GetBytes((ulong)(_bytesProcessed << 3)))
+    for b in bts:
+      i = processed >> 2
+      s = (processed & 3) << 3
+      x[i] = (x[i] & ~(255 << s)) | (b << s)
+      if (processed == 63): break
+      processed += 1
+    
+    #step 1 - weak message - single step rules 2^25
+    a0 = 0x67452301
+    b0 = 0xefcdab89
+    c0 = 0x98badcfe
+    d0 = 0x10325476
+
+    #a1,7 = b0,7
+    a1 = MD4.round1Operation(a0, b0, c0, d0, x[0], 3)
+    a1 ^= (a1 & (1 << 6)) ^ (b0 & (1 << 6))
+    #extra condition to allow correcting d5,19 in 2nd round
+    if (bMulti and bNaito): a1 ^= (a1 & (1 << 13)) ^ (b0 & (1 << 13))
+    x[0] = MD4.unround1Operation(a0, b0, c0, d0, a1, 3)
+
+    #d1,7 = 0, d1,8 = a1,8, d1,11 = a1,11
+    d1 = MD4.round1Operation(d0, a1, b0, c0, x[1], 7)
+    d1 &= ~(1 << 6)
+    d1 ^= (d1 & (1 << 7)) ^ (a1 & (1 << 7)) ^ (d1 & (1 << 10)) ^ (a1 & (1 << 10))
+    #extra condition to allow correcting d5,19 in 2nd round
+    if (bMulti and bNaito): d1 &= ~(1 << 13)
+    x[1] = MD4.unround1Operation(d0, a1, b0, c0, d1, 7)
+
+    #c1,7 = 1, c1,8 = 1, c1,11 = 0, c1,26 = d1,26
+    c1 = MD4.round1Operation(c0, d1, a1, b0, x[2], 11)
+    c1 |= (1 << 6) | (1 << 7)
+    c1 &= ~(1 << 10)
+    c1 ^= (c1 & (1 << 25)) ^ (d1 & (1 << 25))
+    #extra condition to allow correcting d5,19 in 2nd round
+    if (bMulti and bNaito): c1 &= ~(1 << 13)
+    x[2] = MD4.unround1Operation(c0, d1, a1, b0, c1, 11)
+
+    #b1,7 = 1, b1,8 = 0, b1,11 = 0, b1,26 = 0
+    b1 = MD4.round1Operation(b0, c1, d1, a1, x[3], 19)
+    b1 |= (1 << 6)
+    b1 &= ~((1 << 7) | (1 << 10) | (1 << 25))
+    #extra condition to allow correcting d5,19 in 2nd round
+    if (bMulti and bNaito): b1 &= ~(1 << 13)
+    #extra condition to allow correcting a6,29, a6,30, a6,32 in 2nd round
+    if (bMulti): b1 |= (1 << 0) | ((1 << 1) if bNaito else 0) | (1 << 3)
+    x[3] = MD4.unround1Operation(b0, c1, d1, a1, b1, 19)
+
+    #a2,8 = 1, a2,11 = 1, a2,26 = 0, a2,14 = b1,14
+    a2 = MD4.round1Operation(a1, b1, c1, d1, x[4], 3)
+    a2 |= (1 << 7) | (1 << 10)
+    a2 &= ~(1 << 25)
+    a2 ^= (a2 & (1 << 13)) ^ (b1 & (1 << 13))
+    #extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
+    if (bMulti): a2 ^= (a2 & (1 << (25 - 9))) ^ (b1 & (1 << (25 - 9))) ^ (a2 & (1 << (26 - 9))) ^ (b1 & (1 << (26 - 9))) ^ ((a2 & (1 << (30 - 9))) ^ (b1 & (1 << (30 - 9))) if bNaito else (a2 & (1 << (28 - 9))) ^ (b1 & (1 << (28 - 9))) ^ (a2 & (1 << (31 - 9))) ^ (b1 & (1 << (31 - 9))))
+    x[4] = MD4.unround1Operation(a1, b1, c1, d1, a2, 3)
+
+    #d2,14 = 0, d2,19 = a2,19, d2,20 = a2,20, d2,21 = a2,21, d2,22 = a2,22, d2,26 = 1
+    d2 = MD4.round1Operation(d1, a2, b1, c1, x[5], 7)
+    d2 &= ~(1 << 13)
+    d2 |= (1 << 25)
+    d2 ^= (d2 & (1 << 18)) ^ (a2 & (1 << 18)) ^ (d2 & (1 << 19)) ^ (a2 & (1 << 19)) ^ (d2 & (1 << 20)) ^ (a2 & (1 << 20)) ^ (d2 & (1 << 21)) ^ (a2 & (1 << 21))
+    #extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
+    #(d2 & (1 << 19)) ^ (a2 & (1 << 19)) conflicts with (1 << (28 - 9))
+    #if (bMulti) d2 &= ~((1 << (25 - 9)) | (1 << (26 - 9)) | (0 if bNaito else (1 << (28 - 9)) | (1 << (31 - 9))))
+    if (bMulti): d2 &= ~((1 << (25 - 9)) | (1 << (26 - 9)) | (0 if bNaito else (1 << (31 - 9))))
+    #extra condition to allow correcting c6,32 in 2nd round
+    #(1 << (31 - 9)) conflicts with (d2 & (1 << 22)) ^ (a2 & (1 << 22))
+    #unfortunately not knowing whether to correct for c5,32 or d2,32 makes a 3/8 chance of failure not 1/4 because of the additional case of when d2,23!=a2,23
+    if (bMulti and bNaito): d2 ^= (d2 & (1 << 22)) ^ (a2 & (1 << 22))
+    x[5] = MD4.unround1Operation(d1, a2, b1, c1, d2, 7)
+
+    #c2,13 = d2,13, c2,14 = 0, c2,15 = d2,15, c2,19 = 0, c2,20 = 0, c2,21 = 1, c2,22 = 0
+    c2 = MD4.round1Operation(c1, d2, a2, b1, x[6], 11)
+    c2 &= ~((1 << 13) | (1 << 18) | (1 << 19) | (1 << 21))
+    c2 |= (1 << 20)
+    c2 ^= (c2 & (1 << 12)) ^ (d2 & (1 << 12)) ^ (c2 & (1 << 14)) ^ (d2 & (1 << 14))
+    #extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
+    if (bMulti): c2 &= ~((1 << (25 - 9)) | (1 << (26 - 9)) | (0 if bNaito else (1 << (28 - 9)) | (1 << (31 - 9))))
+    #extra condition to allow correcting c6,32 in 2nd round
+    if (bMulti): c2 &= ~(1 << 22)
+    x[6] = MD4.unround1Operation(c1, d2, a2, b1, c2, 11)
+
+    #b2,13 = 1, b2,14 = 1, b2,15 = 0, b2,17 = c2,17, b2,19 = 0, b2,20 = 0, b2,21 = 0, b2,22 = 0
+    b2 = MD4.round1Operation(b1, c2, d2, a2, x[7], 19)
+    b2 |= (1 << 12) | (1 << 13)
+    b2 &= ~((1 << 14) | (1 << 18) | (1 << 19) | (1 << 20) | (1 << 21))
+    b2 ^= (b2 & (1 << 16)) ^ (c2 & (1 << 16))
+    #extra condition to allow correcting c5,26, c5,27, c5,29, c5,31 in 2nd round
+    #(b2 & (1 << 16)) ^ (c2 & (1 << 16)) conflicts with (1 << (25 - 9))
+    if (bMulti): b2 &= ~((1 << (25 - 9)) | (1 << (26 - 9)) | (0 if bNaito else (1 << (28 - 9)) | (1 << (31 - 9))))
+    #extra condition to allow correcting d6,29 in 2nd round
+    if (bMulti): b2 |= (1 << 30)
+    #extra condition to allow correcting c6,32 in 2nd round
+    if (bMulti): b2 &= ~(1 << 22)
+    x[7] = MD4.unround1Operation(b1, c2, d2, a2, b2, 19)
+
+    #a3,13 = 1, a3,14 = 1, a3,15 = 1, a3,17 = 0, a3,19 = 0, a3,20 = 0, a3,21 = 0, a3,23 = b2,23, a3,22 = 1, a3,26 = b2,26
+    a3 = MD4.round1Operation(a2, b2, c2, d2, x[8], 3)
+    a3 |= (1 << 12) | (1 << 13) | (1 << 14) | (1 << 21)
+    a3 &= ~((1 << 16) | (1 << 18) | (1 << 19) | (1 << 20))
+    a3 ^= (a3 & (1 << 22)) ^ (b2 & (1 << 22)) ^ (a3 & (1 << 25)) ^ (b2 & (1 << 25))
+    x[8] = MD4.unround1Operation(a2, b2, c2, d2, a3, 3)
+
+    #d3,13 = 1, d3,14 = 1, d3,15 = 1, d3,17 = 0, d3,20 = 0, d3,21 = 1, d3,22 = 1, d3,23 = 0, d3,26 = 1, d3,30 = a3,30
+    d3 = MD4.round1Operation(d2, a3, b2, c2, x[9], 7)
+    d3 &= ~((1 << 16) | (1 << 19) | (1 << 22))
+    d3 |= (1 << 12) | (1 << 13) | (1 << 14) | (1 << 20 | (1 << 21) | (1 << 25))
+    d3 ^= (d3 & (1 << 29)) ^ (a3 & (1 << 29))
+    #extra condition to allow correcting b5,29, b5,32 in 2nd round
+    if (bMulti): d3 ^= (d3 & (1 << 15)) ^ (a3 & (1 << 15)) ^ (d3 & (1 << 18)) ^ (a3 & (1 << 18))
+    x[9] = MD4.unround1Operation(d2, a3, b2, c2, d3, 7)
+
+    #c3,17 = 1, c3,20 = 0, c3,21 = 0, c3,22 = 0, c3,23 = 0, c3,26 = 0, c3,30 = 1, c3,32 = d3,32
+    c3 = MD4.round1Operation(c2, d3, a3, b2, x[10], 11)
+    c3 &= ~((1 << 19) | (1 << 20) | (1 << 21) | (1 << 22) | (1 << 25))
+    c3 |= (1 << 16) | (1 << 29)
+    c3 ^= (c3 & (1 << 31)) ^ (d3 & (1 << 31))
+    #extra condition to allow correcting b5,29, b5,32 in 2nd round
+    if (bMulti): c3 &= ~((1 << 15) | (1 << 18))
+    #extra conditions to allow 3rd round corrections in x[11]
+    if (bMulti and bNaito): c3 ^= ((c3 & (1 << 0)) ^ (c3 & (1 << 1)) ^ (c3 & (1 << 2)) ^ (c3 & (1 << 3)) ^ (c3 & (1 << 4)) ^ (c3 & (1 << 5)) ^ (c3 & (1 << 6)) ^ (c3 & (1 << 7)) ^ (c3 & (1 << 8)) ^ (c3 & (1 << 9)) ^ (c3 & (1 << 10)) ^ (c3 & (1 << 11)) ^ (c3 & (1 << 12)) ^ (c3 & (1 << 13)) ^ (c3 & (1 << 14)) ^ (c3 & (1 << 17)) ^ (c3 & (1 << 23)) ^ (c3 & (1 << 24)) ^ (c3 & (1 << 30)) ^
+                                (d3 & (1 << 0)) ^ (d3 & (1 << 1)) ^ (d3 & (1 << 2)) ^ (d3 & (1 << 3)) ^ (d3 & (1 << 4)) ^ (d3 & (1 << 5)) ^ (d3 & (1 << 6)) ^ (d3 & (1 << 7)) ^ (d3 & (1 << 8)) ^ (d3 & (1 << 9)) ^ (d3 & (1 << 10)) ^ (d3 & (1 << 11)) ^ (d3 & (1 << 12)) ^ (d3 & (1 << 13)) ^ (d3 & (1 << 14)) ^ (d3 & (1 << 17)) ^ (d3 & (1 << 23)) ^ (d3 & (1 << 24)) ^ (d3 & (1 << 30)))
+    x[10] = MD4.unround1Operation(c2, d3, a3, b2, c3, 11)
+
+    #b3 uses 7 + 5 = 12 not 13 but b3,29 comes from a4,29 and d4,29 - b3,16, b3,17, b3,19, b3,20, b3,21, b3,22, b3,23, b3,26, b3,27, b3,28, b3,29, b3,30, b3,32
+    #b3,20 = 0, b3,21 = 1, b3,22 = 1, b3,23 = c3,23, b3,26 = 1, b3,30 = 0, b3,32 = 0
+    b3 = MD4.round1Operation(b2, c3, d3, a3, x[11], 19)
+    b3 |= (1 << 20) | (1 << 21) | (1 << 25)
+    b3 &= ~((1 << 19) | (1 << 29) | (1 << 31))
+    b3 ^= (b3 & (1 << 22)) ^ (c3 & (1 << 22))
+    #extra condition to allow correcting b5,29, b5,32 in 2nd round
+    if (bMulti): b3 |= (1 << 15) | (1 << 18)
+    #extra condition to allow correcting b5,30 in 2nd round
+    if (bMulti): b3 &= ~(1 << 16)
+    #extra condition to allow correcting c6,29, c6,30 in 2nd round
+    if (bMulti): b3 |= (1 << 26) | (1 << 27)
+    x[11] = MD4.unround1Operation(b2, c3, d3, a3, b3, 19)
+
+    #a4,23 = 0, a4,26 = 0, a4,27 = b3,27, a4,29 = b3,29, a4,30 = 1, a4,32 = 0
+    a4 = MD4.round1Operation(a3, b3, c3, d3, x[12], 3)
+    a4 |= (1 << 29)
+    a4 &= ~((1 << 22) | (1 << 25) | (1 << 31))
+    a4 ^= (a4 & (1 << 26)) ^ (b3 & (1 << 26)) ^ (a4 & (1 << 28)) ^ (b3 & (1 << 28))
+    #extra condition to allow correcting b5,29, b5,32 in 2nd round
+    if (bMulti): a4 |= (1 << 15) | (1 << 18)
+    #extra condition to allow correcting b5,30 in 2nd round
+    if (bMulti): a4 &= ~(1 << 16)
+    #extra conditions to allow 3rd round corrections in x[11]
+    if (bMulti and bNaito): a4 &= ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))
+    x[12] = MD4.unround1Operation(a3, b3, c3, d3, a4, 3)
+
+    #d4,23 = 0, d4,26 = 0, d4,27 = 1, d4,29 = 1, d4,30 = 0, d4,32 = 1
+    d4 = MD4.round1Operation(d3, a4, b3, c3, x[13], 7)
+    d4 &= ~((1 << 22) | (1 << 25) | (1 << 29))
+    d4 |= (1 << 26) | (1 << 28) | (1 << 31)
+    #extra condition to allow correcting c5,29, c5,32 in 2nd round
+    if (bMulti and bNaito): d4 ^= (d4 & (1 << 19)) ^ (a4 & (1 << 19)) ^ (d4 & (1 << 21)) ^ (a4 & (1 << 21))
+    #extra condition to allow correcting b5,30 in 2nd round
+    if (bMulti): d4 |= (1 << 16)
+    #extra conditions to allow 3rd round corrections in x[11]
+    #if (bMulti and bNaito) d4 &= ~((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))
+    if (bMulti and bNaito): d4 |= ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))
+    x[13] = MD4.unround1Operation(d3, a4, b3, c3, d4, 7)
+
+    #c4,19 = d4,19, c4,23 = 1, c4,26 = 1, c4,27 = 0, c4,29 = 0, c4,30 = 0
+    c4 = MD4.round1Operation(c3, d4, a4, b3, x[14], 11)
+    c4 &= ~((1 << 26) | (1 << 28) | (1 << 29))
+    c4 |= (1 << 22) | (1 << 25)
+    c4 ^= (c4 & (1 << 18)) ^ (d4 & (1 << 18))
+    #extra condition to allow correcting c5,29, c5,32 in 2nd round
+    if (bMulti and bNaito): c4 &= ~((1 << 19) | (1 << 21))
+    x[14] = MD4.unround1Operation(c3, d4, a4, b3, c4, 11)
+
+    #b4,19 = 0, b4,26 = c4,26 = 1, b4,27 = 1, b4,29 = 1, b4,30 = 0
+    b4 = MD4.round1Operation(b3, c4, d4, a4, x[15], 19)
+    b4 |= (1 << 25) | (1 << 26) | (1 << 28)
+    b4 &= ~((1 << 18) | (1 << 29))
+    b4 ^= (b4 & (1 << 25)) ^ (c4 & (1 << 25))
+    #newly discovered condition: b4,32 = c4,32
+    if (bNaito): b4 ^= (b4 & (1 << 31)) ^ (c4 & (1 << 31))
+    #extra condition to allow correcting c5,29, c5,32 in 2nd round
+    if (bMulti and bNaito): b4 ^= (b4 & (1 << 19)) ^ (d4 & (1 << 19)) ^ (b4 & (1 << 21)) ^ (d4 & (1 << 21))
+    x[15] = MD4.unround1Operation(b3, c4, d4, a4, b4, 19)
+    #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+    #  raise ValueError
+
+    if (not bMulti):
+      return bytes([item for sublist in [y.to_bytes(4, 'little') for y in x] for item in sublist])
+
+    #round/step 2 and 3 - multi-step modification
+    #must not "stomp" on the first round conditions
+    saveX = x[:]
+    n = 0
+    while True:
+      if (not bNaito and n != 0):
+        #return None
+        x = saveX[:]
+        a1 = MD4.round1Operation(a0, b0, c0, d0, x[0], 3)
+        d1 = MD4.round1Operation(d0, a1, b0, c0, x[1], 7)
+        c1 = MD4.round1Operation(c0, d1, a1, b0, x[2], 11)
+        b1 = MD4.round1Operation(b0, c1, d1, a1, x[3], 19)
+        a2 = MD4.round1Operation(a1, b1, c1, d1, x[4], 3)
+        d2 = MD4.round1Operation(d1, a2, b1, c1, x[5], 7)
+        c2 = MD4.round1Operation(c1, d2, a2, b1, x[6], 11)
+        b2 = MD4.round1Operation(b1, c2, d2, a2, x[7], 19)
+        a3 = MD4.round1Operation(a2, b2, c2, d2, x[8], 3)
+        d3 = MD4.round1Operation(d2, a3, b2, c2, x[9], 7)
+        c3 = MD4.round1Operation(c2, d3, a3, b2, x[10], 11)
+        b3 = MD4.round1Operation(b2, c3, d3, a3, x[11], 19)
+        a4 = MD4.round1Operation(a3, b3, c3, d3, x[12], 3)
+        d4 = MD4.round1Operation(d3, a4, b3, c3, x[13], 7)
+        x[14] ^= (n & 0xFFFFFFFF)
+        x[15] ^= (n >> 32) #deliberate as we need to try to solve b4 condition without waiting 0xFFFFFFFF iterations
+        #c4,19 = d4,19, c4,23 = 1, c4,26 = 1, c4,27 = 0, c4,29 = 0, c4,30 = 0
+        c4 = MD4.round1Operation(c3, d4, a4, b3, x[14], 11)
+        c4 &= ~((1 << 26) | (1 << 28) | (1 << 29))
+        c4 |= (1 << 22) | (1 << 25)
+        c4 ^= (c4 & (1 << 18)) ^ (d4 & (1 << 18))
+        #extra condition to allow correcting c5,29, c5,32 in 2nd round
+        #if (bMulti and bNaito) c4 &= ~((1 << 19) | (1 << 21))
+        x[14] = MD4.unround1Operation(c3, d4, a4, b3, c4, 11)
+
+        #b4,19 = 0, b4,26 = c4,26 = 1, b4,27 = 1, b4,29 = 1, b4,30 = 0
+        b4 = MD4.round1Operation(b3, c4, d4, a4, x[15], 19)
+        b4 |= (1 << 25) | (1 << 26) | (1 << 28)
+        b4 &= ~((1 << 18) | (1 << 29))
+        b4 ^= (b4 & (1 << 25)) ^ (c4 & (1 << 25))
+        #newly discovered condition: b4,32 = c4,32
+        #if (bNaito) b4 ^= (b4 & (1 << 31)) ^ (c4 & (1 << 31))
+        #extra condition to allow correcting c5,29, c5,32 in 2nd round
+        #if (bMulti and bNaito): b4 ^= (b4 & (1 << 19)) ^ (d4 & (1 << 19)) ^ (b4 & (1 << 21)) ^ (d4 & (1 << 21))
+        x[15] = MD4.unround1Operation(b3, c4, d4, a4, b4, 19)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      if (not bNaito):
+        n += 1
+        if (n == 0): return None #nothing found after 2^64 search...
+      #a5,19 = c4,19, a5,26 = 1, a5,27 = 0, a5,29 = 1, a5,32 = 1
+      #must do these in exact order as arithmetic over and underflows must be handled
+      a5 = MD4.round2Operation(a4, b4, c4, d4, x[0], 3)
+      #d5 = MD4.round2Operation(d4, a5, b4, c4, x[4], 5)
+      #c5 = MD4.round2Operation(c4, d5, a5, b4, x[8], 9)
+      #b5 = MD4.round2Operation(b4, c5, d5, a5, x[12], 13)
+      #a6 = MD4.round2Operation(a5, b5, c5, d5, x[1], 3)
+      #d6 = MD4.round2Operation(d5, a6, b5, c5, x[5], 5)
+      #c6 = MD4.round2Operation(c5, d6, a6, b5, x[9], 9)
+      #b6 = MD4.round2Operation(b5, c6, d6, a6, x[13], 13)
+      #a7 = MD4.round2Operation(a6, b6, c6, d6, x[2], 3)
+      #d7 = MD4.round2Operation(d6, a7, b6, c6, x[6], 5)
+      #c7 = MD4.round2Operation(c6, d7, a7, b6, x[10], 9)
+      #b7 = MD4.round2Operation(b6, c7, d7, a7, x[14], 13)
+      #a8 = MD4.round2Operation(a7, b7, c7, d7, x[3], 3)
+      #d8 = MD4.round2Operation(d7, a8, b7, c7, x[7], 5)
+      #c8 = MD4.round2Operation(c7, d8, a8, b7, x[11], 9)
+      #b8 = MD4.round2Operation(b7, c8, d8, a8, x[15], 13)
+
+      a5mods = [18, 19, 21, 25, 26, 28, 31] if bNaito else [18, 25, 26, 28, 31]
+      for i in a5mods:
+        if (i == 18 and (a5 & (1 << 18)) == (c4 & (1 << 18)) or
+            i == 19 and (a5 & (1 << 19)) == (b4 & (1 << 19)) or #extra conditions to allow correcting c5,29, c5,32
+            i == 21 and (a5 & (1 << 21)) == (b4 & (1 << 21)) or
+            i == 25 and (a5 & (1 << 25)) != 0 or
+            i == 26 and (a5 & (1 << 26)) == 0 or
+            i == 28 and (a5 & (1 << 28)) != 0 or
+            i == 31 and (a5 & (1 << 31)) != 0): continue
+        x[0] = (x[0] + (1 << (i - 3)) if ((a1 & (1 << i)) == 0) else x[0] - (1 << (i - 3))) % 0x100000000
+        a1 = MD4.round1Operation(a0, b0, c0, d0, x[0], 3)
+        x[1] = MD4.unround1Operation(d0, a1, b0, c0, d1, 7)
+        x[2] = MD4.unround1Operation(c0, d1, a1, b0, c1, 11)
+        x[3] = MD4.unround1Operation(b0, c1, d1, a1, b1, 19)
+        x[4] = MD4.unround1Operation(a1, b1, c1, d1, a2, 3)
+        a5 = MD4.round2Operation(a4, b4, c4, d4, x[0], 3)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 1)):
+      #  raise ValueError
+
+      #d5,19 = a5,19, d5,26 = b4,26, d5,27 = b4,27, d5,29 = b4,29, d5,32 = b4,32
+      d5 = MD4.round2Operation(d4, a5, b4, c4, x[4], 5)
+      d5mods = [18, 25, 26, 28, 31]
+      for i in d5mods:
+        if (i == 18 and (d5 & (1 << 18)) == (a5 & (1 << 18)) or
+            i == 25 and (d5 & (1 << 25)) == (b4 & (1 << 25)) or
+            i == 26 and (d5 & (1 << 26)) == (b4 & (1 << 26)) or
+            i == 28 and (d5 & (1 << 28)) == (b4 & (1 << 28)) or
+            i == 31 and (d5 & (1 << 31)) == (b4 & (1 << 31))): continue
+        if (bNaito and i == 18):
+          #if (not ((d1 & (1 << 13)) == 0 and (a1 & (1 << 13)) == (b0 & (1 << 13)) and (c1 & (1 << 13)) == 0 and (b1 & (1 << 13)) == 0)):
+          #  raise ValueError
+          x[1] = (x[1] + (1 << 6) if (d1 & (1 << 13)) == 0 else x[1] - (1 << 6)) % 0x100000000
+          d1 = MD4.round1Operation(d0, a1, b0, c0, x[1], 7)
+          x[4] = (x[4] - (1 << 13)) % 0x100000000
+          x[5] = (x[5] - (1 << 13)) % 0x100000000
+        else:
+          x[4] = (x[4] + (1 << (i - 5)) if ((a2 & (1 << (i - 2))) == 0) else x[4] - (1 << (i - 5))) % 0x100000000
+          a2 = MD4.round1Operation(a1, b1, c1, d1, x[4], 3)
+          x[5] = MD4.unround1Operation(d1, a2, b1, c1, d2, 7)
+          x[6] = MD4.unround1Operation(c1, d2, a2, b1, c2, 11)
+          x[7] = MD4.unround1Operation(b1, c2, d2, a2, b2, 19)
+          x[8] = MD4.unround1Operation(a2, b2, c2, d2, a3, 3)
+        d5 = MD4.round2Operation(d4, a5, b4, c4, x[4], 5)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 2)):
+      #  raise ValueError
+
+      #c5,26 = d5,26, c5,27 = d5,27, c5,29 = d5,29, c5,30 = d5,30, c5,32 = d5,32
+      c5 = MD4.round2Operation(c4, d5, a5, b4, x[8], 9)
+      c5mods = [25, 26, 28, 29, 30, 31] if bNaito else [25, 26, 28, 29, 31]
+      #bContinue = False
+      for i in c5mods:
+        if (i == 25 and (c5 & (1 << 25)) == (d5 & (1 << 25)) or
+            i == 26 and (c5 & (1 << 26)) == (d5 & (1 << 26)) or
+            i == 28 and (c5 & (1 << 28)) == (d5 & (1 << 28)) or
+            i == 29 and (c5 & (1 << 29)) == (d5 & (1 << 29)) or
+            i == 30 and (c5 & (1 << 30)) != 0 or
+            i == 31 and (c5 & (1 << 31)) == (d5 & (1 << 31))): continue
+        if (i == 29 or i == 30):
+          x[8] = (x[8] + (1 << (i - 9)) if ((a3 & (1 << (i - 6))) == 0) else x[8] - (1 << (i - 9))) % 0x100000000
+          a3 = MD4.round1Operation(a2, b2, c2, d2, x[8], 3)
+          x[9] = MD4.unround1Operation(d2, a3, b2, c2, d3, 7)
+          x[10] = MD4.unround1Operation(c2, d3, a3, b2, c3, 11)
+          x[11] = MD4.unround1Operation(b2, c3, d3, a3, b3, 19)
+          x[12] = MD4.unround1Operation(a3, b3, c3, d3, a4, 3)
+        elif ((i == 28 or i == 31) and bNaito):
+          #if (i == 28 and not ((c4 & (1 << (i - 9))) == 0 and (d4 & (1 << (i - 9))) == (a4 & (1 << (i - 9))) and (b4 & (1 << (i - 9))) == (d4 & (1 << (i - 9))))):
+          #  raise ValueError
+          #if (i == 31 and not ((c4 & (1 << (i - 10))) == 0 and (d4 & (1 << (i - 10))) == (a4 & (1 << (i - 10))) and (b4 & (1 << (i - 10))) == (d4 & (1 << (i - 10))))):
+          #  raise ValueError
+          if (i == 28): x[14] = (x[14] + (1 << (i - 20))) & 0xFFFFFFFF
+          else: x[14] = (x[14] + (1 << (i - 21))) & 0xFFFFFFFF
+          c4 = MD4.round1Operation(c3, d4, a4, b3, x[14], 11)
+          c5 = MD4.round2Operation(c4, d5, a5, b4, x[8], 9)
+        else:
+          #if (not ((not bNaito and i == 28 or (d2 & (1 << (i - 9))) == 0) and (not bNaito and i == 25 or (a2 & (1 << (i - 9))) == (b1 & (1 << (i - 9)))) and (c2 & (1 << (i - 9))) == 0 and (b2 & (1 << (i - 9))) == 0)):
+          #  raise ValueError
+          if (not bNaito and i == 28): #c5,29 can break a first round condition and will never succeed if it occurs
+            return None
+            #bContinue = True
+            #break
+          x[5] = (x[5] + (1 << (i - 16))) & 0xFFFFFFFF
+          #x[5] = (d2 & (1 << (i - 9))) == 0 ? x[5] + (1 << (i - 16)) : x[5] - (1 << (i - 16))
+          #x[8] = (d2 & (1 << (i - 9))) == 0 ? x[8] - (1 << (i - 9)) : x[8] + (1 << (i - 9))
+          #x[9] = (d2 & (1 << (i - 9))) == 0 ? x[9] - (1 << (i - 9)) : x[9] + (1 << (i - 9))
+          d2 = MD4.round1Operation(d1, a2, b1, c1, x[5], 7)
+          x[8] = (x[8] - (1 << (i - 9))) % 0x100000000
+          x[9] = (x[9] - (1 << (i - 9))) % 0x100000000
+          #if i == 25 and d5,19 was corrected, then c2 is broken and c2 != Round1Operation(c1, d2, a2, b1, x[6], 11)
+          if (not bNaito and i == 25 and c2 != MD4.round1Operation(c1, d2, a2, b1, x[6], 11)): #not ((a2 & (1 << (i - 9))) == (b1 & (1 << (i - 9))))
+            #probability 1/8 that we have to abort and no forgery can be found using Wang's method
+            #however if d6,26 is additionally corrected then c2 will be fixed even though Wang did not mention this
+            x[6] = MD4.unround1Operation(c1, d2, a2, b1, c2, 11)
+            c2 = MD4.round1Operation(c1, d2, a2, b1, x[6], 11)
+        c5 = MD4.round2Operation(c4, d5, a5, b4, x[8], 9)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      #if (bContinue): continue
+      #c5,26 when not equal to d5,19 and c5,29 are stomping on first round conditions and must have more modifications to correct
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 3)):
+      #  raise ValueError
+
+      #b5,29 = c5,29, b5,30 = 1, b5,32 = 0
+      b5 = MD4.round2Operation(b4, c5, d5, a5, x[12], 13)
+      b5mods = [28, 29, 31]
+      for i in b5mods:
+        if (i == 28 and (b5 & (1 << 28)) == (c5 & (1 << 28)) or
+            i == 29 and (b5 & (1 << 29)) != 0 or
+            i == 31 and (b5 & (1 << 31)) == 0): continue
+        if (i == 29):
+          #if (not ((b3 & (1 << 16)) == 0 and (a4 & (1 << 16)) == 0 and (d4 & (1 << 16)) != 0)):
+          #  raise ValueError
+          x[11] = (x[11] + (1 << 29)) & 0xFFFFFFFF
+          #x[11] = (b3 & (1 << 16)) == 0 ? x[11] + (1 << 29) : x[11] - (1 << 29)
+          #x[12] = (b3 & (1 << 16)) == 0 ? x[12] - (1 << 16) : x[12] + (1 << 16)
+          #x[15] = (b3 & (1 << 16)) == 0 ? x[15] - (1 << 16) : x[15] + (1 << 16)
+          b3 = MD4.round1Operation(b2, c3, d3, a3, x[11], 19)
+          x[12] = (x[12] - (1 << 16)) % 0x100000000
+          x[15] = (x[15] - (1 << 16)) % 0x100000000
+        else:
+          #if (not ((c3 & (1 << (i - 13))) == 0 and (d3 & (1 << (i - 13))) == (a3 & (1 << (i - 13))) and (b3 & (1 << (i - 13))) != 0 and (a4 & (1 << (i - 13))) != 0)):
+          #  raise ValueError
+          x[10] = (x[10] + (1 << (i - 24))) & 0xFFFFFFFF
+          #x[10] = (c3 & (1 << (i - 13))) == 0 ? x[10] + (1 << (i - 24)) : x[10] - (1 << (i - 24))
+          #x[12] = (c3 & (1 << (i - 13))) == 0 ? x[12] - (1 << (i - 13)) : x[12] + (1 << (i - 13))
+          #x[14] = (c3 & (1 << (i - 13))) == 0 ? x[14] - (1 << (i - 13)) : x[14] + (1 << (i - 13))
+          c3 = MD4.round1Operation(c2, d3, a3, b2, x[10], 11)
+          x[12] = (x[12] - (1 << (i - 13))) % 0x100000000
+          x[14] = (x[14] - (1 << (i - 13))) % 0x100000000
+        b5 = MD4.round2Operation(b4, c5, d5, a5, x[12], 13)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 4)):
+      #  raise ValueError
+
+      #a6,29 = 1, a6,32 = 1
+      #newly discovered condition: a6,30 = 0
+      a6 = MD4.round2Operation(a5, b5, c5, d5, x[1], 3)
+      a6mods = [28, 29, 31] if bNaito else [28, 31]
+      for i in a6mods:
+        if (i == 28 and (a6 & (1 << 28)) != 0 or
+            i == 29 and (a6 & (1 << 29)) == 0 or
+            i == 31 and (a6 & (1 << 31)) != 0): continue
+        #if (not ((b1 & (1 << ((i + 4) % 32))) != 0)):
+        #  raise ValueError
+        x[1] = (x[1] + (1 << (i - 3)) if ((d1 & (1 << ((i + 4) % 32))) == 0) else x[1] - (1 << (i - 3))) % 0x100000000
+        d1 = MD4.round1Operation(d0, a1, b0, c0, x[1], 7)
+        x[2] = MD4.unround1Operation(c0, d1, a1, b0, c1, 11)
+        x[3] = MD4.unround1Operation(b0, c1, d1, a1, b1, 19)
+        x[5] = MD4.unround1Operation(d1, a2, b1, c1, d2, 7)
+        a6 = MD4.round2Operation(a5, b5, c5, d5, x[1], 3)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 5)):
+      #  raise ValueError
+
+      #d6,29 = b5,29
+      d6 = MD4.round2Operation(d5, a6, b5, c5, x[5], 5)
+      if ((d6 & (1 << 28)) != (b5 & (1 << 28))):
+        #if (not ((b2 & (1 << 30)) != 0)):
+        #  raise ValueError
+        x[5] = (x[5] + (1 << 23) if ((d2 & (1 << 30)) == 0) else x[5] - (1 << 23)) % 0x100000000
+        d2 = MD4.round1Operation(d1, a2, b1, c1, x[5], 7)
+        d6 = MD4.round2Operation(d5, a6, b5, c5, x[5], 5)
+        x[6] = MD4.unround1Operation(c1, d2, a2, b1, c2, 11)
+        x[7] = MD4.unround1Operation(b1, c2, d2, a2, b2, 19)
+        x[9] = MD4.unround1Operation(d2, a3, b2, c2, d3, 7)
+      #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+      #  raise ValueError
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 6)):
+      #  raise ValueError
+
+      #c6,29 = d6,29, c6,30 = d6,30 + 1, c6,32 = d6,32 + 1
+      c6 = MD4.round2Operation(c5, d6, a6, b5, x[9], 9)
+      c6mods = [28, 29]
+      for i in c6mods:
+        if (i == 28 and (c6 & (1 << 28)) == (d6 & (1 << 28)) or
+            i == 29 and (c6 & (1 << 29)) != (d6 & (1 << 29))): continue
+        #if (not ((b3 & (1 << (i - 2))) != 0)):
+        #  raise ValueError
+        x[9] = (x[9] + (1 << (i - 9)) if ((d3 & (1 << (i - 2))) == 0) else x[9] - (1 << (i - 9))) % 0x100000000
+        d3 = MD4.round1Operation(d2, a3, b2, c2, x[9], 7)
+        x[10] = MD4.unround1Operation(c2, d3, a3, b2, c3, 11)
+        x[11] = MD4.unround1Operation(b2, c3, d3, a3, b3, 19)
+        x[13] = MD4.unround1Operation(d3, a4, b3, c3, d4, 7)
+        c6 = MD4.round2Operation(c5, d6, a6, b5, x[9], 9)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+        #  raise ValueError
+      if ((c6 & (1 << 31)) == (d6 & (1 << 31))):
+        #if (not ((c2 & (1 << 22)) == 0 and (not bNaito or (d2 & (1 << 22)) == (a2 & (1 << 22))) and (b2 & (1 << 22)) == 0)):
+        #  raise ValueError
+        if (not bNaito and not ((d2 & (1 << 22)) == (a2 & (1 << 22)))):
+          #if c5,32 and c6,32 are both corrected, an error will occur need to detect and return...
+          return None
+          #continue
+        x[6] = (x[6] + (1 << 11) if (c2 & (1 << 22)) == 0 else x[6] - (1 << 11)) % 0x100000000
+        c2 = MD4.round1Operation(c1, d2, a2, b1, x[6], 11)
+        x[9] = (x[9] - (1 << 22)) % 0x100000000
+        c6 = MD4.round2Operation(c5, d6, a6, b5, x[9], 9)
+        x[10] = (x[10] - (1 << 22)) % 0x100000000
+      #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito)):
+      #  raise ValueError
+
+      b6 = MD4.round2Operation(b5, c6, d6, a6, x[13], 13)
+      a7 = MD4.round2Operation(a6, b6, c6, d6, x[2], 3)
+      d7 = MD4.round2Operation(d6, a7, b6, c6, x[6], 5)
+      c7 = MD4.round2Operation(c6, d7, a7, b6, x[10], 9)
+      b7 = MD4.round2Operation(b6, c7, d7, a7, x[14], 13)
+      a8 = MD4.round2Operation(a7, b7, c7, d7, x[3], 3)
+      d8 = MD4.round2Operation(d7, a8, b7, c7, x[7], 5)
+      c8 = MD4.round2Operation(c7, d8, a8, b7, x[11], 9)
+      b8 = MD4.round2Operation(b7, c8, d8, a8, x[15], 13)
+      a9 = MD4.round3Operation(a8, b8, c8, d8, x[0], 3)
+      d9 = MD4.round3Operation(d8, a9, b8, c8, x[8], 9)
+      c9 = MD4.round3Operation(c8, d9, a9, b8, x[4], 11)
+      b9 = MD4.round3Operation(b8, c9, d9, a9, x[12], 15)
+      a10 = MD4.round3Operation(a9, b9, c9, d9, x[2], 3)
+      #if (not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 7)):
+      #  raise ValueError
+
+      if ((bNaito or (b4 & (1 << 31)) == (c4 & (1 << 31)) and ((a6 & (1 << 29)) == 0)) and ((b9 & (1 << 31)) != 0 and (a10 & (1 << 31)) != 0)):
+        return bytes([item for sublist in [y.to_bytes(4, 'little') for y in x] for item in sublist])
+      if bNaito: break
+    if bNaito:
+      #...round 3 modifications for exact collision not known how to hold without stomping on rounds 1 and 2
+      #for all values except b3,20, b3,21, b3,22, b3,23, b3,26, b3,27, b3,28, b3,29, b3,30, b3,32 + b3,16, b3,17, b3,19
+      #cannot stomp on these first round bit positions either: 10, 12, 29 + 7, 9, 10, 28, 31 + 0, 3, 7, 9, 12, 29
+      permutebits = [4, 5, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30] #b3 free bit indexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 23, 24, 30]
+      b3save, x11save, x15save = b3, x[11], x[15]
+      #if (not ((c3 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) ==
+      #     (d3 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) and
+      #     (a4 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) == 0 and
+      #     (d4 & ((1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12) | (1 << 13) | (1 << 14) | (1 << 17) | (1 << 23) | (1 << 24) | (1 << 30))) != 0)):
+      #  raise ValueError
+      for i in range(1, 1 << 19):
+        for c in range(19):
+          if ((i & (1 << c)) != 0):
+            #if (not ((c3 & (1 << ((19 + permutebits[c]) % 32))) == (d3 & (1 << ((19 + permutebits[c]) % 32))) and (a4 & (1 << ((19 + permutebits[c]) % 32))) == 0 and (d4 & (1 << ((19 + permutebits[c]) % 32))) != 0)):
+            #  raise ValueError
+            x[11] = (x[11] + (1 << (permutebits[c])) if (b3 & (1 << ((19 + permutebits[c]) % 32))) == 0 else x[11] - (1 << (permutebits[c]))) % 0x100000000
+            b3 = MD4.round1Operation(b2, c3, d3, a3, x[11], 19)
+            #c4 = ROL(c3 + ((d4 & a4) | (~d4 & b3)) + x[14], 11) //d4 should be set not unset like the paper shows or this will fail
+            #c4 = Round1Operation(c3, d4, a4, b3, x[14], 11)
+            x[15] = MD4.unround1Operation(b3, c4, d4, a4, b4, 19)
+        c8 = MD4.round2Operation(c7, d8, a8, b7, x[11], 9)
+        b8 = MD4.round2Operation(b7, c8, d8, a8, x[15], 13)
+        #if (not MD4.verifyConditions(x, a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, a4, b4, c4, d4, bMulti, bNaito) or
+        #    not MD4.verifyConditions2(x, a0, b0, c0, d0, a5, b5, c5, d5, a6, b6, c6, d6, a7, b7, c7, d7, a8, b8, c8, d8, bNaito, 7)):
+        #  raise ValueError
+        a9 = MD4.round3Operation(a8, b8, c8, d8, x[0], 3)
+        d9 = MD4.round3Operation(d8, a9, b8, c8, x[8], 9)
+        c9 = MD4.round3Operation(c8, d9, a9, b8, x[4], 11)
+        #b9,32 = 1
+        b9 = MD4.round3Operation(b8, c9, d9, a9, x[12], 15)
+        #a10,32 = 1
+        a10 = MD4.round3Operation(a9, b9, c9, d9, x[2], 3)
+        if (((b9 & (1 << 31)) != 0 and (a10 & (1 << 31)) != 0)):
+          return bytes([item for sublist in [y.to_bytes(4, 'little') for y in x] for item in sublist])
+        b3 = b3save
+        x[11] = x11save
+        x[15] = x15save
+    return None
+    
 def testUtility():
   def testHexPartToInt():
     for i in range(0, 256):

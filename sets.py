@@ -15,11 +15,11 @@ exec(open(os.path.join(curDir, '1.py')).read())
 exec(open(os.path.join(curDir, '2.py')).read())
 exec(open(os.path.join(curDir, '3.py')).read())
 exec(open(os.path.join(curDir, '4.py')).read())
-#exec(open(os.path.join(curDir, '5.py')).read())
-#exec(open(os.path.join(curDir, '6.py')).read())
-#exec(open(os.path.join(curDir, '7.py')).read())
-#exec(open(os.path.join(curDir, '8.py')).read())
-#exec(open(os.path.join(curDir, '9.py')).read())
+exec(open(os.path.join(curDir, '5.py')).read())
+exec(open(os.path.join(curDir, '6.py')).read())
+exec(open(os.path.join(curDir, '7.py')).read())
+exec(open(os.path.join(curDir, '8.py')).read())
+exec(open(os.path.join(curDir, '9.py')).read())
 
 #def loadImp(name):
 #  import imp
@@ -61,7 +61,6 @@ set4 = [(challenge25, 25), (challenge26, 26), (challenge27, 27),
         (challenge28, 28), (challenge29, 29), (challenge30, 30),
         (challenge31, 31), (challenge32, 32)]
 
-"""
 set5 = [(challenge33, 33), (challenge34, 34), (challenge35, 35),
         (challenge36, 36), (challenge37, 37), (challenge38, 38),
         (challenge39, 39), (challenge40, 40)]
@@ -79,15 +78,14 @@ set8 = [(challenge57, 57), (challenge58, 58), (challenge59, 59),
         (challenge63, 63), (challenge64, 64)]
 
 set9 = [(challenge65, 65), (challenge66, 66)]
-"""
 
 testUtility()
 #runSet(1, set1)
 #runSet(2, set2)
 #runSet(3, set3)
-runSet(4, set4)
+#runSet(4, set4)
 #runSet(5, set5)
 #runSet(6, set6)
-#runSet(7, set7)
+runSet(7, set7)
 #runSet(8, set8)
 #runSet(9, set9)
