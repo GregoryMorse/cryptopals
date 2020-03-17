@@ -116,11 +116,10 @@ namespace Cryptopals
             //RunSet(2, Set2);
             //RunSet(3, Set3);
             //RunSet(4, Set4);
-            Challenge55();
             //RunSet(5, Set5);
             //RunSet(6, Set6);
             //RunSet(7, Set7);
-            //RunSet(8, Set8);
+            RunSet(8, Set8);
             //RunSet(9, Set9);
             Console.ReadKey();
         }

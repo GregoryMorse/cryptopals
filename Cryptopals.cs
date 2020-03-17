@@ -758,28 +758,6 @@ namespace Cryptopals
             }
             return time == delay1;
         }
-        //RFC 2104 HMAC(k,m)=H((K' xor opad) || H((K' xor ipad) || m))
-        static byte[] hmac(byte[] key, byte[] message)
-        {
-            SHA1Context sc = new SHA1Context(); //64 bit block size for SHA-1 and MD4
-            if (key.Length > 64)
-            {
-                SHA1_Algo.SHA1Reset(sc);
-                SHA1_Algo.SHA1Input(sc, key);
-                key = new byte[64];
-                SHA1_Algo.SHA1Result(sc, key);
-            } else if (key.Length < 64) {
-                key = key.Concat(Enumerable.Repeat((byte)0, 64 - key.Length)).ToArray();
-            }
-            SHA1_Algo.SHA1Reset(sc);
-            byte[] b = new byte[20];
-            SHA1_Algo.SHA1Input(sc, FixedXOR(Enumerable.Repeat((byte)0x36, 64).ToArray(), key).Concat(message).ToArray());
-            SHA1_Algo.SHA1Result(sc, b);
-            SHA1_Algo.SHA1Reset(sc);
-            SHA1_Algo.SHA1Input(sc, FixedXOR(Enumerable.Repeat((byte)0x5c, 64).ToArray(), key).Concat(b).ToArray());
-            SHA1_Algo.SHA1Result(sc, b);
-            return b;
-        }
         static bool insecure_compare(byte[] o, byte[] sig, int millisec)
         {
             for (int i = 0; i < o.Length; i++)
@@ -1296,23 +1274,6 @@ namespace Cryptopals
 
             return true;
         }
-        //Extended Euclid GCD of 1
-        static BigInteger modInverse(BigInteger a, BigInteger n)
-        {
-            BigInteger i = n, v = 0, d = 1;
-            if (a < 0) a = posRemainder(a, n);
-            while (a > 0) {
-                BigInteger t = i / a, x = a;
-                a = i % x;
-                i = x;
-                x = d;
-                d = v - t * x;
-                v = x;
-            }
-            v %= n;
-            if (v < 0) v = (v + n) % n;
-            return v;
-        }
         //from Hacker's Delight
         public static BigInteger icbrt2(BigInteger x)
         {
@@ -1520,13 +1481,6 @@ namespace Cryptopals
         static byte[] PadToSize(byte[] arr, int size)
         {
             return (arr.Length >= size ? arr.Skip(arr.Length - size).ToArray() : Enumerable.Repeat((byte)0, size - arr.Length).Concat(arr).ToArray());
-        }
-        static BigInteger posRemainder(BigInteger dividend, BigInteger divisor)
-        {
-            if (dividend >= 0 && dividend < divisor) return dividend;
-            BigInteger r = dividend % divisor; //BigInteger.Remainder(dividend, divisor);
-            //if ((r < 0 ? r + divisor : r) != modBarrettReduction(dividend, divisor)) throw new ArgumentException();
-            return r < 0 ? r + divisor : r;
         }
         static BigInteger BytesToBigInt(byte[] b)
         {
@@ -2513,35 +2467,7 @@ namespace Cryptopals
             Console.WriteLine("Equal to original: " + (new ByteArrayComparer().Equals(recover, forgery)));
             return false;
         }
-        static BigInteger PollardKangaroo(BigInteger a, BigInteger b, int k, BigInteger g, BigInteger p, BigInteger y)
-        {
-            BigInteger xT = BigInteger.Zero;
-            BigInteger yT = BigInteger.ModPow(g, b, p);
-            //N is then derived from f -take the mean of all possible outputs of f and multiply it by a small constant, e.g. 4.
-            int N = ((1 << (k + 1)) - 1) * 4 / k;
-            //make the constant bigger to better your chances of finding a collision at the(obvious) cost of extra computation.
-            for (int i = 1; i <= N; i++)
-            {
-                BigInteger KF = BigInteger.Remainder(KangF(yT, k), p);
-                xT = xT + KF;
-                yT = BigInteger.Remainder(yT * BigInteger.ModPow(g, KF, p), p);
-            }
-            //now yT = g^(b + xT)
-            //Console.WriteLine("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
-            BigInteger xW = BigInteger.Zero;
-            BigInteger yW = y;
-            while (xW < (b - a + xT))
-            {
-                BigInteger KF = BigInteger.Remainder(KangF(yW, k), p);
-                xW = xW + KF;
-                yW = BigInteger.Remainder(yW * BigInteger.ModPow(g, KF, p), p);
-                if (yW == yT)
-                {
-                    return b + xT - xW;
-                }
-            }
-            return BigInteger.Zero;
-        }
+        
         static BigInteger PollardKangarooEC(BigInteger a, BigInteger b, int k, Tuple<BigInteger, BigInteger> G, int Ea, BigInteger p, Tuple<BigInteger, BigInteger> y)
         {//modular exponentiation/multiplication is scalar multiplication/group addition on the elliptical curve
             BigInteger xT = BigInteger.Zero;
@@ -2601,11 +2527,7 @@ namespace Cryptopals
             }
             return BigInteger.Zero;
         }
-        static BigInteger KangF(BigInteger y, int k)
-        {
-            return BigInteger.One << (int)(BigInteger.Remainder(y, k));
-            //return BigInteger.Pow(2, (int)BigInteger.Remainder(y, k));
-        }
+
         static Tuple<BigInteger, BigInteger> invertEC(Tuple<BigInteger, BigInteger> P, BigInteger GF)
         {
             return new Tuple<BigInteger, BigInteger>(P.Item1, GF - P.Item2);
@@ -5713,7 +5635,7 @@ namespace Cryptopals
                 }
             }
             do { x = Crypto.GetNextRandomBig(rng, q); } while (x <= 1); //Bob's secret key
-            Console.WriteLine("Secret key generated: " + HexEncode(x.ToByteArray()));
+            //Console.WriteLine("Secret key generated: " + HexEncode(x.ToByteArray()));
             do
             {
                 BigInteger h;
@@ -5746,8 +5668,8 @@ namespace Cryptopals
                 BigInteger curcum = rcum / rs[i];
                 RecX += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
-            Console.WriteLine("8.57 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX, rcum).ToByteArray()));
-            return false;
+            //Console.WriteLine("8.57 Secret key recovered: " + HexEncode(posRemainder(RecX, rcum).ToByteArray()));
+            return posRemainder(RecX, rcum) == x;
         }
         static public bool Challenge58()
         {
@@ -5766,13 +5688,19 @@ namespace Cryptopals
                 }
             }*/
             //[0, 2^20], y=g^x mod p
-            Console.WriteLine("Pollard Kangaroo secret key from public: " + HexEncode(PollardKangaroo(0, 1 << 20, 7, g, p, y).ToByteArray().Reverse().ToArray()));
+            BigInteger yPass = 705485;
+            BigInteger yRes = PollardKangaroo(0, 1 << 20, 7, g, p, y);
+            if (yPass != yRes) return false;
+            //Console.WriteLine("Pollard Kangaroo secret key from public: " + HexEncode(yRes.ToByteArray().Reverse().ToArray()));
             y = BigInteger.Parse("9388897478013399550694114614498790691034187453089355259602614074132918843899833277397448144245883225611726912025846772975325932794909655215329941809013733");
             //[0, 2^40], 53b89e66e4
-            //Console.WriteLine("Pollard Kangaroo secret key from public: " + HexEncode(PollardKangaroo(0, (ulong)1 << 40, 23, g, p, y).ToByteArray().Reverse().ToArray()));
+            yPass = 359579674340;
+            yRes = PollardKangaroo(0, (ulong)1 << 40, 23, g, p, y);
+            if (yPass != yRes) return false;
+            //Console.WriteLine("Pollard Kangaroo secret key from public: " + HexEncode(yRes.ToByteArray().Reverse().ToArray()));
             do { x = Crypto.GetNextRandomBig(rng, q); } while (x <= 1); //Bob's secret key
             y = BigInteger.ModPow(g, x, p);
-            Console.WriteLine("Secret key generated: " + HexEncode(x.ToByteArray()));
+            //Console.WriteLine("Secret key generated: " + HexEncode(x.ToByteArray()));
             List<int> rs = new List<int>();
             for (int i = 2; i < 1 << 16; i++)
             {
@@ -5807,7 +5735,7 @@ namespace Cryptopals
                 for (int i = 0; i < rs[curr]; i++)
                 {
                     testK = BigInteger.ModPow(h, i, p);
-                    if (new ByteArrayComparer().Equals(t, hmac(testK.ToByteArray(), m)))
+                    if (t.SequenceEqual(hmac(testK.ToByteArray(), m)))
                     {
                         bs.Add(i);
                         break;
@@ -5825,7 +5753,7 @@ namespace Cryptopals
                 RecX += bs[i] * curcum * modInverse(curcum, rs[i]);
             }
             RecX = BigInteger.Remainder(RecX, rcum);
-            Console.WriteLine("CRT recovered: " + HexEncode(RecX.ToByteArray()));
+            //Console.WriteLine("CRT recovered: " + HexEncode(RecX.ToByteArray()));
             //[0, (q-1)/r]
             //x = n mod r, x = n + m * r therefore transform
             //y = g^x=g^(n+m*r)=g^n*g^(m*r)
@@ -5833,8 +5761,9 @@ namespace Cryptopals
             BigInteger Gprime = BigInteger.ModPow(g, rcum, p);
             BigInteger Yprime = BigInteger.Remainder(y * modInverse(BigInteger.ModPow(g, RecX, p), p), p);
             BigInteger Mprime = PollardKangaroo(0, (p - 1) / rcum, 23, Gprime, p, Yprime); //(p - 1) / rcum is 40 bits in this case, 23 could also be good
-            Console.WriteLine("8.58 Secret key recovered: " + HexEncode(BigInteger.Remainder(RecX + Mprime * rcum, p - 1).ToByteArray()));
-            return false;
+            BigInteger res = BigInteger.Remainder(RecX + Mprime * rcum, p - 1);
+            //Console.WriteLine("8.58 Secret key recovered: " + HexEncode(res.ToByteArray()));
+            return res == x;
         }
         static public bool Challenge59()
         {

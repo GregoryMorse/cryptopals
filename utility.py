@@ -1227,7 +1227,65 @@ class MD4:
         x[11] = x11save
         x[15] = x15save
     return None
-    
+
+#RFC 2104 HMAC(k,m)=H((K' xor opad) || H((K' xor ipad) || m))
+def hmac(key, message):
+  import hashlib
+  sha1 = hashlib.sha1()
+  if len(key) > 64:
+    sha1.update(key)
+    key = m.digest()
+  else:
+    key = bytearray(key)
+    key.extend(bytearray(64 - len(key)))
+  sha1 = hashlib.sha1()
+  sha1.update(bytearray([a ^ 0x36 for a in key]) + message)
+  b = sha1.digest()
+  sha1 = hashlib.sha1()
+  sha1.update(bytearray([a ^ 0x5C for a in key]) + b)
+  return b
+
+#Extended Euclid GCD of 1
+def modInverse(a, n):
+  i, v, d = n, 0, 1
+  if (a < 0): a = a % n
+  while (a > 0):
+    t, x = i // a, a;
+    a = i % x
+    i = x
+    x = d
+    d = v - t * x
+    v = x
+  v %= n
+  if (v < 0): v = (v + n) % n
+  return v
+
+def kangF(y, k):
+  return 1 << (y % k)
+  
+def pollardKangaroo(a, b, k, g, p, y):
+  xT = 0
+  yT = pow(g, b, p)
+  #N is then derived from f -take the mean of all possible outputs of f and multiply it by a small constant, e.g. 4.
+  #N = (1 << (k >> 1)) * 4
+  N = ((1 << (k + 1)) - 1) * 4 // k
+  #make the constant bigger to better your chances of finding a collision at the(obvious) cost of extra computation.
+  for i in range(1, N + 1):
+    KF = kangF(yT, k) % p
+    xT = xT + KF
+    yT = (yT * pow(g, KF, p)) % p
+  #now yT = g^(b + xT)
+  #print("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
+  xW = 0
+  yW = y
+  while (xW < (b - a + xT)):
+    KF = kangF(yW, k) % p
+    xW = xW + KF
+    yW = (yW * pow(g, KF, p)) % p
+    if (yW == yT):
+      return b + xT - xW
+  return 0
+
 def testUtility():
   def testHexPartToInt():
     for i in range(0, 256):

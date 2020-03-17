@@ -1738,5 +1738,90 @@ namespace Cryptopals
                 return null;
             }
         }
+        //RFC 2104 HMAC(k,m)=H((K' xor opad) || H((K' xor ipad) || m))
+        public static byte[] hmac(byte[] key, byte[] message)
+        {
+            SHA1Context sc = new SHA1Context(); //64 bit block size for SHA-1 and MD4
+            if (key.Length > 64)
+            {
+                SHA1_Algo.SHA1Reset(sc);
+                SHA1_Algo.SHA1Input(sc, key);
+                key = new byte[64];
+                SHA1_Algo.SHA1Result(sc, key);
+            }
+            else if (key.Length < 64)
+            {
+                key = key.Concat(Enumerable.Repeat((byte)0, 64 - key.Length)).ToArray();
+            }
+            SHA1_Algo.SHA1Reset(sc);
+            byte[] b = new byte[20];
+            SHA1_Algo.SHA1Input(sc, FixedXOR(Enumerable.Repeat((byte)0x36, 64).ToArray(), key).Concat(message).ToArray());
+            SHA1_Algo.SHA1Result(sc, b);
+            SHA1_Algo.SHA1Reset(sc);
+            SHA1_Algo.SHA1Input(sc, FixedXOR(Enumerable.Repeat((byte)0x5c, 64).ToArray(), key).Concat(b).ToArray());
+            SHA1_Algo.SHA1Result(sc, b);
+            return b;
+        }
+        public static BigInteger posRemainder(BigInteger dividend, BigInteger divisor)
+        {
+            if (dividend >= 0 && dividend < divisor) return dividend;
+            BigInteger r = dividend % divisor; //BigInteger.Remainder(dividend, divisor);
+            //if ((r < 0 ? r + divisor : r) != modBarrettReduction(dividend, divisor)) throw new ArgumentException();
+            return r < 0 ? r + divisor : r;
+        }
+        //Extended Euclid GCD of 1
+        public static BigInteger modInverse(BigInteger a, BigInteger n)
+        {
+            BigInteger i = n, v = 0, d = 1;
+            if (a < 0) a = posRemainder(a, n);
+            while (a > 0)
+            {
+                BigInteger t = i / a, x = a;
+                a = i % x;
+                i = x;
+                x = d;
+                d = v - t * x;
+                v = x;
+            }
+            v %= n;
+            if (v < 0) v = (v + n) % n;
+            return v;
+        }
+        public static BigInteger KangF(BigInteger y, int k)
+        {
+            return BigInteger.One << (int)(BigInteger.Remainder(y, k));
+            //return BigInteger.Pow(2, (int)BigInteger.Remainder(y, k));
+        }
+        public static BigInteger PollardKangaroo(BigInteger a, BigInteger b, int k, BigInteger g, BigInteger p, BigInteger y)
+        {
+            BigInteger xT = BigInteger.Zero;
+            BigInteger yT = BigInteger.ModPow(g, b, p);
+            //N is then derived from f -take the mean of all possible outputs of f and multiply it by a small constant, e.g. 4.
+            //actual mean is:
+            //int N = (1 << (k >> 1)) * 4;
+            int N = ((1 << (k + 1)) - 1) * 4 / k;
+            //make the constant bigger to better your chances of finding a collision at the(obvious) cost of extra computation.
+            for (int i = 1; i <= N; i++)
+            {
+                BigInteger KF = BigInteger.Remainder(KangF(yT, k), p);
+                xT = xT + KF;
+                yT = BigInteger.Remainder(yT * BigInteger.ModPow(g, KF, p), p);
+            }
+            //now yT = g^(b + xT)
+            //Console.WriteLine("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
+            BigInteger xW = BigInteger.Zero;
+            BigInteger yW = y;
+            while (xW < (b - a + xT))
+            {
+                BigInteger KF = BigInteger.Remainder(KangF(yW, k), p);
+                xW = xW + KF;
+                yW = BigInteger.Remainder(yW * BigInteger.ModPow(g, KF, p), p);
+                if (yW == yT)
+                {
+                    return b + xT - xW;
+                }
+            }
+            return BigInteger.Zero;
+        }
     }
 }
