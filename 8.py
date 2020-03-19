@@ -57,9 +57,9 @@ def challenge58():
   if passY != yRes: return False
   y = 9388897478013399550694114614498790691034187453089355259602614074132918843899833277397448144245883225611726912025846772975325932794909655215329941809013733  
   passY = 359579674340
-  #yRes = pollardKangaroo(0, 1 << 40, 23, g, p, y)
+  yRes = pollardKangaroo(0, 1 << 40, 23, g, p, y)
   #print(bytes(reversed(yRes.to_bytes((yRes.bit_length() + 7) // 8, byteorder='little'))).hex())
-  #if passY != yRes: return False
+  if passY != yRes: return False
   import secrets
   while True:
     x = secrets.randbelow(q)
@@ -115,7 +115,10 @@ def challenge58():
   return res == x
   
 def challenge59():
-  pass
+  ea, eb = -95051, 11279326
+  gx, gy, gf, bpOrd = 182, 85518893674295321206118380980485522083, 233970423115425145524320034830162017933, 29246302889428143187362802287225875743
+  ord = bpOrd * 2 * 2 * 2
+  if ord != schoof(ea, eb, gf, ord): return False
   
 def challenge60():
   pass

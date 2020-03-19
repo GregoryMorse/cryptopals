@@ -1245,6 +1245,11 @@ def hmac(key, message):
   sha1.update(bytearray([a ^ 0x5C for a in key]) + b)
   return b
 
+def posRemainder(dividend, divisor):
+  if (dividend >= 0 and dividend < divisor): return dividend
+  r = dividend % divisor
+  return r + divisor if r < 0 else r
+
 #Extended Euclid GCD of 1
 def modInverse(a, n):
   i, v, d = n, 0, 1
@@ -1275,7 +1280,7 @@ def pollardKangaroo(a, b, k, g, p, y):
     xT = xT + KF
     yT = (yT * pow(g, KF, p)) % p
   #now yT = g^(b + xT)
-  #print("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(BigInteger.ModPow(g, b + xT, p).ToByteArray()));
+  #print("yT = " + HexEncode(yT.ToByteArray()) + " g^(b + xT) = " + HexEncode(pow(g, b + xT, p).ToByteArray()));
   xW = 0
   yW = y
   while (xW < (b - a + xT)):
@@ -1285,6 +1290,469 @@ def pollardKangaroo(a, b, k, g, p, y):
     if (yW == yT):
       return b + xT - xW
   return 0
+  
+def getBitSize(num): return num.bit_length()
+def isSqrt(n, root):
+  lowerBound = root * root
+  return n >= lowerBound and n <= lowerBound + root + root
+def sqrt(n):
+  if (n == 0): return 0
+  if (n > 0):
+    bitLength = getBitSize(n)
+    root = 1 << (bitLength >> 1)
+    while not isSqrt(n, root):
+      root += n // root
+      root >>= 1
+    return root
+  return float('nan') #raise ArithmeticException("NaN")
+def isPrime(n):
+  mx = sqrt(n)
+  for i in range(2, mx + 1):
+    if (n % i == 0): return False
+  return True
+  
+def nextPrime(n):
+  if (n == 2): return 3
+  while True:
+    n += 2;
+    if isPrime(n): break
+  return n
+def getPrimes(n): #sieve of Eratosthenes
+  a = [False] * (n - 2 + 1)
+  mx = sqrt(n)
+  for i in range(2, mx + 1):
+    if (not a[i - 2]):
+      for j in range(i * i, n + 1, i):
+        a[j - 2] = True
+  return list(filter(lambda x: x != -1, [i + 2 if not b else -1 for i, b in enumerate(a)]))
+
+def addPolyRing(a, b, gf):
+  alen, blen = len(a), len(b)
+  c = [0] * max(alen, blen)
+  clen = len(c)
+  for i in range(0, clen):
+    aoffs, boffs, coffs = alen - 1 - i, blen - 1 - i, clen - 1 - i
+    if (i >= alen): c[coffs] = b[boffs]
+    elif (i >= blen): c[coffs] = a[aoffs]
+    elif (a[aoffs] >= 0 and a[aoffs] < gf and b[boffs] >= 0 and b[boffs] >= 0 and b[boffs] < gf):
+      c[coffs] = a[aoffs] + b[boffs]
+      if (c[coffs] >= gf): c[coffs] -= gf
+    else: c[coffs] = posRemainder(a[aoffs] + b[boffs], gf)
+  import itertools
+  return c if clen == 0 or c[0] != 0 else list(itertools.dropwhile(lambda cr: cr == 0, c))
+
+def combineBigIntegers(nums, bits):
+  nlen = len(nums)
+  b = new byte[((nums.Length * bits + 7) >> 3) + (((nums.Length * bits) & 7) == 0 ? 1 : 0)] #+1 for avoiding negatives
+  curBit = 0
+  for i in range(nlen):
+    curByte, bit = curBit >> 3, curBit & 7
+    if (bit != 0):
+      byte[] src = (nums[i] << bit).ToByteArray()
+      b[curByte] |= src[0]
+      Array.Copy(src, 1, b, curByte + 1, src.Length - 1)
+    else:
+      byte[] src = nums[i].ToByteArray()
+      Array.Copy(src, 0, b, curByte, src.Length)
+    curBit += bits
+  return b
+
+def multiSplitBigInteger(num, bits, size):
+  c = [0] * size
+  if (bits == 0): return c #impossible split size
+  bytes = num.to_bytes((num.bit_length() + 7) // 8, byteorder='little')
+  blen = len(bytes)
+  if (blen == 0): return c
+  curbits, count, startByte = 0, 0, 0
+  while (count < size):
+    lastByte = (curbits + bits + 7) >> 3
+    rembits = (curbits + bits) & 7
+    if (blen < lastByte): lastByte, rembits = blen, 0
+    taken = bytearray(lastByte - startByte + (1 if (bytes[lastByte - 1] & 0x80) != 0 else 0))
+    Array.Copy(bytes, startByte, taken, 0, lastByte - startByte)
+    if (rembits != 0): taken[lastByte - startByte - 1] &= ((1 << rembits) - 1)
+    if ((curbits & 7) != 0): c[count] = new BigInteger(taken) >> (curbits & 7);
+    else: c[count] = new BigInteger(taken);
+    if (blen < (curbits + bits + 7) >> 3): break
+    startByte = lastByte - (1 if rembits != 0 else 0)
+    curbits += bits
+    count += 1
+  return c
+  
+def mulKaratsuba(num1, num2, num1bits, num2bits):
+  m = min(num1bits, num2bits)
+  m2 = m >> 1
+  m2shift = (1 << m2) - 1
+  low1 = num1 & m2shift
+  low2 = num2 & m2shift
+  high1 = num1 >> m2
+  high2 = num2 >> m2
+  z0 = doBigMul(low1, low2, m2, m2)
+  lowhigh1, lowhigh2 = low1 + high1, low2 + high2
+  z1 = doBigMul(lowhigh1, lowhigh2, num1bits - m2 + 1, num2bits - m2 + 1)
+  z2 = doBigMul(high1, high2, num1bits - m2, num2bits - m2)
+  return ((z2 << (m2 << 1)) | z0) + ((z1 - z0 - z2) << m2)
+
+def doBigMul(num1, num2, num1bits, num2bits):
+  if (num1 <= 0xFFFFFFFF and num2 <= 0xFFFFFFFF):
+    return num1 * num2
+  if (num1 <= 0xFFFFFFFF or num2 <= 0xFFFFFFFF or
+      num1bits <= 4096 or num2bits <= 4096): return num1 * num2; #experimentally determined threshold 8192 is next best
+                                                                #if (num1bits >= 1728 * 64 && num2bits >= 1728 * 64)
+                                                                #return mulSchonhageStrassen(num1, num2, num1bits, num2bits)
+  return mulKaratsuba(num1, num2, num1bits, num2bits)
+
+def bigMul(num1, num2):
+  signum = (-1 if num1 < 0 else 1) * (-1 if num2 < 0 else 1)
+  if (num1 < 0): num1 = -num1
+  if (num2 < 0): num2 = -num2
+  res = doBigMul(num1, num2, getBitSize(num1), getBitSize(num2))
+  return -res if signum < 0 else res
+
+#Kronecker substitution
+#https://en.wikipedia.org/wiki/Kronecker_substitution
+#https://web.maths.unsw.edu.au/~davidharvey/talks/kronecker-talk.pdf
+def mulPolyRingKronecker(a, b, gf):
+  alen, blen = len(a), len(b)
+  packSize = (getBitSize(gf) << 1) + getBitSize(max(alen, blen)) #coefficients are bounded by 2^(2*GetBitSize(GF))*n where n is degree+1 of A, B
+  #evaluate at 2^(2*getBitSize(gf)+UpperBound(log2(n)))
+  Apack = combineBigIntegers(list(reversed([posRemainder(nm, GF) if nm < 0 else nm for nm in a])), packSize)
+  Bpack = combineBigIntegers(list(reversed([posRemainder(nm, GF) if nm < 0 else nm for nm in b])), packSize);
+  Cpack = doBigMul(Apack, Bpack, packSize * alen, packSize * blen);
+  p = reversed([posRemainder(nm, GF) for nm in multiSplitBigInteger(Cpack, packSize, alen + blen - 1)])
+  import itertools
+  return list(itertools.dropwhile(lambda c: c == 0, p))
+
+def mulPolyRing(a, b, gf):
+  alen, blen = len(a), len(b)
+  if (getBitSize(gf) * min(alen, blen) > 16384): return mulPolyRingKronecker(a, b, gf)
+  if (alen == 0): return a
+  if (blen == 0): return b
+  p = [0] * (alen + blen - 1)
+  for i in range(0, blen):
+    if (b[i] == 0): continue
+    for j in range(0, alen):
+      if (a[j] == 0): continue
+      ijoffs = i + j
+      #if (posRemainder(a[j] * b[i], gf) != posRemainder(mulKaratsuba(A[j] < 0 ? posRemainder(A[j], GF) : A[j], B[i] < 0 ? posRemainder(B[i], GF) : B[i]), GF)) throw new ArgumentException();
+      #p[ijoffs] += posRemainder(mulKaratsuba(A[j] < 0 ? posRemainder(A[j], GF) : A[j], B[i] < 0 ? posRemainder(B[i], GF) : B[i]), GF);
+      #p[ijoffs] += modmul(a[j], b[i], gf)
+      #p[ijoffs] += posRemainder(a[j] * b[i], gf)
+      #if (p[ijoffs] >= GF) p[ijoffs] -= gf
+      if (b[i] == -1): p[ijoffs] += (gf - a[j])
+      elif (a[j] == -1): p[ijoffs] += (gf - b[i])
+      else: p[ijoffs] += a[j] * b[i]
+  #while (not all([c == 0 for c in a])):
+  #  if (a[0] != 0): p = posRemainder(p + b, gf)
+  #  a, b = a[1:], b + [0]
+  #if (mulPolyRingKronecker(A, B, GF) != [posRemainder(x, gf) for x in itertools.dropwhile(lambda c: c == 0, p)]):
+  #  raise ValueError
+  #return p if len(p) == 0 or p[0] != 0 else list(itertools.dropwhile(lambda c: c == 0, p))
+  import itertools
+  return [posRemainder(x, gf) for x in itertools.dropwhile(lambda c: c == 0, p)]
+
+#https://en.wikipedia.org/wiki/Polynomial_long_division#Pseudo-code
+def divmodPolyRing(a, b, gf):
+  #if (len(b) == 0) raise ValueError
+  alen, blen = len(a), len(b)
+  q, r = [0] * alen, a
+  binv = modInverse(b[0], gf)
+  bneg = mulPolyRing(b, [-1], gf)
+  rlen = len(r)
+  d = (rlen - 1) - (blen - 1)
+  while (rlen != 0 and d >= 0):
+    aoffs = alen - d - 1
+    q[aoffs] = posRemainder(r[0] * binv, gf)
+    if (q[aoffs] == 0): break
+    #r = addPolyRing(r, mulPolyRing(bneg, q[aoffs:], gf), gf)
+    r = addPolyRing(r, mulPolyRing(bneg, [q[aoffs]], gf) + q[aoffs+1:], gf)
+    rlen = len(r)
+    d = (rlen - 1) - (blen - 1)
+  import itertools
+  return list(itertools.dropwhile(lambda c: c == 0, q)), r
+
+#https://github.com/sagemath/sage/blob/master/src/sage/libs/ntl/ntlwrap_impl.h
+#https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/polynomial_quotient_ring_element.py
+#https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/polynomial_quotient_ring.py
+def remainderPolyRingSparsePow2(a, b, gf):
+  #note that (B%2^p)*(B%2^(p-1))=B%2^(2p-1)
+  #NTL in lzz_pX for integer field univariate polynomial implements rem with rem21 using the FFT method
+  #however in this case we can just do the classic modular exponentiation which works in log n and always keeps a reduced polynomial
+  m = len(b) - 1
+  remainder = [0] * m #m-1 terms
+  for elem in a:
+    exp = elem[0]
+    result = [1]
+    bmul = [1, 0]
+    while (exp > 0):
+      if ((exp & 1) == 1):
+        result = divmodPolyRing(mulPolyRing(result, bmul, gf), b, gf)[1]
+      exp >>= 1
+      bmul = divmodPolyRing(mulPolyRing(bmul, bmul, gf), b, gf)[1]
+    result = mulPolyRing(result, [elem[1]], gf)
+    remainder = addPolyRing(result, remainder, gf)
+  import itertools
+  return list(itertools.dropwhile(lambda c: c == 0, remainder))
+
+def substitutePolyRing(a, b, divpoly, gf):
+  result = [0]
+  alen = len(a)
+  for i in range(alen):
+    if (i == alen - 1):
+      result = addPolyRing(result, [a[i]], gf)
+    else:
+      result = addPolyRing(result, mulPolyRing(modexpPolyRing(b, alen - i - 1, divpoly, gf), [A[i]], gf), gf)
+  return result
+
+#https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
+#https://en.wikipedia.org/wiki/Polynomial_greatest_common_divisor#Bézout's_identity_and_extended_GCD_algorithm
+def gcdPolyRing(a, b, gf):
+  r, ro = a, b
+  s, so = [0], [1]
+  t, to = [1], [0]
+  while (len(r) != 0):
+    if (r[0] != 1):
+      #must be monic or division will not be correct!
+      multiplier = modInverse(r[0], gf)
+      r = mulPolyRing(r, [multiplier], gf)
+    quot = mulPolyRing(divmodPolyRing(ro, r, gf)[0], [-1], gf)
+    swap = ro
+    ro, r = r, addPolyRing(swap, mulPolyRing(quot, r, gf), gf)
+    swap = so
+    so, s = s, addPolyRing(swap, mulPolyRing(quot, s, gf), gf)
+    swap = to
+    to, t = t, addPolyRing(swap, mulPolyRing(quot, t, gf), gf)
+  return ro
+
+#Extended Euclid GCD of 1
+def modInversePolyRing(a, n, gf):
+  i, v, d = n, [0], [1]
+  while (len(a) > 0):
+    t, x = divmodPolyRing(i, a, gf)[0], a
+    a = divmodPolyRing(i, x, gf)[1]
+    i = x
+    x = d
+    d = addPolyRing(v, mulPolyRing(mulPolyRing(t, x, gf), [-1], gf), gf)
+    v = x
+  if (len(i) > 1): return None #no modular inverse exists if degree more than 0...
+  v = mulPolyRing([modInverse(i[0], gf)], v, gf)
+  v = divmodPolyRing(v, n, gf)[1]
+  #if (v < 0): v = (v + n) % n
+  return v
+
+def modexpPolyRing(x, m, f, gf):
+  d = [1]
+  bs = getBitSize(m)
+  for i in range(bs, 0, -1):
+    if (((1 << (bs - i)) & m) != 0):
+      d = divmodPolyRing(mulPolyRing(d, x, gf), f, gf)[1]
+    x = divmodPolyRing(mulPolyRing(x, x, gf), f, gf)[1]
+  return d
+
+def invertECPolyRing(p, gf):
+  return (p[0], mulPolyRing(p[1], [-1], gf))
+
+def addECPolyRing(p1, p2, a, gf, divpoly, f):
+  o = ([0], [1])
+  if (p1[0] == o[0] and p1[1] == o[1]): return p2
+  if (p2[0] == o[0] and p2[1] == o[1]): return p1
+  inv = invertECPolyRing(p2, gf)
+  if (p1[0] == inv[0] and p1[1] == inv[1]): return ([0], [1])
+  x1, y1, x2, y2 = p1[0], p1[1], p2[0], p2[1]
+  if (p1[0] == p2[0] and p1[1] == p2[1]):
+    factor = divmodPolyRing(mulPolyRing(mulPolyRing([2], y1, gf), f, gf), divpoly, gf)[1]
+    div = modInversePolyRing(factor, divpoly, gf)
+    if (div is None): return (None, factor)
+    m = divmodPolyRing(mulPolyRing(addPolyRing(mulPolyRing([3], mulPolyRing(x1, x1, gf), gf), [a], gf), div, gf), divpoly, gf)[1]
+  else:
+    factor = divmodPolyRing(addPolyRing(x2, mulPolyRing(x1, [-1], gf), gf), divpoly, gf)[1]
+    div = modInversePolyRing(factor, divpoly, gf)
+    if (div is None): return (None, factor)
+    m = divmodPolyRing(mulPolyRing(addPolyRing(y2, mulPolyRing(y1, [-1], gf), gf), div, gf), divpoly, gf)[1]
+  x3 = divmodPolyRing(addPolyRing(addPolyRing(mulPolyRing(f, mulPolyRing(m, m, gf), gf), mulPolyRing(x1, [-1], gf), gf), mulPolyRing(x2, [-1], gf), gf), divpoly, gf)[1]
+  return (x3, divmodPolyRing(addPolyRing(mulPolyRing(m, addPolyRing(x1, mulPolyRing(x3, [-1], gf), gf), gf), mulPolyRing(y1, [-1], gf), gf), divpoly, gf)[1])
+
+def scaleECPolyRing(x, k, a, gf, divpoly, f):
+  result = ([0], [1])
+  while (k > 0):
+    if (k & 1) != 0:
+      result = addECPolyRing(result, x, a, gf, divpoly, f)
+      if (result[0] is None): return result #division by zero case
+    x = addECPolyRing(x, x, a, gf, divpoly, f)
+    if (x[0] is None): return x #division by zero case
+    k = k >> 1
+  return result
+
+def scaleECDivPoly(x, k, gf, divpolys, divpoly, f):
+  ysub = mulPolyRing(f, [4], gf) #2*y or 4*y^2 really
+  num = mulPolyRing(mulPolyRing(divpolys[k + 1], divpolys[k - 1], gf), [-1], gf)
+  ynum = divpolys[2 * k] #this is even so need to divide out a y...
+  denom = mulPolyRing(divpolys[k], divpolys[k], gf)
+  ydenom = mulPolyRing(mulPolyRing(denom, denom, gf), [2], gf)
+  if ((k & 1) != 0):
+    num = divmodPolyRing(num, ysub, GF)[0]
+  else:
+    denom = divmodPolyRing(denom, ysub, GF)[0]
+    ydenom = divmodPolyRing(ydenom, mulPolyRing(ysub, ysub, GF), GF)[0]
+  modinv = modInversePolyRing(denom, divpoly, gf)
+  rx = addPolyRing([1, 0], num if modinv is None else divmodPolyRing(mulPolyRing(num, modinv, gf), divpoly, gf)[1], gf)
+  ymodinv = modInversePolyRing(divmodPolyRing(ydenom, divpoly, GF)[1], divpoly, GF);
+  ry = ynum if ymodinv is None else divmodPolyRing(mulPolyRing(ynum, ymodinv, gf), divpoly, gf)[1] #this likely needs a modInverse to make the y coefficient in the numerator
+  yinv = modInversePolyRing(divmodPolyRing(mulPolyRing(f, mulPolyRing(x[1], [2], gf), gf), divpoly, gf)[1], divpoly, gf) #divide by y
+  #yinv = modInversePolyRing(ysub, divpoly, gf) #divide by y
+  return (substitutePolyRing(rx, x[0], divpoly, gf), divmodPolyRing(mulPolyRing(substitutePolyRing(ry, x[0], divpoly, gf), yinv, gf), divpoly, gf)[1])
+
+def getDivPolys(curDivPolys, l, ea, eb, f, gf):
+  ysub = mulPolyRing([2], f, gf)
+  #ysquared = mulPolyRing(ysub, ysub, gf)
+  b6sqr = mulPolyRing([2 * 2], mulPolyRing(ysub, ysub, gf), gf)
+  #b6sqrinv = modInverse(2 * 2 * y * y * 2 * 2 * y * y, gf); //(4y^2)^2
+  divPolys = [[0], [1], mulPolyRing([2], ysub, gf),
+    [3, 0, 6 * ea, 12 * eb, -ea * ea], #-ea * ea, 12 * eb, 6 * ea, 0, 3
+      mulPolyRing(mulPolyRing([4], ysub, gf), [1, 0, 5 * ea, 20 * eb, -5 * ea * ea, -4 * ea * eb, -8 * eb * eb - ea * ea * ea ], gf) #-8 * eb * eb - ea * ea * ea, -4 * ea * eb, -5 * ea * ea, 20 * eb, 5 * ea, 0, 1
+    ] if curDivPolys is None else curDivPolys
+  while (len(divPolys) <= l):
+    m = len(divPolys) // 2 #m >= 2
+                           #even ones in odd psis need adjustment by b6^2=(2*y)^2=4y^2
+    if ((m & 1) == 0):
+      divPolys.append(addPolyRing(divmodPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m], gf), divPolys[m], gf), divPolys[m], gf), b6sqr, gf)[0], mulPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 1], divPolys[m + 1], gf), divPolys[m + 1], gf), divPolys[m + 1], gf), [-1], gf), gf))
+    else:
+      divPolys.append(addPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m], gf), divPolys[m], gf), divPolys[m], gf), mulPolyRing(divmodPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 1], divPolys[m + 1], gf), divPolys[m + 1], gf), divPolys[m + 1], gf), b6sqr, gf)[0], [-1], gf), gf))
+    #divPolys.append(addPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m], gf), divPolys[m], gf), divPolys[m], gf), mulPolyRing(mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 1], divPolys[m + 1], gf), divPolys[m + 1], gf), divPolys[m + 1], gf), [-1], gf), gf))
+    m += 1 #m >= 3
+    divPolys.append(divmodPolyRing(mulPolyRing(divPolys[m], addPolyRing(mulPolyRing(mulPolyRing(divPolys[m + 2], divPolys[m - 1], gf), divPolys[m - 1], gf), mulPolyRing(mulPolyRing(mulPolyRing(divPolys[m - 2], divPolys[m + 1], gf), divPolys[m + 1], gf), [-1], gf), gf), gf), mulPolyRing([2], ysub, gf), gf)[0])
+  return divPolys
+
+def getSchoofRemainder(ea, eb, gf, l, divPolys, f):
+  divPolys = getDivPolys(divPolys, l * 2, ea, eb, f, gf) #l * 2 required for fast variant of point multiplication algorithm
+  tl = 0
+  divpoly = divPolys[l] #even ones need to be divided by 2*y
+  if (l == 2):
+    #www.grantjenks.com/docs/sortedcontainers/
+    xp = []
+    xp.append((gf, 1)) #gcd should return 1
+    gcdres = addPolyRing(gcdPolyRing(remainderPolyRingSparsePow2(xp, f, gf), f, gf), mulPolyRing([1, 0], [-1], gf), gf)
+    if (len(gcdres) == 1 and gcdres[0] == 1): tl = 1
+  else:
+    pl = posRemainder(gf, l)
+    if (pl >= l // 2): pl -= l
+    #xp = []
+    #xp.append((gf, 1))
+    while True:
+      #remainderPolyRingSparse(xp, divpoly, gf)
+      #divmodPolyRingSparse(xp, divpoly, gf)
+      #modinv = modInversePolyRing([1, 0], divpoly, gf)
+      #divmodPolyRing(mulPolyRing(modinv, [1, 0], gf), divpoly, gf)[1]
+      #xprem = remainderPolyRingSparsePow2(xp, divpoly, gf)
+      xprem = modexpPolyRing([1, 0], gf, divpoly, gf)
+      yprem = modexpPolyRing(f, (gf - 1) // 2, divpoly, gf)
+      #correct method of squaring is to substitute x value of prior fields into x, y of itself with the y multiplied by the original y
+      #xpsquared = divmodPolyRing(substitutePolyRing(xprem, xprem, divpoly, GF), divpoly, GF)[1]
+      xpsquared = modexpPolyRing(xprem, gf, divpoly, gf)
+      #ypsquared = divmodPolyRing(mulPolyRing(substitutePolyRing(yprem, xprem, divpoly, GF), yprem, GF), divpoly, GF)[1]
+      #ypsquared calculation can be delayed by computing the x' of S using alternate equation and then computing it only if needed
+      #ypsquared = modexpPolyRing(mulPolyRing(substitutePolyRing(f, xprem, divpoly, GF), f, GF), (GF - 1) / 2, divpoly, GF);
+      ypsquared = modexpPolyRing(yprem, gf + 1, divpoly, gf)
+      #using identity element with x and y as 1 but this will not suffice in comparisons with x^p or x^p^2
+      Q = scaleECPolyRing(([1, 0], [1]), abs(pl), ea, gf, divpoly, f)
+      #use identity element since factoring y out of this and making it a function r(x) * y which means r(x)==1 for simple (x, y)
+      #Q = scaleECPolyRing(([1, 0], f), abs(pl), ea, gf, divpoly, f)
+      #Q = scaleECDivPoly(([1, 0], [1]), abs(pl), gf, divPolys, divpoly, f)
+      #if (Q[0] != qalt[0]): raise ValueError
+      #if (Q[1] != qalt[1]): raise ValueError
+      m = 1
+      if (not Q[0] is None):
+        if (pl < 0): Q = (Q[0], mulPolyRing(Q[1], [-1], gf))
+        #if (Q[0] != xpsquared or Q[1] != ypsquared) {
+        S = addECPolyRing((xpsquared, ypsquared), Q, ea, gf, divpoly, f)
+        if (S[0] is None): Q = S #also can check xpsquared == Q[0]
+        elif (S[0] != [0] or S[1] != [1]):
+          #redundant with last check
+          modinv = modInversePolyRing(addPolyRing(xpsquared, mulPolyRing(Q[0], [-1], gf), gf), divpoly, gf)
+          if (not modinv is None):
+            #xpsquared != qalt[0]
+            diffsqr = divmodPolyRing(mulPolyRing(addPolyRing(ypsquared, mulPolyRing(Q[1], [-1], gf), gf),
+                modinv, gf), divpoly, gf)[1];
+            xprime = addPolyRing(addPolyRing(divmodPolyRing(mulPolyRing(mulPolyRing(diffsqr, diffsqr, gf), f, gf), divpoly, gf)[1],
+                mulPolyRing(xpsquared, [-1], gf), gf), mulPolyRing(Q[0], [-1], gf), gf); #need to remember to multiply by y^2
+            if (xprime != S[0]): raise ValueError
+            #xprime + yprime/lambda = xpsquared - ypsquared/lambda, or yprime = xpsquared*lambda - ypsquared - xprime*lambda
+            #lambda=(ypsquared-ypl)/(xpsquared-xpl)
+            yprime = addPolyRing(divmodPolyRing(mulPolyRing(addPolyRing(xpsquared, mulPolyRing(xprime, [-1], gf), gf), diffsqr, gf), divpoly, gf)[1], mulPolyRing(ypsquared, [-1], gf), gf)
+            if (yprime != S[1]): raise ValueError
+          #limited by 1 in y, and (l^2 - 3) / 2 in x
+          P = (xprem, yprem)
+          while True:
+            if (len(addPolyRing(S[0], mulPolyRing(P[0], [-1], gf), gf)) == 0):
+              tl = m if len(addPolyRing(S[1], mulPolyRing(P[1], [-1], gf), gf)) == 0 else l - m
+              break
+            if (m == (l - 1) / 2): break
+            #P = scaleECDivPoly((xprem, yprem), m + 1, gf, divPolys, divpoly, f)
+            P = addECPolyRing(P, (xprem, yprem), ea, gf, divpoly, f)
+            #if (P[0] != palt[0]): raise ValueError
+            #if (P[1] != palt[1]): raise ValueError
+            if (P[0] is None):
+              Q = P
+              break
+            m += 1
+        #else tl = 0
+      #else: m = (l - 1) // 2
+      if (Q[0] is None): divpoly = gcdPolyRing(divpoly, Q[1], gf)
+      else: break
+      if (Q[0] is None or m > (l - 1) // 2):
+        #one thing to do here is factor the division polynomial since we have hit a root in the point arithmetic
+        #quadratic non-residue of x^2 === GF (mod l) === pl
+        #since l is prime, do not need to deal with composite or prime power cases
+        #instead of Tonelli-Shanks, can show non-residue by excluding 1 root (GF === 0 (mod l)), and 2 roots (gcd(GF, l) == 1) and is residue
+        #but easier to just use Legendre symbol is -1 and prove non-residue = GF ^ ((l - 1) / 2) (mod l)
+        #if (pow(GF, (l - 1) / 2, l) == -1): tl = 0
+        #if (pl != 0  and math.gcd(GF, l) != 1): tl = 0
+        w = tonelliShanks(posRemainder(gf, l), l) #since we need result anyway might as well compute unless non-residue very common and much faster other methods
+        if (w == 0): tl = 0 #no square root, or one square root if posRemainder(GF, l) == 0 but zero either way...
+        else:
+          #posRemainder(gf, l) != 0 //so there are 2 square roots
+          #w = l - w; //l - w is also square root //both roots should give same result though
+          #xyw = scaleECPolyRing(([1, 0], [1]), w, ea, gf, divpoly, f)
+          xyw = scaleECDivPoly(([1, 0], [1]), w, GF, divPolys, divpoly, f)
+          #if (xprem != xyw[0])
+          if (gcdPolyRing(addPolyRing(xprem, xyw[0], GF), divpoly, GF) != [1]): tl = 0
+          #else: tl = posRemainder((yprem == xyw[1] ? 2 : -2) * w, l);
+          else: tl = posRemainder((2 if gcdPolyRing(addPolyRing(yprem, xyw[1], GF), divpoly, GF) == [1] else -2) * w, l)
+        break #no need to continue using reduced polynomial since this method is certainly better and faster
+  return tl
+
+#https://en.wikipedia.org/wiki/Schoof%27s_algorithm
+def schoof(ea, eb, gf, expectedBase):
+  realT = gf + 1 - expectedBase
+  #sqrtp = tonelliShanks(gf, gf)
+  sqrtGF = sqrt(16 * gf)
+  sqrtp4 = sqrtGF + (1 if sqrtGF * sqrtGF < 16 * gf else 0) #64-bit square root, can bump this up by one if less than lower bound if that is needed
+  #getPrimes(1024)
+  l = 2
+  prodS = 1
+  #https://en.wikipedia.org/wiki/Division_polynomials
+  #y=2*y^2 where y^2=x^3+ax+b
+  #ysub = 2 * (x * x * x + ea * x + eb)
+  f = [1, 0, ea, eb] #eb, ea, 0, 1
+  divPolys = None
+  ts = []
+  t = 0
+  while (prodS < sqrtp4): #log2(GF) primes required on average
+    tl = getSchoofRemainder(ea, eb, gf, l, divPolys, f)
+    print("%d %d %d" % (l, tl, posRemainder(realT, l)))
+    #posRemainder(realT, l) == tl
+    ts.append((tl, l))
+    a = prodS * modInverse(prodS, l)
+    b = l * modInverse(l, prodS)
+    prodS *= l
+    t = posRemainder(a * tl + b * t, prodS)
+    l = nextPrime(l)
+  #getBitSize(gf) == int(math.ceil(math.log(GF, 2))); //128-bit field
+  #t = 0
+  #chinese remainder theorem (CRT) on ts while |t| < 2*sqrt(gf)
+  if (t > sqrt(4 * gf)):
+    t -= prodS
+  return GF + 1 - t
 
 def testUtility():
   def testHexPartToInt():
