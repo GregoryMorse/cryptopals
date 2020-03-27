@@ -1311,6 +1311,28 @@ def isPrime(n):
     if (n % i == 0): return False
   return True
 
+def invertEC(p, gf):
+  return (p[0], gf - p[1])
+def addEC(p1, p2, a, gf):
+  O = (0, 1)
+  if (p1 == O): return p2
+  if (p2 == O): return p1
+  if (p1 == invertEC(p2, gf)): return (0, 1)
+  x1, y1, x2, y2 = p1[0], p1[1], p2[0], p2[1]
+  m = posRemainder((3 * x1 * x1 + a) * modInverse(2 * y1, gf), gf) if p1 == p2 else posRemainder((y2 - y1) * modInverse(posRemainder(x2 - x1, gf), gf), gf)
+  x3 = posRemainder(m * m - x1 - x2, gf)
+  return (x3, posRemainder(m * (x1 - x3) - y1, gf))
+def scaleEC(x, k, a, gf):
+  result = (0, 1)
+  if (k < 0):
+    x = invertEC(x, gf)
+    k = -k
+  while (k > 0):
+    if ((k & 1) != 0): result = addEC(result, x, a, gf)
+    x = addEC(x, x, a, gf)
+    k = k >> 1
+  return result
+
 def getRandomBitSize(bitSize, mx):
   import secrets
   r = secrets.randbits(bitSize)
@@ -1871,6 +1893,7 @@ def mulPolyPow(a, b, psN):
       if (a[j] == 0): continue
       ijoffs = i + j
       p[ijoffs] += a[j] * b[i]
+  import itertools
   return p if len(p) == 0 or p[0] != 0 else list(itertools.dropwhile(lambda c: c == 0, p))
 
 def modexpPoly(x, m):
@@ -1965,18 +1988,18 @@ def modInversePoly(a, n):
   #powers = [(val, len(a) - 1 - i) for i, val in enumerate(a) if val != 0]
 
   import numpy as np
-  M = np.zeros(((len(n) - 1) * 2 - 1, (len(n) - 1) * 2), dtype=np.int)
+  M = np.zeros(((len(n) - 1) * 2 - 1, (len(n) - 1) * 2), dtype='object')
   for i in range(len(n) - 1):
     for j in range(len(n) - 1):
       M[i + j, j] = a[len(a) - 1 - i] if i <= len(a) - 1 else 0
   for i in range(len(n)):
     for j in range(len(n) - 1 - 1):
-      M[i + j, j + len(n) - 1] = n[len(n) - 1 - i];
+      M[i + j, j + len(n) - 1] = n[len(n) - 1 - i]
   M[0, M.shape[1] - 1] = 1
   M = gaussianElimZZ(M)
   v = [0] * (len(n) - 1) #no solution likely means identity matrix not seen - should check that case
   for i in range(len(n) - 1):
-    v[len(v) - 1 - i] = M[i, M.shape[1] - 1];
+    v[len(v) - 1 - i] = M[i, M.shape[1] - 1]
   """
   i, v, d = n, [0], [1]
   while (len(a) > 0):
@@ -1997,7 +2020,7 @@ def modInversePoly(a, n):
 def modInversePolyPow(a, n, pow):
   import numpy as np
   powlen = (len(n) - 1) // pow + (1 if ((len(n) - 1) % pow) != 0 else 0)
-  M = np.zeros((powlen * 2 - 1, powlen * 2), dtype=np.int)
+  M = np.zeros((powlen * 2 - 1, powlen * 2), dtype='object')
   for i in range(powlen):
     for j in range(powlen):
       M[i + j, j] = a[len(a) - 1 - i * pow] if i * pow <= len(a) - 1 else 0
@@ -2132,7 +2155,7 @@ def getModularPoly(l):
       c[i] = res[1]
       cdiv[i] = res[0]
     #c[i] = divmodPoly(mulPoly(c[i], [-1]), [i])[0]
-    c[i] = [val / i for val in mulPoly(c[i], [-1])]
+    c[i] = [val // i for val in mulPoly(c[i], [-1])]
   jlt = [[]] * (v + 1)
   jltdiv = [0] * (v + 1)
   jlt[0] = [1]
@@ -2310,7 +2333,7 @@ def getModularPolyGF(l, gf):
   return coeffs #coeff x^ y^ 
 def diffdx(modPoly):
   dx = []
-  for i in range(len(modPoly)):
+  for i in range(len(modPoly) - 1):
     #last coefficient becomes 0
     dx.append([(val[0] * (len(modPoly) - 1 - i), val[1]) for val in modPoly[i]])
   return dx
