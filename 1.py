@@ -2,11 +2,11 @@
 def challenge1():
   passResult = ("SSdtIGtpbGxpbmcgeW91ciBicmFpbiBs"
                 "aWtlIGEgcG9pc29ub3VzIG11c2hyb29t")
-  str = ("49276d206b696c6c696e6720796f757220627261696e206c"
-         "696b65206120706f69736f6e6f7573206d757368726f6f6d")
-  #result = hexToBase64Alt(str)
-  #print(hexStrToBin(str))
-  result = hexToBase64(str)
+  s = ("49276d206b696c6c696e6720796f757220627261696e206c"
+       "696b65206120706f69736f6e6f7573206d757368726f6f6d")
+  #result = hexToBase64Alt(s)
+  #print(hexStrToBin(s))
+  result = hexToBase64(s)
   bSame = result == passResult
   if not bSame: print("%s != %s" % (result, passResult))
   return bSame

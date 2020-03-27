@@ -3350,12 +3350,12 @@ namespace Cryptopals
             //if (Ords[1] != SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, true, Ords[1])) return false;
             //if (Ords[1] != SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, false, Ords[1])) return false;
             //if (Ords[1] != Schoof(Ea, PickGys[1], GF, rng, Ords[1])) return false;
-            if (Ords[2] != SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, true, Ords[2])) return false;
-            if (Ords[2] != SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, false, Ords[2])) return false;
-            if (Ords[2] != Schoof(Ea, PickGys[2], GF, rng, Ords[2])) return false;
-            if (Ords[3] != SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, true, Ords[3])) return false;
-            if (Ords[3] != SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, false, Ords[3])) return false;
-            if (Ords[3] != Schoof(Ea, PickGys[3], GF, rng, Ords[3])) return false;
+            //if (Ords[2] != SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, true, Ords[2])) return false;
+            //if (Ords[2] != SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, false, Ords[2])) return false;
+            //if (Ords[2] != Schoof(Ea, PickGys[2], GF, rng, Ords[2])) return false;
+            //if (Ords[3] != SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, true, Ords[3])) return false;
+            //if (Ords[3] != SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, false, Ords[3])) return false;
+            //if (Ords[3] != Schoof(Ea, PickGys[3], GF, rng, Ords[3])) return false;
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);

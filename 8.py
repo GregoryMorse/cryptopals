@@ -128,12 +128,12 @@ def challenge59():
   #if ords[1] != schoofElkiesAtkin(ea, pickGys[1], gf, True, ords[1]): return False
   #if ords[1] != schoofElkiesAtkin(ea, pickGys[1], gf, False, ords[1]): return False
   #if ords[1] != schoof(ea, pickGys[1], gf, ords[1]): return False
-  if ords[2] != schoofElkiesAtkin(ea, pickGys[2], gf, True, ords[2]): return False
-  if ords[2] != schoofElkiesAtkin(ea, pickGys[2], gf, False, ords[2]): return False
-  if ords[2] != schoof(ea, pickGys[2], gf, ords[2]): return False
-  if ords[3] != schoofElkiesAtkin(ea, pickGys[3], gf, True, ords[3]): return False
-  if ords[3] != schoofElkiesAtkin(ea, pickGys[3], gf, False, ords[3]): return False
-  if ords[3] != schoof(ea, pickGys[3], gf, ords[3]): return False
+  #if ords[2] != schoofElkiesAtkin(ea, pickGys[2], gf, True, ords[2]): return False
+  #if ords[2] != schoofElkiesAtkin(ea, pickGys[2], gf, False, ords[2]): return False
+  #if ords[2] != schoof(ea, pickGys[2], gf, ords[2]): return False
+  #if ords[3] != schoofElkiesAtkin(ea, pickGys[3], gf, True, ords[3]): return False
+  #if ords[3] != schoofElkiesAtkin(ea, pickGys[3], gf, False, ords[3]): return False
+  #if ords[3] != schoof(ea, pickGys[3], gf, ords[3]): return False
   
 def challenge60():
   pass
