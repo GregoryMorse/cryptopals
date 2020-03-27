@@ -1310,7 +1310,65 @@ def isPrime(n):
   for i in range(2, mx + 1):
     if (n % i == 0): return False
   return True
+
+def getRandomBitSize(bitSize, mx):
+  import secrets
+  r = secrets.randbits(bitSize)
+  return mx - 1 if r >= mx else r
+
+def getNextRandomBig(mx):
+  import secrets
+  i = getBitSize(mx - 1)
+  while True:
+    ret = secrets.randbits(i)
+    if mx > ret: break
+  return ret
   
+def tonelliShanks(n, p): #inverse modular square root
+  #print(BigInteger.ModPow(n, (p - 1) / 2, p) == 1) #Euler's criterion must equal one or no square root exists
+  #if ((n % p) == 0): return 0 #single root case if p is prime
+  S = 0
+  Q = p - 1
+  while (Q & 1 == 0):
+    S += 1
+    Q >>= 1
+  if (S == 1):
+    r = pow(n, (p + 1) >> 2, p)
+    return r if ((r * r) % p) == n else 0
+  while True:
+    z = getNextRandomBig(p)
+    if (z > 1 and pow(z, (p - 1) >> 1, p) == p - 1): break #Euler's criterion for quadratic non-residue (== -1)
+  M = S
+  c, t, R = pow(z, Q, p), pow(n, Q, p), pow(n, (Q + 1) >> 1, p)
+  while True:
+    if (t == 0 or M == 0): return 0
+    if (t == 1): return R
+    i, tt = 0, t
+    while True:
+      i += 1
+      tt = (tt * tt) % p
+      if (i >= M or tt == 1): break
+    if (i == M): return 0 #no solution to the congruence exists
+    b = pow(c, pow(2, M - i - 1, p - 1), p)
+    M = i
+    c = (b * b) % p
+    t = (t * c) % p
+    R = (R * b) % p
+
+def jacobi(n, k):
+  if (k <= 0 or (k & 1) == 0): raise ValueError
+  n = n % k
+  t = 1
+  while (n != 0):
+    while ((n & 1) == 0):
+      n >>= 1
+      r = k & 7
+      if (r == 3 or r == 5): t = -t
+    n, k = k, n
+    if ((n & 3) == 3 and (k & 3) == 3): t = -t
+    n = n % k
+  return t if k == 1 else 0
+
 def nextPrime(n):
   if (n == 2): return 3
   while True:
@@ -1343,36 +1401,37 @@ def addPolyRing(a, b, gf):
 
 def combineBigIntegers(nums, bits):
   nlen = len(nums)
-  b = new byte[((nums.Length * bits + 7) >> 3) + (((nums.Length * bits) & 7) == 0 ? 1 : 0)] #+1 for avoiding negatives
+  b = bytearray(((nlen * bits + 7) >> 3) + (1 if ((nlen * bits) & 7) == 0 else 0)) #+1 for avoiding negatives
   curBit = 0
   for i in range(nlen):
     curByte, bit = curBit >> 3, curBit & 7
     if (bit != 0):
-      byte[] src = (nums[i] << bit).ToByteArray()
-      b[curByte] |= src[0]
-      Array.Copy(src, 1, b, curByte + 1, src.Length - 1)
+      n = nums[i] << bit
+      src = n.to_bytes((n.bit_length() + 7) // 8, byteorder='little')
+      if len(src) != 0: b[curByte] |= src[0]
+      b[curByte + 1:curByte + len(src)] = src[1:]
     else:
-      byte[] src = nums[i].ToByteArray()
-      Array.Copy(src, 0, b, curByte, src.Length)
+      src = nums[i].to_bytes((nums[i].bit_length() + 7) // 8, byteorder='little')
+      b[curByte:curByte + len(src)] = src
     curBit += bits
-  return b
+  return int.from_bytes(b, byteorder='little')
 
 def multiSplitBigInteger(num, bits, size):
   c = [0] * size
   if (bits == 0): return c #impossible split size
-  bytes = num.to_bytes((num.bit_length() + 7) // 8, byteorder='little')
-  blen = len(bytes)
+  bts = num.to_bytes((num.bit_length() + 7) // 8, byteorder='little')
+  blen = len(bts)
   if (blen == 0): return c
   curbits, count, startByte = 0, 0, 0
   while (count < size):
     lastByte = (curbits + bits + 7) >> 3
     rembits = (curbits + bits) & 7
     if (blen < lastByte): lastByte, rembits = blen, 0
-    taken = bytearray(lastByte - startByte + (1 if (bytes[lastByte - 1] & 0x80) != 0 else 0))
-    Array.Copy(bytes, startByte, taken, 0, lastByte - startByte)
+    taken = bytearray(lastByte - startByte + (1 if (bts[lastByte - 1] & 0x80) != 0 else 0))
+    taken[0:lastByte - startByte] = bts[startByte:lastByte]
     if (rembits != 0): taken[lastByte - startByte - 1] &= ((1 << rembits) - 1)
-    if ((curbits & 7) != 0): c[count] = new BigInteger(taken) >> (curbits & 7);
-    else: c[count] = new BigInteger(taken);
+    if ((curbits & 7) != 0): c[count] = int.from_bytes(taken, byteorder='little') >> (curbits & 7)
+    else: c[count] = int.from_bytes(taken, byteorder='little')
     if (blen < (curbits + bits + 7) >> 3): break
     startByte = lastByte - (1 if rembits != 0 else 0)
     curbits += bits
@@ -1398,7 +1457,7 @@ def doBigMul(num1, num2, num1bits, num2bits):
     return num1 * num2
   if (num1 <= 0xFFFFFFFF or num2 <= 0xFFFFFFFF or
       num1bits <= 4096 or num2bits <= 4096): return num1 * num2; #experimentally determined threshold 8192 is next best
-                                                                #if (num1bits >= 1728 * 64 && num2bits >= 1728 * 64)
+                                                                #if (num1bits >= 1728 * 64 and num2bits >= 1728 * 64)
                                                                 #return mulSchonhageStrassen(num1, num2, num1bits, num2bits)
   return mulKaratsuba(num1, num2, num1bits, num2bits)
 
@@ -1414,12 +1473,12 @@ def bigMul(num1, num2):
 #https://web.maths.unsw.edu.au/~davidharvey/talks/kronecker-talk.pdf
 def mulPolyRingKronecker(a, b, gf):
   alen, blen = len(a), len(b)
-  packSize = (getBitSize(gf) << 1) + getBitSize(max(alen, blen)) #coefficients are bounded by 2^(2*GetBitSize(GF))*n where n is degree+1 of A, B
+  packSize = (getBitSize(gf) << 1) + getBitSize(max(alen, blen)) #coefficients are bounded by 2^(2*GetBitSize(gf))*n where n is degree+1 of A, B
   #evaluate at 2^(2*getBitSize(gf)+UpperBound(log2(n)))
-  Apack = combineBigIntegers(list(reversed([posRemainder(nm, GF) if nm < 0 else nm for nm in a])), packSize)
-  Bpack = combineBigIntegers(list(reversed([posRemainder(nm, GF) if nm < 0 else nm for nm in b])), packSize);
+  Apack = combineBigIntegers(list(reversed([posRemainder(nm, gf) if nm < 0 else nm for nm in a])), packSize)
+  Bpack = combineBigIntegers(list(reversed([posRemainder(nm, gf) if nm < 0 else nm for nm in b])), packSize);
   Cpack = doBigMul(Apack, Bpack, packSize * alen, packSize * blen);
-  p = reversed([posRemainder(nm, GF) for nm in multiSplitBigInteger(Cpack, packSize, alen + blen - 1)])
+  p = reversed([posRemainder(nm, gf) for nm in multiSplitBigInteger(Cpack, packSize, alen + blen - 1)])
   import itertools
   return list(itertools.dropwhile(lambda c: c == 0, p))
 
@@ -1501,7 +1560,7 @@ def substitutePolyRing(a, b, divpoly, gf):
     if (i == alen - 1):
       result = addPolyRing(result, [a[i]], gf)
     else:
-      result = addPolyRing(result, mulPolyRing(modexpPolyRing(b, alen - i - 1, divpoly, gf), [A[i]], gf), gf)
+      result = addPolyRing(result, mulPolyRing(modexpPolyRing(b, alen - i - 1, divpoly, gf), [a[i]], gf), gf)
   return result
 
 #https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Pseudocode
@@ -1590,13 +1649,13 @@ def scaleECDivPoly(x, k, gf, divpolys, divpoly, f):
   denom = mulPolyRing(divpolys[k], divpolys[k], gf)
   ydenom = mulPolyRing(mulPolyRing(denom, denom, gf), [2], gf)
   if ((k & 1) != 0):
-    num = divmodPolyRing(num, ysub, GF)[0]
+    num = divmodPolyRing(num, ysub, gf)[0]
   else:
-    denom = divmodPolyRing(denom, ysub, GF)[0]
-    ydenom = divmodPolyRing(ydenom, mulPolyRing(ysub, ysub, GF), GF)[0]
+    denom = divmodPolyRing(denom, ysub, gf)[0]
+    ydenom = divmodPolyRing(ydenom, mulPolyRing(ysub, ysub, gf), gf)[0]
   modinv = modInversePolyRing(denom, divpoly, gf)
   rx = addPolyRing([1, 0], num if modinv is None else divmodPolyRing(mulPolyRing(num, modinv, gf), divpoly, gf)[1], gf)
-  ymodinv = modInversePolyRing(divmodPolyRing(ydenom, divpoly, GF)[1], divpoly, GF);
+  ymodinv = modInversePolyRing(divmodPolyRing(ydenom, divpoly, gf)[1], divpoly, gf);
   ry = ynum if ymodinv is None else divmodPolyRing(mulPolyRing(ynum, ymodinv, gf), divpoly, gf)[1] #this likely needs a modInverse to make the y coefficient in the numerator
   yinv = modInversePolyRing(divmodPolyRing(mulPolyRing(f, mulPolyRing(x[1], [2], gf), gf), divpoly, gf)[1], divpoly, gf) #divide by y
   #yinv = modInversePolyRing(ysub, divpoly, gf) #divide by y
@@ -1713,11 +1772,11 @@ def getSchoofRemainder(ea, eb, gf, l, divPolys, f):
           #posRemainder(gf, l) != 0 //so there are 2 square roots
           #w = l - w; //l - w is also square root //both roots should give same result though
           #xyw = scaleECPolyRing(([1, 0], [1]), w, ea, gf, divpoly, f)
-          xyw = scaleECDivPoly(([1, 0], [1]), w, GF, divPolys, divpoly, f)
+          xyw = scaleECDivPoly(([1, 0], [1]), w, gf, divPolys, divpoly, f)
           #if (xprem != xyw[0])
-          if (gcdPolyRing(addPolyRing(xprem, xyw[0], GF), divpoly, GF) != [1]): tl = 0
+          if (gcdPolyRing(addPolyRing(xprem, xyw[0], gf), divpoly, gf) != [1]): tl = 0
           #else: tl = posRemainder((yprem == xyw[1] ? 2 : -2) * w, l);
-          else: tl = posRemainder((2 if gcdPolyRing(addPolyRing(yprem, xyw[1], GF), divpoly, GF) == [1] else -2) * w, l)
+          else: tl = posRemainder((2 if gcdPolyRing(addPolyRing(yprem, xyw[1], gf), divpoly, gf) == [1] else -2) * w, l)
         break #no need to continue using reduced polynomial since this method is certainly better and faster
   return tl
 
@@ -1752,7 +1811,912 @@ def schoof(ea, eb, gf, expectedBase):
   #chinese remainder theorem (CRT) on ts while |t| < 2*sqrt(gf)
   if (t > sqrt(4 * gf)):
     t -= prodS
-  return GF + 1 - t
+  return gf + 1 - t
+  
+#Dedekind Eta function (1-x)(1-x^2)(1-x^3)... infinite expansion
+#https://github.com/miracl/MIRACL/blob/master/source/curve/ps_zzn.cpp
+def getEta(psN):
+  ce, co, c, one = 2, 1, 2, 1
+  even = True
+  degree = psN * (psN - 1) // 2 + 1
+  res = [1, -1, -1]
+  while c < psN:
+    if even:
+      c += ce + 1
+      ce += 2
+      while (len(res) < c): res.append(0)
+      res.append(one)
+    else:
+      c += co + 1
+      co += 1
+      while (len(res) < c): res.append(0)
+      res.append(one)
+      one = -one
+    even = not even
+  return list(reversed(res))
+
+def addPoly(a, b):
+  alen, blen = len(a), len(b)
+  c = [0] * max(alen, blen)
+  clen = len(c)
+  for i in range(clen):
+    aoffs, boffs, coffs = alen - 1 - i, blen - 1 - i, clen - 1 - i
+    if (i >= alen): c[coffs] = b[boffs]
+    elif (i >= blen): c[coffs] = a[aoffs]
+    else: c[coffs] = a[aoffs] + b[boffs]
+  import itertools
+  return c if clen == 0 or c[0] != 0 else list(itertools.dropwhile(lambda cr: cr == 0, c))
+
+def mulPoly(a, b):
+  alen, blen = len(a), len(b)
+  if (alen == 0): return a
+  if (blen == 0): return b
+  p = [0] * (alen + blen - 1)
+  for i in range(blen):
+    if (b[i] == 0): continue
+    for j in range(alen):
+      if (a[j] == 0): continue
+      ijoffs = i + j
+      p[ijoffs] += a[j] * b[i]
+  return p if len(p) == 0 or p[0] != 0 else list(itertools.dropwhile(lambda c: c == 0, p))
+
+def mulPolyPow(a, b, psN):
+  alen, blen = len(a), len(b)
+  if (alen == 0): return a
+  if (blen == 0): return b
+  p = [0] * (alen + blen - 1)
+  for i in range(blen):
+    if (b[i] == 0): continue
+    for j in range(max(0, len(p) - psN - i - 1), alen): #len(p) - (j + i) > psN, len(p) - psN - i > j
+      if (a[j] == 0): continue
+      ijoffs = i + j
+      p[ijoffs] += a[j] * b[i]
+  return p if len(p) == 0 or p[0] != 0 else list(itertools.dropwhile(lambda c: c == 0, p))
+
+def modexpPoly(x, m):
+  d = [1]
+  bs = getBitSize(m)
+  for i in range(bs, 0, -1):
+    if (((1 << (bs - i)) & m) != 0):
+      d = mulPoly(d, x)
+    x = mulPoly(x, x)
+  return d
+  
+def modexpPolyPow(x, m, psN):
+  d = [1]
+  bs = getBitSize(m)
+  for i in range(bs, 0, -1):
+    if (((1 << (bs - i)) & m) != 0):
+      d = reducePoly(mulPoly(d, x), 0, psN)[1]
+    x = reducePoly(mulPoly(x, x), 0, psN)[1]
+  return d
+
+def substPowerPoly(x, m):
+  if (len(x) == 0): return x
+  p = [0] * ((len(x) - 1) * m + 1)
+  for i in range(len(x)): p[i * m] = x[i]
+  return p
+
+def divmodPoly(a, b):
+  #if (len(b) == 0): raise ValueError
+  #if B is not monic, this poses a problem - rational numbers might work, Sage seems to use matrix system to solve modInversePoly
+  alen, blen = len(a), len(b)
+  q, r = [0] * alen, a
+  bneg = mulPoly(B, [-1])
+  rlen = len(r)
+  d = (rlen - 1) - (blen - 1)
+  while (rlen != 0 and d >= 0):
+    aoffs = alen - d - 1
+    q[aoffs] = r[0] // B[0]
+    if (q[aoffs] == 0): break
+    r = addPoly(r, mulPoly(bneg, q[aoffs:]))
+    rlen = len(r)
+    d = (rlen - 1) - (blen - 1)
+  import itertools
+  return (list(itertools.dropwhile(lambda c: c == 0, q)), r)
+def gaussianElimZZ(x):
+  h = 0 #Initialization of pivot row
+  k = 0 #Initialization of pivot column
+  m = x.shape[0]
+  n = x.shape[1]
+  while (h < m and k < n):
+    #Find the k-th pivot
+    res = [(abs(x[i, k]), i) for i in range(h, m) if x[i, k] != 0]
+    i_max = -1 if len(res) == 0 else min(res)[1] #index of maximum which is first one with a bit set, also should consider absolute value but here its not applicable since no negative values though zero still possible
+    if (i_max < h or x[i_max, k] == 0): #No pivot in this column, pass to next column
+      k += 1
+    else:
+      #swap rows h and i_max
+      if (h != i_max):
+        vect = x[i_max * n:i_max * (n + 1)]
+        x[i_max * n:i_max * (n + 1)] = x[h * n:h * (n + 1)]
+        x[h * n:h * (n + 1)] = vect
+      #Do for all rows below pivot
+      #for (int i = h + 1; i < m; i++) {
+      #reduced row echelon form (RREF) is obtained without a back substitution step by starting from 0 and skipping h
+      for i in range(m):
+        if (h == i): continue
+        f = x[i, k] // x[h, k]
+        x[i, k] = 0
+        #Do for all remaining elements in current row
+        for j in range(k+1, n):
+          x[i, j] -= (x[h, j] * f)
+      h += 1
+      k += 1 #Increase pivot row and column
+  return x #ret
+#Extended Euclid GCD of 1
+def modInversePoly(a, n):
+  #https://github.com/sagemath/sage/blob/master/src/sage/rings/polynomial/polynomial_element.pyx
+  #use matrix to solve this as linear system since there can be non-monic polynomials or intermediate ones
+  #Gaussian elimination row reduction to solve
+  """
+   [a[2] 0 0 0 0] = 1
+   [a[1] a[2] 0 0 0] = 0
+   [a[0] a[1] a[2] 0 0] = 0
+   [0 a[0] a[1] b[3]  0] = 0
+   [0 0 a[0] 0  b[3]] = 0
+   M=matrix(ZZ,[[1,0,0,0,0,1],[-24,1,0,0,0,0],[252,-24,1,0,0,0],[0,252,-24,1,0,0],[0,0,252,0,1,0]])
+   M.echelon_form() # last column 1, 24, 324, 1728, -81648
+  """
+  #if we have a power series here, we want the result also to be in coefficients of the same power series, and hence
+  #the matrix equations can be reduced by this to eliminate all the known 0 coefficients
+  #otherwise this is way too computationally complex
+  #cannot necessarily deduce this as 0 coefficients could be in any positions and best it could guess by the smallest gap which might not be correct
+  #powers = [(val, len(a) - 1 - i) for i, val in enumerate(a) if val != 0]
+
+  import numpy as np
+  M = np.zeros(((len(n) - 1) * 2 - 1, (len(n) - 1) * 2), dtype=np.int)
+  for i in range(len(n) - 1):
+    for j in range(len(n) - 1):
+      M[i + j, j] = a[len(a) - 1 - i] if i <= len(a) - 1 else 0
+  for i in range(len(n)):
+    for j in range(len(n) - 1 - 1):
+      M[i + j, j + len(n) - 1] = n[len(n) - 1 - i];
+  M[0, M.shape[1] - 1] = 1
+  M = gaussianElimZZ(M)
+  v = [0] * (len(n) - 1) #no solution likely means identity matrix not seen - should check that case
+  for i in range(len(n) - 1):
+    v[len(v) - 1 - i] = M[i, M.shape[1] - 1];
+  """
+  i, v, d = n, [0], [1]
+  while (len(a) > 0):
+    t, x = divmodPoly(i, a)[0], a
+    a = divmodPoly(i, x)[1]
+    i = x
+    x = d
+    d = addPoly(v, mulPoly(mulPoly(t, x), [-1]))
+    v = x
+  if (len(i) > 1): return None #no modular inverse exists if degree more than 0...
+  //v = mulPoly([modInverse(i[0], gf)], v);
+  v = divmodPoly(v, n)[1]
+  //if (v < 0): v = (v + n) % n
+  """
+  import itertools
+  return list(itertools.dropwhile(lambda c: c == 0, v))
+
+def modInversePolyPow(a, n, pow):
+  import numpy as np
+  powlen = (len(n) - 1) // pow + (1 if ((len(n) - 1) % pow) != 0 else 0)
+  M = np.zeros((powlen * 2 - 1, powlen * 2), dtype=np.int)
+  for i in range(powlen):
+    for j in range(powlen):
+      M[i + j, j] = a[len(a) - 1 - i * pow] if i * pow <= len(a) - 1 else 0
+  for i in range(powlen, powlen + 1):
+    #this will only work for x^n field
+    for j in range(powlen - 1):
+      M[i + j, j + powlen] = n[0]
+  M[0, M.shape[1] - 1] = 1
+  M = gaussianElimZZ(M)
+  v = [0] * (len(n) - 1) #no solution likely means identity matrix not seen - should check that case
+  for i in range(powlen):
+    v[len(v) - 1 - i * pow] = M[i, M.shape[1] - 1]
+  import itertools
+  #if (not modInversePoly(a, n) == list(itertools.dropwhile(lambda c: c == 0, v))):
+  #  raise ValueError
+  return list(itertools.dropwhile(lambda c: c == 0, v))
+
+def reducePoly(a, offs, psN):
+  if (len(a) == 0): return (0, a)
+  import itertools
+  reduce = len(list(itertools.takewhile(lambda val: a[len(a) - 1 - val] == 0, range(offs))))
+  if (reduce != 0):
+    a = a[:len(a) - reduce]
+    offs -= reduce
+  if (len(a) - offs > psN):
+    a = a[len(a) - offs - psN:] #mod x^psN
+    a = list(itertools.dropwhile(lambda cz: cz == 0, a))
+  return (offs, a)
+
+def mulShiftedPoly(a, aoffs, b, boffs, psN):
+  c = mulPoly(a, b)
+  return reducePoly(c, aoffs + boffs, psN)
+
+def addShiftedPoly(a, aoffs, b, boffs, psN):
+  if (aoffs < boffs):
+    c = addPoly(a + ([0] * (boffs - aoffs)), b)
+  elif (aoffs > boffs):
+    c = addPoly(a, b + ([0] * (aoffs - boffs)))
+  else: c = addPoly(a, b)
+  return reducePoly(c, max(aoffs, boffs), psN)
+def phase(z, zf, l, psN):
+  #k is degree of polynomial
+  if (zf % l == 0): k = zf
+  else:
+    k = ((zf // l) if zf >= 0 else -(-zf // l)) * l
+    if (zf >= 0): k += l
+  offset = -k if k < 0 else 0
+  w = [0] * (psN + offset)
+  for ki in range(k, psN, l):
+    if (len(z) - 1 + zf < ki): break
+    w[len(w) - 1 - offset - ki] = l * z[len(z) - 1 + zf - ki]
+  import itertools
+  return (offset, list(itertools.dropwhile(lambda cz: cz == 0, w)))
+#https://sage.math.leidenuniv.nl/src/modular/ssmod/ssmod.py
+#https://github.com/miracl/MIRACL/blob/master/source/curve/mueller.cpp
+def getModularPoly(l):
+  #need mulPoly, divmodPoly, addPoly, modexpPoly since no ring here
+  s = 1
+  while True:
+    if (s * (l - 1) % 12 == 0): break #s is either 1, 2, 3 or 6 from fastest to slowest
+    s += 1
+  v = s * (l - 1) // 12
+  psN = v + 2
+  divpoly = [0] * (psN + 1)
+  divpoly[0] = 1
+  x = [0]
+  #calculate Klein=j(tau) from its definition
+  #x/(-x+1)==x+1
+  #8x^2/(-x^2+1)==8x^2
+  for n in range(1, psN):
+    #a = [(n, n * n * n)] #a=n^3*x^n
+    #b = [(0, 1), (n, -1)]
+    a = [0] * (n + 1)
+    a[0] = n * n * n #a=n^3*x^n
+    b = [0] * (n + 1)
+    b[0] = -1
+    b[n] = 1
+    t = mulShiftedPoly(a, 0, modInversePolyPow(b, divpoly, n), 0, psN)[1]
+    x = addPoly(x, t)
+  x = mulPoly(x, [240])
+  x[len(x) - 1] += 1
+  x = reducePoly(modexpPoly(x, 3), 0, psN)[1]
+  y = reducePoly(getEta(psN), 0, psN)[1]
+  y = reducePoly(modexpPoly(y, 24), 0, psN)[1]
+  #R.<x> = PolynomialRing(ZZ)
+  #inverse_mod(252*x^2-24*x+1, x^3)
+  klein = reducePoly(mulPoly(x, modInversePoly(y, divpoly)), 0, psN)[1] #[324, 24, 1]
+  #klein = divmodPoly(klein, [1, 0])[0] #divide by x
+  kleindiv = 1 #divide by x but since negative powers just store this denominator
+  psN *= l
+  divpoly = [0] * (psN + 1)
+  divpoly[0] = 1
+  klein = substPowerPoly(klein, l) #divmodPoly(substPowerPoly(klein, l), divpoly)[1]
+  kleindiv *= l
+  z = reducePoly(getEta(psN), 0, psN)[1]
+  y = reducePoly(substPowerPoly(z, l), 0, psN)[1]
+  z = reducePoly(mulPoly(z, modInversePolyPow(y, divpoly, l)), 0, psN)[1] #y = 1 / y, z *= y
+  flt = reducePoly(modexpPolyPow(z, 2 * s, psN), 0, psN)[1]
+  #xv = [0] * (v + 1)
+  #xv[0] = 1
+  #flt = divmodPoly(flt, xv)[0] #multiply by x^-v
+  fltdiv = v
+  w = l ** s
+  y = reducePoly(substPowerPoly(flt, l), 0, psN)[1]
+  ydiv = fltdiv * l
+  yinvw = [0] * (ydiv + 1)
+  yinvw[0] = w
+  zlt = reducePoly(mulPoly(yinvw, modInversePolyPow(y, divpoly, l)), 0, psN)[1]
+  #Calculate Power Sums
+  z = [1]
+  f = [1]
+  fdiv = 0
+  ps = [[]] * (l + 1 + 1)
+  psdiv = [0] * (l + 1 + 1)
+  ps[0] = [l + 1]
+  for i in range(1, l + 1 + 1):
+    f = reducePoly(mulPolyPow(f, flt, psN), 0, psN)[1]
+    fdiv += fltdiv
+    z = reducePoly(mulPoly(z, zlt), 0, psN)[1]
+    pswithdiv = phase(f, -fdiv, l, psN)
+    pswithdiv = addShiftedPoly(pswithdiv[1], pswithdiv[0], z, 0, psN)
+    ps[i] = pswithdiv[1]
+    psdiv[i] = pswithdiv[0]
+  c = [[]] * (l + 1 + 1)
+  cdiv = [0] * (l + 1 + 1)
+  c[0] = [1]
+  for i in range(1, l + 1 + 1):
+    c[i] = [0]
+    for j in range(1, i + 1):
+      res = mulShiftedPoly(ps[j], psdiv[j], c[i - j], cdiv[i - j], psN)
+      res = addShiftedPoly(c[i], cdiv[i], res[1], res[0], psN)
+      c[i] = res[1]
+      cdiv[i] = res[0]
+    #c[i] = divmodPoly(mulPoly(c[i], [-1]), [i])[0]
+    c[i] = [val / i for val in mulPoly(c[i], [-1])]
+  jlt = [[]] * (v + 1)
+  jltdiv = [0] * (v + 1)
+  jlt[0] = [1]
+  jlt[1] = klein
+  jltdiv[1] = kleindiv
+  for i in range(2, v + 1):
+    res = mulShiftedPoly(jlt[i - 1], jltdiv[i - 1], klein, kleindiv, psN)
+    jlt[i] = res[1]
+    jltdiv[i] = res[0]
+  #x^(l+1) is first term
+  coeffs = []
+  #print("X^%d" % (l + 1))
+  coeffs.append([(1, 0)])
+  for i in range(1, l + 1 + 1):
+    z = c[i]
+    zdiv = cdiv[i]
+    yvals = []
+    #print("+(")
+    while (zdiv != 0):
+      j = zdiv // l
+      cf = z[len(z) - 1]
+      res = addShiftedPoly(z, zdiv, mulPoly(jlt[j], [-cf]), jltdiv[j], psN)
+      z = res[1]
+      zdiv = res[0]
+      #print("+%d*Y^%d" % (cf, j))
+      yvals.append((cf, j))
+      #(cf*Y^j;
+    cf = z[len(z) - 1];
+    #+cf)*X^(l+1-i)
+    #print(" + %d)*X^%d" % (cf, l + 1 - i))
+    yvals.append((cf, 0))
+    coeffs.append(yvals)
+    if (l <= len(z) - 1 and z[len(z) - 1 - l] != 0): raise ValueError
+  return coeffs #coeff x^ y^
+def mulShiftedPolyRing(a, aoffs, b, boffs, psN, gf):
+  c = mulPolyRing(a, b, gf)
+  return reducePoly(c, aoffs + boffs, psN)
+def addShiftedPolyRing(a, aoffs, b, boffs, psN, gf):
+  if (aoffs < boffs):
+    c = addPolyRing(a + ([0] * (boffs - aoffs)), b, gf)
+  elif (aoffs > boffs):
+    c = addPolyRing(a, b + ([0] * (aoffs - boffs)), gf)
+  else: c = addPolyRing(a, b, gf)
+  return reducePoly(c, max(aoffs, boffs), psN)
+def mulPolyRingPow(a, b, psN, gf):
+  alen, blen = len(a), len(b)
+  if (alen == 0): return a
+  if (blen == 0): return b
+  p = [0] * (alen + blen - 1)
+  for i in range(blen):
+    if (b[i] == 0): continue
+    for j in range(max(0, len(p) - psN - i - 1), alen):
+      if (a[j] == 0): continue
+      ijoffs = i + j
+      if (b[i] == -1): p[ijoffs] += (gf - a[j])
+      elif (a[j] == -1): p[ijoffs] += (gf - b[i])
+      else: p[ijoffs] += a[j] * b[i]
+  import itertools
+  return [posRemainder(x, gf) for x in list(itertools.dropwhile(lambda c: c == 0, p))]
+def getModularPolyGF(l, gf):
+  #need mulPoly, divmodPoly, addPoly, modexpPoly since no ring here
+  s = 1
+  while True:
+    if (s * (l - 1) % 12 == 0): break #s is either 1, 2, 3 or 6 from fastest to slowest
+    s += 1
+  v = s * (l - 1) // 12
+  psN = v + 2
+  divpoly = [0] * (psN + 1)
+  divpoly[0] = 1
+  x = [0]
+  #calculate Klein=j(tau) from its definition
+  #x/(-x+1)==x+1
+  #8x^2/(-x^2+1)==8x^2
+  for n in range(1, psN):
+    #a = [(n, n * n * n)] #a=n^3*x^n
+    #b = [(0, 1), (n, -1)]
+    a = [0] * (n + 1)
+    a[0] = n * n * n #a=n^3*x^n
+    b = [0] * (n + 1)
+    b[0] = -1
+    b[n] = 1
+    t = mulShiftedPolyRing(a, 0, modInversePolyRing(b, divpoly, gf), 0, psN, gf)[1]
+    x = addPolyRing(x, t, gf)
+  x = mulPolyRing(x, [240], gf)
+  x[len(x) - 1] += 1
+  x = modexpPolyRing(x, 3, divpoly, gf)
+  y = reducePoly(getEta(psN), 0, psN)[1]
+  y = modexpPolyRing(y, 24, divpoly, gf)
+  #R.<x> = PolynomialRing(ZZ)
+  #inverse_mod(252*x^2-24*x+1, x^3)
+  klein = reducePoly(mulPolyRing(x, modInversePolyRing(y, divpoly, gf), gf), 0, psN)[1] #[324, 24, 1]
+  #klein = divmodPoly(klein, [1, 0])[0] # divide by x
+  kleindiv = 1 #divide by x but since negative powers just store this denominator
+  psN *= l
+  divpoly = [0] * (psN + 1)
+  divpoly[0] = 1
+
+  klein = substPowerPoly(klein, l) #divmodPoly(substPowerPoly(klein, l), divpoly)[1];
+  kleindiv *= l
+  z = reducePoly(getEta(psN), 0, psN)[1]
+  y = reducePoly(substPowerPoly(z, l), 0, psN)[1]
+  z = reducePoly(mulPolyRing(z, modInversePolyRing(y, divpoly, gf), gf), 0, psN)[1] #y = 1 / y, z *= y
+  flt = modexpPolyRing(z, 2 * s, divpoly, gf)
+  #xv = [0] * (v + 1)
+  #xv[0] = 1
+  #flt = divmodPoly(flt, xv)[0] // multiply by x^-v
+  fltdiv = v
+  w = l ** s
+  y = reducePoly(substPowerPoly(flt, l), 0, psN)[1]
+  ydiv = fltdiv * l
+  yinvw = [0] * (ydiv + 1)
+  yinvw[0] = w
+  zlt = reducePoly(mulPolyRing(yinvw, modInversePolyRing(y, divpoly, gf), gf), 0, psN)[1]
+  #Calculate Power Sums
+  z = [1]
+  f = [1]
+  fdiv = 0
+  ps = [[]] * (l + 1 + 1)
+  psdiv = [0] * (l + 1 + 1)
+  ps[0] = [l + 1]
+  for i in range(1, l + 1 + 1):
+    f = mulPolyRingPow(f, flt, psN, gf)
+    fdiv += fltdiv
+    z = reducePoly(mulPolyRing(z, zlt, gf), 0, psN)[1]
+    pswithdiv = phase(f, -fdiv, l, psN)    
+    pswithdiv = addShiftedPolyRing(pswithdiv[1], pswithdiv[0], z, 0, psN, gf)
+    ps[i] = pswithdiv[1]
+    psdiv[i] = pswithdiv[0]
+  c = [[]] * (l + 1 + 1)
+  cdiv = [0] * (l + 1 + 1)
+  c[0] = [1]
+  for i in range(1, l + 1 + 1):
+    c[i] = [0]
+    for j in range(1, i + 1):
+      res = mulShiftedPolyRing(ps[j], psdiv[j], c[i - j], cdiv[i - j], psN, gf)
+      res = addShiftedPolyRing(c[i], cdiv[i], res[1], res[0], psN, gf)
+      c[i] = res[1]
+      cdiv[i] = res[0]
+    #c[i] = divmodPoly(mulPolyRing(c[i], [-1], gf), [i])[0]
+    #c[i] = [val / i for val in mulPolyRing(c[i], [-1], gf)]
+    c[i] = [posRemainder(val * modInverse(i, gf), gf) for val in mulPolyRing(c[i], [-1], gf)]
+  jlt = [[]] * (v + 1)
+  jltdiv = [0] * (v + 1)
+  jlt[0] = [1]
+  jlt[1] = klein
+  jltdiv[1] = kleindiv
+  for i in range(2, v + 1):
+    res = mulShiftedPolyRing(jlt[i - 1], jltdiv[i - 1], klein, kleindiv, psN, gf)
+    jlt[i] = res[1]
+    jltdiv[i] = res[0]
+  #x^(l+1) is first term
+  coeffs = []
+  #print("X^%d" % (l + 1))
+  coeffs.append([(1, 0)])
+  for i in range(1, l + 1 + 1):
+    z = c[i]
+    zdiv = cdiv[i]
+    yvals = []
+    #print("+(")
+    while (zdiv != 0):
+      j = zdiv // l
+      cf = z[len(z) - 1]
+      res = addShiftedPolyRing(z, zdiv, mulPolyRing(jlt[j], [-cf], gf), jltdiv[j], psN, gf)
+      z = res[1]
+      zdiv = res[0]
+      #print("+%d*Y^%d" % (cf, j))
+      yvals.append((cf, j))
+      #(cf*Y^j;
+    cf = z[len(z) - 1]
+    #+cf)*X^(l+1-i)
+    #print(" + %d)*X^%d" % (cf, l + 1 - i))
+    yvals.append((cf, 0))
+    coeffs.append(yvals)
+    if (l <= len(z) - 1 and z[len(z) - 1 - l] != 0): raise ValueError
+  return coeffs #coeff x^ y^ 
+def diffdx(modPoly):
+  dx = []
+  for i in range(len(modPoly)):
+    #last coefficient becomes 0
+    dx.append([(val[0] * (len(modPoly) - 1 - i), val[1]) for val in modPoly[i]])
+  return dx
+def diffdy(modPoly):
+  dy = []
+  for i in range(len(modPoly)):
+    dy.append([(val[0] * val[1], val[1] - 1) for val in modPoly[i] if val[1] != 0])
+  import itertools
+  return list(itertools.dropwhile(lambda l: len(l) == 0, dy))
+def evalDiffEq(diffeq, x, y, gf):
+  sum = 0
+  for i in range(len(diffeq)):
+    cfsum = 0
+    for j in range(len(diffeq[i])):
+      if (len(diffeq[i]) - 1 - j == 0):
+          cfsum += diffeq[i][j][0]
+      else:
+          cfsum += posRemainder(diffeq[i][j][0] * pow(y, len(diffeq[i]) - 1 - j, gf), gf)
+    if (len(diffeq) - 1 - i == 0):
+      sum += cfsum
+    else:
+      sum += posRemainder(cfsum * pow(x, len(diffeq) - 1 - i, gf), gf)
+  return posRemainder(sum, gf)
+def getCk(terms, a, b, gf):
+  c = [0] * (terms + 1)
+  if (terms == 0): return c
+  c[1] = posRemainder(-a * modInverse(5, gf), gf)
+  if (terms == 1): return c
+  c[2] = posRemainder(-b * modInverse(7, gf), gf)
+  for k in range(3, terms + 1):
+    c[k] = 0
+    for h in range(1, k - 2 + 1): c[k] += c[h] * c[k - 1 - h]
+    c[k] *= (3 * modInverse((k - 2) * (2 * k + 3), gf))
+    c[k] = posRemainder(c[k], gf)
+  return c
+def mulquad(p, qnr, x, y, a, b):
+  return (posRemainder(a * x + b * y * qnr, p), posRemainder(a * y + b * x, p))
+def powquad(p, qnr, x, y, e):
+  k = e
+  a = 1
+  b = 0
+  if (k == 0): return (a, b)
+  while True:
+    if ((k & 1) != 0):
+      ret = mulquad(p, qnr, x, y, a, b)
+      a = ret[0]
+      b = ret[1]
+    k >>= 1
+    if (k == 0): return (a, b)
+    retxy = mulquad(p, qnr, x, y, x, y)
+    x = retxy[0]
+    y = retxy[1]
+def schoofElkiesAtkin(ea, eb, gf, useModPolyGF, expectedBase):
+  import math
+  realT = gf + 1 - expectedBase
+  delta = -16 * (4 * ea * ea * ea + 27 * eb * eb)
+  #4A^3+27B^2 == 0 is not allowed or j-invariant with 0 or 1728
+  j_invariant = posRemainder((-1728 * 4 * 4 * 4 * ea * ea * ea) * modInverse(delta, gf), gf)
+  sqrtGF = sqrt(16 * gf)
+  sqrtp4 = sqrtGF + (1 if sqrtGF * sqrtGF < 16 * gf else 0) #64-bit square root, can bump this up by one if less than lower bound if that is needed
+  #getPrimes(1024)
+  M, l = 1, 2
+  prodS = 1
+  prodA = 1
+  f = [1, 0, ea, eb] #eb, ea, 0, 1
+  #modular polynomials are needed first
+  #https://github.com/miracl/MIRACL/blob/master/source/curve/mueller.cpp
+  Ap = []
+  #Ep = []
+  t = 0
+  divPolys = None
+  #https://github.com/miracl/MIRACL/blob/master/source/curve/sea.cpp
+  #while (prodS <= (sqrtp4 >> 24)): #log2(GF) primes required on average
+  while (prodA * prodS <= sqrtp4):
+    tl = 0
+    if (l <= 9): tl = getSchoofRemainder(ea, eb, gf, l, divPolys, f)
+    else:
+      if (not useModPolyGF):
+        modPoly = getModularPoly(l)
+        modPoly = [[(posRemainder(innerval[0], gf), innerval[1]) for innerval in val] for val in modPoly]
+      else:
+        modPoly = getModularPolyGF(l, gf)
+      modPolyJ = [0] * len(modPoly)
+      for i in range(len(modPoly)):
+        sum = 0
+        for j in range(len(modPoly[i])):
+          if (len(modPoly[i]) - 1 - j == 0):
+            sum += modPoly[i][j][0]
+          else:
+            sum += posRemainder(modPoly[i][j][0] * pow(j_invariant, len(modPoly[i]) - 1 - j, gf), gf)
+        modPolyJ[i] = posRemainder(sum, gf)
+      xp = [(gf, 1)]
+      #remainderPolyRingSparse(xp, divpoly, gf)
+      #divmodPolyRingSparse(xp, divpoly, gf)
+      #modinv = modInversePolyRing([1, 0], divpoly, gf)
+      #divmodPolyRing(mulPolyRing(modinv, [1, 0], gf), divpoly, gf)[1]
+      #xprem = remainderPolyRingSparsePow2(xp, modPolyJ, gf)
+      xprem = modexpPolyRing([1, 0], gf, modPolyJ, gf)
+      gcdres = gcdPolyRing(addPolyRing(xprem, mulPolyRing([1, 0], [-1], gf), gf), modPolyJ, gf)
+      if (len(gcdres) - 1 == l + 1):
+        l = nextPrime(l)
+        continue; #pathological case with degree l + 1
+      print(("Atkin" if len(gcdres) == 1 else "Elkies") + " %d" % l)
+      if (len(gcdres) - 1 == 0):
+        #Atkin prime with degree 0
+        #T = []
+        k = posRemainder(gf, l)
+        v = tonelliShanks(k, l)
+        lim = 1
+        u = [[]] * getBitSize(l)
+        u[0] = xprem
+        u[1] = substitutePolyRing(u[0], u[0], modPolyJ, gf)
+        for r in range(2, l + 1 + 1):
+          C = None
+          if (posRemainder(l + 1, r) != 0): continue
+          jj = (l + 1) // r
+          if ((jj & 1) == 0 and (v == 0 and (k % l) != 0)): continue
+          if ((jj & 1) == 1 and v != 0): continue
+          kk, m = r, 0
+          first = True
+          while (True):
+            if ((kk & 1) != 0):
+              if (first): C = u[m]
+              else: C = substitutePolyRing(u[m], C, modPolyJ, gf)
+              first = False
+            kk >>= 1
+            if (kk == 0): break
+            m += 1
+            if (m > lim):
+              u[m] = substitutePolyRing(u[m - 1], u[m - 1], modPolyJ, gf)
+          if (C == [1, 0]): break
+        qnr = 2
+        while (tonelliShanks(qnr, l) != 0 or (qnr % l) == 0): qnr += 1
+        ord = l * l - 1
+        #find generator of F(l^2)
+        gy = 1
+        for gx in range(1, l):
+          gen = True
+          for jj in range(2, ord >> 1):
+            if (posRemainder(ord, jj) != 0): continue
+            ab = powquad(l, qnr, gx, gy, ord // jj)
+            if (ab[0] == 1 and ab[1] == 0):
+              gen = False
+              break
+          if (gen): break
+        candidates = 0;
+        T = []
+        rphi = 1
+        for i in range(2, r):
+          if (math.gcd(i, r) == 1): rphi += 1
+        for jj in range(1, r):
+          if (jj > 1 and math.gcd(jj, r) != 1): continue
+          ab = powquad(l, qnr, gx, gy, jj * ord // r)
+          tau = posRemainder((ab[0] + 1) * k * modInverse(2, l), l)
+          if (tau == 0):
+            #this special case means r==2 and we can determine a single candidate easy to use
+            T.append(tau) #posRemainder(gf+ 1, l)
+            break
+          elif (tonelliShanks(tau, l) != 0):
+            tau = tonelliShanks(tau, l);
+            tau = posRemainder(2 * tau, l);
+            T.append(posRemainder(tau, l));
+            T.append(posRemainder(-tau, l));
+            if (len(T) == rphi):
+              #total will always be rphi at end
+              break;
+        if (len(T) != 1):
+          #can save T for match sort algorithm...
+          Ap.append((T, l))
+          prodA *= l
+          l = nextPrime(l)
+          continue
+        else: tl = T[0]
+      else:
+        #mueller 0 200 -o mueller.raw
+        #need to specify with 32 signed 32-bit numbers...
+        #233970423115425145524320034830162017933+1=2 * 13 * 547 * 94819 * 3444919 * 50364659311132962574477
+        #50364659311132962574477+1=2 * 7 * 29 * 89 * 293 * 3761 * 24317 * 52015037
+        #process -f 2*13*547*94819*3444919*(2*7*29*89*293*3761*24317*52015037-1)-1 -i mueller.raw -o test128.pol
+        #sea -95051 11279326 -i test128.pol
+        #Elkies prime
+        E4b = posRemainder(-(ea * modInverse(3, gf)), gf)
+        E6b = posRemainder(-(eb * modInverse(2, gf)), gf)
+        delta = posRemainder((E4b * E4b * E4b - E6b * E6b) * modInverse(1728, gf), gf)
+        s = 1
+        while True:
+          if (s * (l - 1) % 12 == 0): break
+          s += 1
+        
+        #solve quadratic for root
+        if (len(gcdres) - 1 == 1):
+          #degree == 1
+          #one square root
+          discrim = 0;
+          g = posRemainder(-gcdres[len(gcdres) - 1], gf)
+        else:
+          #degree == 2
+          #two square roots
+          discrim = 1;
+          g = tonelliShanks(posRemainder(gcdres[1] * gcdres[1] - 4 * gcdres[len(gcdres) - 1], gf), gf)
+          g = posRemainder((-gcdres[1] - g) * modInverse(2, gf), gf)
+        dGx = diffdx(modPoly)
+        dGy = diffdy(modPoly)
+        dGxx = diffdx(dGx)
+        dGxy = diffdx(dGy)
+        dGyy = diffdy(dGy)
+        Eg = evalDiffEq(dGx, g, j_invariant, gf)
+        Ej = evalDiffEq(dGy, g, j_invariant, gf)
+        Exy = evalDiffEq(dGxy, g, j_invariant, gf)
+        Dg = posRemainder(g * Eg, gf)
+        Dj = posRemainder(j_invariant * Ej, gf)
+        deltal = posRemainder(delta * pow(g, 12 // s, gf) * modInverse(pow(l, 12, gf), gf), gf)
+        if (Dj == 0):
+          E4bl = E4b * modInverse(l * l, gf)
+          atilde = posRemainder(-3 * pow(l, 4, gf) * E4bl, gf)
+          jl = pow(E4bl, 3, gf) * modInverse(deltal, gf)
+          btilde = posRemainder(2 * pow(l, 6, gf) * tonelliShanks((jl - 1728) * deltal, gf), gf)
+          p1 = 0
+        else:
+          E2bs = posRemainder((-12 * E6b * Dj) * modInverse(s * E4b * Dg, gf), gf)
+
+          gd = posRemainder(-(s * modInverse(12, gf)) * E2bs * g, gf)
+          jd = posRemainder(-E4b * E4b * E6b * modInverse(delta, gf), gf)
+          E0b = posRemainder(E6b * modInverse(E4b * E2bs, gf), gf)
+
+          Dgd = posRemainder(gd * Eg + g * (gd * evalDiffEq(dGxx, g, j_invariant, gf) + jd * Exy), gf)
+          Djd = posRemainder(jd * Ej + j_invariant * (jd * evalDiffEq(dGyy, g, j_invariant, gf) + gd * Exy), gf)
+
+          E0bd = posRemainder(((-s * Dgd) * modInverse(12, gf) - E0b * Djd) * modInverse(Dj, gf), gf)
+
+          E4bl = posRemainder((E4b - E2bs * (12 * E0bd * modInverse(E0b, gf) + 6 * E4b * E4b * modInverse(E6b, gf) - 4 * E6b * modInverse(E4b, gf)) + E2bs * E2bs) * modInverse(l * l, gf), gf)
+
+          jl = posRemainder(pow(E4bl, 3, gf) * modInverse(deltal, gf), gf)
+          fs = posRemainder(pow(l, s, gf) * modInverse(g, gf), gf)
+          fd = posRemainder(s * E2bs * fs * modInverse(12, gf), gf)
+
+          Dgs = evalDiffEq(dGx, fs, jl, gf)
+          Djs = evalDiffEq(dGy, fs, jl, gf)
+
+          jld = posRemainder(-fd * Dgs * modInverse(l * Djs, gf), gf)
+          E6bl = posRemainder(-E4bl * jld * modInverse(jl, gf), gf)
+
+          atilde = posRemainder(-3 * pow(l, 4, gf) * E4bl, gf)
+          btilde = posRemainder(-2 * pow(l, 6, gf) * E6bl, gf)
+          p1 = posRemainder(-l * E2bs * modInverse(2, gf), gf)
+        ld = (l - 1) // 2
+        ld1 = (l - 3) // 2
+        cf = getCk(ld1, ea, eb, gf)
+
+        WP = [[]] * (ld + 1)
+        WP[0] = [0]
+        WP[1] = list(reversed(cf)) + [1]
+        for v in range(2, ld + 1):
+          WP[v] = reducePoly(mulPolyRing(WP[v - 1], WP[1], gf), 0, ld + 1)[1]
+        #WPv have understood multiplier x^-v
+        cft = getCk(ld1, atilde, btilde, gf)
+        Y = list(reversed([posRemainder((l * cf[k] - cft[k]) * modInverse((2 * k + 1) * (2 * k + 2), gf), gf) for k in range(1, ld1 + 1)])) + [0, 0]
+        Y[len(Y) - 2] = posRemainder(Y[len(Y) - 2] - p1, gf)
+        RF = 1
+        H, X = [1], [1]
+        for r in range(1, ld + 1):
+          X = reducePoly(mulPolyRing(X, Y, gf), 0, ld + 1)[1]
+          RF *= r
+          H = addPolyRing(H, mulPolyRing(X, [modInverse(RF, gf)], gf), gf)
+        #H has understood multiplier x^-d
+        ad = 1
+        fl = [0] * (ld + 1)
+        fl[0] = ad
+        for v in range(ld - 1, -1, -1):
+          H = addPolyRing(H, mulPolyRing(WP[v + 1], [-ad], gf), gf)
+          H = H[:len(H) - 1]
+          ad = 0 if len(H) == 0 else H[-1]
+          fl[ld - v] = ad
+        #getFactorOfDivisionPolynomialFactor(l, ea, eb, gf)
+        xprem = modexpPolyRing([1, 0], gf, fl, gf)
+        yprem = modexpPolyRing(f, (gf - 1) // 2, fl, gf)
+        for lbda in range(1, (l - 1) // 2 + 1):
+          tau = (lbda + modInverse(lbda, l) * gf) % l
+          divPolys = getDivPolys(divPolys, lbda * 2, ea, eb, f, gf)
+          k = (l + tau * tau - (4 * gf) % l) % l
+          sqrroot = tonelliShanks(k, l) #compute Jacobian the long way
+          if ((sqrroot != 0 or (k % l) != 0) and discrim == 0 or sqrroot == 0 and discrim == 1): continue
+          R = scaleECDivPoly(([1, 0], [1]), lbda, gf, divPolys, fl, f)
+          if (xprem == R[0]):
+            if (yprem == R[1]): pass
+            elif (yprem == mulPolyRing(R[1], [-1], gf)):
+              tau = (l - tau) % l
+            tl = tau
+            break
+        #lbda = 0
+        #t = lbda + lbda // GF
+        #Ep.append((t, l))
+    print("%d %d %d" % (l, tl, posRemainder(realT, l)))
+    a = prodS * modInverse(prodS, l)
+    b = l * modInverse(l, prodS)
+    prodS *= l
+    t = posRemainder(a * tl + b * t, prodS)
+    l = nextPrime(l)
+  if (len(Ap) != 0):
+    while True:
+      x = getRandomBitSize(getBitSize(gf), gf)
+      y = tonelliShanks(posRemainder(x * x * x + x * ea + eb, gf), gf)
+      if (y != 0): break
+      #all finite points are also generators if prime order of points
+    P = (x, y)
+    #Q = scaleEC(P, gf + 1, ea, gf)
+
+    A1, A2 = [], []
+    n1, n2 = 1, 1 #partition into 2 sets
+    for i in range(len(Ap)):
+      if (n1 <= n2):
+        A1.append(Ap[i])
+        n1 += len(Ap[i][0])
+      else:
+        A2.append(Ap[i])
+        n2 += len(Ap[i][0])
+    tau = [[], []]
+    m = [1, 1]
+    for ct in range(0, 1 + 1):
+      #generate CRT combinations of both sets
+      Acur = A1 if ct == 0 else A2
+      totalCombs = 1
+      for i in range(len(Acur)): totalCombs *= len(Acur[i][0])
+      for i in range(totalCombs):
+        tryT = 0
+        tryProdS = 1
+        itmp = i
+        for j in range(len(Acur)):
+          a = tryProdS * modInverse(tryProdS, Acur[j][1]);
+          b = Acur[j][1] * modInverse(Acur[j][1], tryProdS);
+          tryProdS *= Acur[j][1]
+          tryT = (a * Acur[j][0][(itmp % len(Acur[j][0]))] + b * tryT) % tryProdS
+          itmp //= len(Acur[j][0])
+        tau[ct].append(tryT)
+        if (i == 0): m[ct] = tryProdS
+    R = [[], []]
+    for ct in range(0, 1 + 1):
+      for i in range(len(tau[ct])):
+        r = posRemainder((tau[ct][i] - t) * modInverse(posRemainder(prodS * m[1 - ct], m[ct]), m[ct]), m[ct])
+        if (ct == 0 and r > (m[ct] >> 1)): r -= m[ct]
+        #if (ct == 1 and r > (m[1] >> 1)) r -= m[1] #this should not be necessary though since r[0] already scaled
+        R[ct].append(r)
+        if (ct == 1): R[ct].append(r - m[ct]) #abs(R[1]) <= m[1] so must try both positive and negative value
+    Q = scaleEC(P, gf + 1 - t, ea, gf)
+    PMe = scaleEC(P, prodS, ea, gf)
+    Pm0, Pm1 = scaleEC(PMe, m[0], ea, gf), scaleEC(PMe, m[1], ea, gf)
+    #Q1 = []
+    Q1 = dict()
+    for i in range(len(R[0])):
+      Q1pt = addEC(Q, invertEC(scaleEC(Pm1, R[0][i], ea, gf), gf), ea, gf)
+      #Q1.append(Q1pt)
+      Q1[Q1pt[0]] = (Q1pt, i)
+    r1, r2 = 0, 0
+    for i in range(len(R[1])):
+      Q2 = scaleEC(Pm0, R[1][i], ea, gf)
+      #if (any([Q1[i] == Q2[i] for i in range(len(Q1))])):
+      if (Q2[0] in Q1 and Q1[Q2[0]][0][1] == Q2[1]):
+        #r1 = R[0][[(val, idx) for idx, val in enumerate(Q1) if val[0][0] == Q2[0]][0][1]]
+        r1 = R[0][Q1[Q2[0]][1]]
+        r2 = R[1][i]
+        break
+    t = t + prodS * (r1 * m[1] + r2 * m[0]) #(r1 * m[1] + r2 * m[0]) % (m[0] * m[1]) #but no modulo needed and wrong in fact as already calculated exactly including sign
+    prodS *= m[0] * m[1]
+    """
+    totalCombs = 1 #naive CRT combination method
+    for i in range(len(Ap)): #totalCombs *= len(Ap[i][0])
+    for i in range(totalCombs):
+      tryT = t
+      tryProdS = prodS
+      itmp = i
+      for j in range(len(Ap)):
+        a = tryProdS * modInverse(tryProdS, Ap[j][1])
+        b = Ap[j][1] * modInverse(Ap[j][1], tryProdS)
+        tryProdS *= Ap[j][1]
+        tryT = (a * Ap[j][0][(itmp % len(Ap[j][0]))] + b * tryT) % tryProdS
+        itmp //= len(Ap[j][0])
+      if (Q[0] == scaleEC(P, tryT, ea, gf)[0] and Q[1] == scaleEC(P, tryT, ea, gf)[1]):
+        t = tryT
+        prodS = tryProdS
+        break
+    """
+  if (prodS <= sqrtp4):
+    #sqrtGF = sqrt(4 * gf)
+    while True:
+      x = getRandomBitSize(getBitSize(gf), gf)
+      y = tonelliShanks(posRemainder(x * x * x + x * ea + eb, gf), gf)
+      if y != 0: break
+      #all finite points are also generators if prime order of points
+    P = (x, y)
+    Q = scaleEC(P, gf + 1, ea, gf)
+    #Q1 = addEC(Q, scaleEC((x, y), sqrtGF, ea, gf), ea, gf)
+    #Q1 == scaleEC(P, realT + sqrtGF, ea, gf) #here is the discrete log
+    #Q == scaleEC(P, realT, ea, gf)
+    #fullt = t % prodS, fullt = t + m * prodS
+    mval = (realT - t) // prodS
+    #Ycalc = addEC(scaleEC(P, t, ea, gf), scaleEC(P, mval * prodS, ea, gf), ea, gf)
+    #Q[0] == Ycalc[0] and Q[1] == Ycalc[1]
+    GprimeEC = scaleEC(P, prodS, ea, gf)
+    YprimeEC = addEC(Q, invertEC(scaleEC(P, t, ea, gf), gf), ea, gf)
+    #YprimeECcalc = scaleEC(GprimeEC, mval, ea, gf)
+    #YprimeECcalc[0] == YprimeEC[0] and YprimeECcalc[1] == YprimeEC[1]
+    Mprime = PollardKangarooEC(0, sqrtp4 / prodS, 13, GprimeEC, ea, gf, YprimeEC) #(q - 1) / rcum is 43 bits in this case, 26 could also be good
+    t = t + Mprime * prodS
+  if (t > sqrt(4 * gf)): #atkins case has already solved the sign
+    t -= prodS
+  return gf + 1 - t
 
 def testUtility():
   def testHexPartToInt():

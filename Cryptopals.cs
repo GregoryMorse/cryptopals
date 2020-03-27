@@ -3333,9 +3333,10 @@ namespace Cryptopals
             //BPOrd*(Gx, Gy) = (0, 1)
             //factor Ord - then test all factors for BPOrd according to point multiplication equal to the infinite point (0, 1)
             //scaleEC(new Tuple<BigInteger, BigInteger>(Gx, Gy), BPOrd, Ea, GF).Equals(new Tuple<BigInteger, BigInteger>(0, 1));
-            if (Ord != SchoofElkiesAtkin(Ea, Eb, GF, rng, Ord)) return false;
-            if (Ord != Schoof(Ea, Eb, GF, rng, Ord)) return false;
-            int[] PickGys = new int[] { 11279326, 210, 504, 727 };
+            //if (Ord != SchoofElkiesAtkin(Ea, Eb, GF, rng, true, Ord)) return false;
+            //if (Ord != SchoofElkiesAtkin(Ea, Eb, GF, rng, false, Ord)) return false;
+            //if (Ord != Schoof(Ea, Eb, GF, rng, Ord)) return false;
+            int[] PickGys = new int[] { Eb, 210, 504, 727 };
             Tuple<BigInteger, BigInteger> G = new Tuple<BigInteger, BigInteger>(Gx, Gy);
             //http://magma.maths.usyd.edu.au/calc/
             //E: y^2+a_1xy+a_3y=x^3+a_2x^2+a_4x+a_6 over GF(p)
@@ -3346,12 +3347,15 @@ namespace Cryptopals
             BigInteger[] Ords = new BigInteger[] { Ord, BigInteger.Parse("233970423115425145550826547352470124412"), //2^2 * 3 * 11 * 23 * 31 * 89 * 4999 * 28411 * 45361 * 109138087 * 39726369581
                 BigInteger.Parse("233970423115425145544350131142039591210"), //2 * 5 * 7 * 11 * 61 * 12157 * 34693 * 11810604523200031240395593
                 BigInteger.Parse("233970423115425145545378039958152057148") }; //2^2 * 7 * 23 * 37 * 67 * 607 * 1979 * 13327 * 13799 * 663413139201923717
-            //Ords[1] = Schoof(Ea, PickGys[1], GF, rng, Ords[1]);
-            //Ords[2] = Schoof(Ea, PickGys[2], GF, rng, Ords[2]);
-            //Ords[3] = Schoof(Ea, PickGys[3], GF, rng, Ords[3]);
-            //Ords[1] = SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, Ords[1]);
-            //Ords[2] = SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, Ords[2]);
-            //Ords[3] = SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, Ords[3]);
+            //if (Ords[1] != SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, true, Ords[1])) return false;
+            //if (Ords[1] != SchoofElkiesAtkin(Ea, PickGys[1], GF, rng, false, Ords[1])) return false;
+            //if (Ords[1] != Schoof(Ea, PickGys[1], GF, rng, Ords[1])) return false;
+            if (Ords[2] != SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, true, Ords[2])) return false;
+            if (Ords[2] != SchoofElkiesAtkin(Ea, PickGys[2], GF, rng, false, Ords[2])) return false;
+            if (Ords[2] != Schoof(Ea, PickGys[2], GF, rng, Ords[2])) return false;
+            if (Ords[3] != SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, true, Ords[3])) return false;
+            if (Ords[3] != SchoofElkiesAtkin(Ea, PickGys[3], GF, rng, false, Ords[3])) return false;
+            if (Ords[3] != Schoof(Ea, PickGys[3], GF, rng, Ords[3])) return false;
             //Ords[0] /= 2; //The correct way to find generators of required order is to use the order of the largest cyclic subgroup of an elliptic curve.
             BigInteger ASecret;
             do { ASecret = GetNextRandomBig(rng, BPOrd); } while (ASecret <= 1);

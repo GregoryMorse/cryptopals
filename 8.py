@@ -118,7 +118,22 @@ def challenge59():
   ea, eb = -95051, 11279326
   gx, gy, gf, bpOrd = 182, 85518893674295321206118380980485522083, 233970423115425145524320034830162017933, 29246302889428143187362802287225875743
   ord = bpOrd * 2 * 2 * 2
-  if ord != schoof(ea, eb, gf, ord): return False
+  #if ord != schoofElkiesAtkin(ea, eb, gf, True, ord): return False
+  #if ord != schoofElkiesAtkin(ea, eb, gf, False, ord): return False
+  #if ord != schoof(ea, eb, gf, ord): return False
+  pickGys = [eb, 210, 504, 727]
+  ords = [ord, 233970423115425145550826547352470124412, #2^2 * 3 * 11 * 23 * 31 * 89 * 4999 * 28411 * 45361 * 109138087 * 39726369581
+               233970423115425145544350131142039591210, #2 * 5 * 7 * 11 * 61 * 12157 * 34693 * 11810604523200031240395593
+               233970423115425145545378039958152057148] #2^2 * 7 * 23 * 37 * 67 * 607 * 1979 * 13327 * 13799 * 663413139201923717
+  #if ords[1] != schoofElkiesAtkin(ea, pickGys[1], gf, True, ords[1]): return False
+  #if ords[1] != schoofElkiesAtkin(ea, pickGys[1], gf, False, ords[1]): return False
+  #if ords[1] != schoof(ea, pickGys[1], gf, ords[1]): return False
+  if ords[2] != schoofElkiesAtkin(ea, pickGys[2], gf, True, ords[2]): return False
+  if ords[2] != schoofElkiesAtkin(ea, pickGys[2], gf, False, ords[2]): return False
+  if ords[2] != schoof(ea, pickGys[2], gf, ords[2]): return False
+  if ords[3] != schoofElkiesAtkin(ea, pickGys[3], gf, True, ords[3]): return False
+  if ords[3] != schoofElkiesAtkin(ea, pickGys[3], gf, False, ords[3]): return False
+  if ords[3] != schoof(ea, pickGys[3], gf, ords[3]): return False
   
 def challenge60():
   pass

@@ -119,6 +119,7 @@ namespace Cryptopals
             //RunSet(5, Set5);
             //RunSet(6, Set6);
             //RunSet(7, Set7);
+            Challenge59();
             RunSet(8, Set8);
             //RunSet(9, Set9);
             Console.ReadKey();

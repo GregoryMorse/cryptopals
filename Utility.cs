@@ -1973,6 +1973,23 @@ namespace Cryptopals
                 M = i; c = BigInteger.Remainder(b * b, p); t = BigInteger.Remainder(t * c, p); R = BigInteger.Remainder(R * b, p);
             }
         }
+        public static int jacobi(BigInteger n, BigInteger k)
+        {
+            if (k <= 0 || k.IsEven) throw new ArgumentException();
+            n = n % k;
+            int t = 1;
+            while (n != 0) {
+                while (n.IsEven) {
+                    n >>= 1;
+                    int r = (int)(k & 7);
+                    if (r == 3 || r == 5) t = -t;
+                }
+                (n, k) = (k, n);
+                if ((n & 3) == 3 && (k & 3) == 3) t = -t;
+                n = n % k;
+            }
+            return k == 1 ? t : 0;
+        }
         static BigInteger[] addPolyRing(BigInteger[] a, BigInteger[] b, BigInteger GF)
         {
             int alen = a.Length, blen = b.Length;
@@ -2276,7 +2293,7 @@ namespace Cryptopals
         {
             int nlen = nums.Length;
 
-            byte[] b = new byte[((nums.Length * bits + 7) >> 3) + (((nums.Length * bits) & 7) == 0 ? 1 : 0)]; //+1 for avoiding negatives
+            byte[] b = new byte[((nlen * bits + 7) >> 3) + (((nlen * bits) & 7) == 0 ? 1 : 0)]; //+1 for avoiding negatives
             int curBit = 0;
             for (int i = 0; i < nlen; i++)
             {
@@ -3758,7 +3775,7 @@ namespace Cryptopals
             }
 
         }
-        public static BigInteger SchoofElkiesAtkin(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, BigInteger ExpectedBase)
+        public static BigInteger SchoofElkiesAtkin(int Ea, int Eb, BigInteger GF, RNGCryptoServiceProvider rng, bool useModPolyGF, BigInteger ExpectedBase)
         {
             BigInteger realT = GF + 1 - ExpectedBase;
             BigInteger delta = -16 * (4 * new BigInteger(Ea) * Ea * Ea + 27 * new BigInteger(Eb) * Eb);
@@ -3785,9 +3802,13 @@ namespace Cryptopals
                 if (l <= 9) tl = getSchoofRemainder(Ea, Eb, GF, rng, l, divPolys, f);
                 else
                 {
-                    //List<List<Tuple<BigInteger, int>>> modPoly = getModularPoly(l);
-                    //modPoly = modPoly.Select((val) => val.Select((innerval) => new Tuple<BigInteger, int>(posRemainder(innerval.Item1, GF), innerval.Item2)).ToList()).ToList();
-                    List<List<Tuple<BigInteger, int>>> modPoly = getModularPolyGF(l, GF);
+                    List<List<Tuple<BigInteger, int>>> modPoly;
+                    if (!useModPolyGF) {
+                        modPoly = getModularPoly(l);
+                        modPoly = modPoly.Select((val) => val.Select((innerval) => new Tuple<BigInteger, int>(posRemainder(innerval.Item1, GF), innerval.Item2)).ToList()).ToList();
+                    } else {
+                        modPoly = getModularPolyGF(l, GF);
+                    }
                     BigInteger[] modPolyJ = new BigInteger[modPoly.Count()];
                     for (int i = 0; i < modPoly.Count(); i++)
                     {
