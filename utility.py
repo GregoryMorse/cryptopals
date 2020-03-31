@@ -10,9 +10,29 @@ def hexPartToInt(char):
           ord(char) - ord('A') + 10 if char >= 'A' and char <= 'F' else
           ord(char) - ord('a') + 10 if char >= 'a' and char <= 'f' else None)
 
+#in production code: use cached 256 byte table lookup for maximal performance
+def getHexPartToInt():
+  ord0, ordA, orda = ord('0'), ord('A'), ord('a') #allow capturing
+  def hexPartToIntInner(char):
+    return (ord(char) - ord0 if char >= '0' and char <= '9' else
+            ord(char) - ordA + 10 if char >= 'A' and char <= 'F' else
+            ord(char) - orda + 10 if char >= 'a' and char <= 'f' else None)
+  return hexPartToIntInner
+#hexPartToInt = getHexPartToInt()
+  
+def getHexPartToIntTable():
+  tbl = ([None] * ord('0') + list(range(0, 10)) +
+         [None] * (ord('A') - ord('9') - 1) + list(range(10, 16)) +
+         [None] * (ord('a') - ord('F') - 1) + list(range(10, 16)) +
+         [None] * (255 - ord('f')))
+  def hexPartToTableInner(char):
+    return tbl[ord(char)]
+  return hexPartToTableInner
+#hexPartToInt = getHexPartToIntTable()
+  
 #test cases are: empty string, odd length string, invalid characters in string,
 #  all hex characters 00-FF in string
-#in production code: a cached dictionary lookup after conversion to lower case
+#in production code: a cached dictionary lookup
 def hexStrToBin(str):
   l, res = len(str), []
   if l & 1: return None #cannot decode odd length string
