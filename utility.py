@@ -6,29 +6,32 @@ def hexToBase64(str):
 #test cases are: all characters from 0 to 255
 #in production code: ord('0'), ord('A'), ord('a') should be cached and reused
 def hexPartToInt(char):
-  return (ord(char) - ord('0') if char >= '0' and char <= '9' else
-          ord(char) - ord('A') + 10 if char >= 'A' and char <= 'F' else
-          ord(char) - ord('a') + 10 if char >= 'a' and char <= 'f' else None)
+  if not isinstance(char, str) or len(char) != 1: raise ValueError
+  return (ord(char) - ord('0') if char <= '9' and char >= '0' else
+          ord(char) - ord('A') + 10 if char <= 'F' and char >= 'A' else
+          ord(char) - ord('a') + 10 if char <= 'f' and char >= 'a' else None)
 
-#in production code: use cached 256 byte table lookup for maximal performance
+#in production code: use cached 256 byte table lookup for best performance
 def getHexPartToInt():
-  ord0, ordA, orda = ord('0'), ord('A'), ord('a') #allow capturing
+  ord0, ordA, orda = ord('0'), ord('A')-10, ord('a')-10 #allow capturing
   def hexPartToIntInner(char):
-    return (ord(char) - ord0 if char >= '0' and char <= '9' else
-            ord(char) - ordA + 10 if char >= 'A' and char <= 'F' else
-            ord(char) - orda + 10 if char >= 'a' and char <= 'f' else None)
+    if not isinstance(char, str) or len(char) != 1: raise ValueError
+    return (ord(char) - ord0 if char <= '9' and char >= '0' else
+            ord(char) - ordA if char <= 'F' and char >= 'A' else
+            ord(char) - orda if char <= 'f' and char >= 'a' else None)
   return hexPartToIntInner
-#hexPartToInt = getHexPartToInt()
-  
+hexPartToIntFaster = getHexPartToInt()
+
 def getHexPartToIntTable():
-  tbl = ([None] * ord('0') + list(range(0, 10)) +
-         [None] * (ord('A') - ord('9') - 1) + list(range(10, 16)) +
-         [None] * (ord('a') - ord('F') - 1) + list(range(10, 16)) +
-         [None] * (255 - ord('f')))
+  n, r = [None], list(range(10, 16))
+  tbl = (n * ord('0') + list(range(0, 10)) +
+         n * (ord('A') - ord('9') - 1) + r +
+         n * (ord('a') - ord('F') - 1) + r + n * (255 - ord('f')))
   def hexPartToTableInner(char):
+    if not isinstance(char, str) or len(char) != 1: raise ValueError
     return tbl[ord(char)]
   return hexPartToTableInner
-#hexPartToInt = getHexPartToIntTable()
+hexPartToIntTable = getHexPartToIntTable()
   
 #test cases are: empty string, odd length string, invalid characters in string,
 #  all hex characters 00-FF in string
@@ -47,25 +50,89 @@ def hexStrToBin(str):
 #in production code: base64table and padChar should be cached
 #  also the specific cases for i % 24 of 0, 6, 12, 18 should be done directly
 #  not generally as is done here where the code could be adapted to any base
-def binToBase64(bin):
-  base64table = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                 "abcdefghijklmnopqrstuvwxyz0123456789+/")
+def getBinToBase64():
+  base64table = [ord(x) for x in
+                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                 "abcdefghijklmnopqrstuvwxyz0123456789+/"]
+  padChar, baseBits = ord('='), 6
+  baseMult = baseBits * 8 // math.gcd(baseBits, 8) #least common multiple
+  bOffs, bOffsDbl = 8 - baseBits, 16 - baseBits
+  def binToBaseInner(bin):
+    if not isinstance(bin, (bytes, bytearray)): raise ValueError
+    l, res = len(bin), []
+    for i in range(0, l << 3, baseBits):
+      startByte, startBit = i >> 3, i & 7
+      val = bin[startByte] & ((1 << (8 - startBit)) - 1) #trim left bits
+      if startBit > bOffs:
+        val <<= startBit - bOffs #shift to left-most position
+        if (startByte + 1) < l: #another byte available
+          #10 - startBit comes from 8 - (startBit + 6 - 8)
+          val |= bin[startByte + 1] >> (bOffsDbl - startBit) #shift right and add on
+      else: val = (val >> (bOffs - startBit)) #shift to right-most position
+      res.append(base64table[val])
+    remBits = (len(res) * baseBits) % baseMult
+    while remBits != 0 and remBits < baseMult:
+      res.append(padChar)
+      remBits += baseBits
+    return bytes(res)
+  def binToBase64Inner(bin):
+    if not isinstance(bin, (bytes, bytearray)): raise ValueError
+    pos, byte, l, res = 0, 0, len(bin), []
+    for i in range(0, l << 3, baseBits):
+      if pos == 0: res.append(base64table[bin[byte] >> 2])
+      elif pos == 6:
+        res.append(base64table[((bin[byte] & 3) << 4) |
+          (0 if byte == l - 1 else bin[byte + 1] >> 4)])
+        byte += 1
+      elif pos == 12:
+        res.append(base64table[((bin[byte] & 0xf) << 2) |
+          (0 if byte == l - 1 else bin[byte + 1] >> 6)])
+        byte += 1
+      elif pos == 18:
+        res.append(base64table[bin[byte] & 0x3f])
+        byte += 1
+      pos = (pos + baseBits) % baseMult
+    if pos == 12 or pos == 18: res.append(padChar)
+    if pos == 12: res.append(padChar)
+    return bytes(res)
+  return binToBaseInner
+binToBase64 = getBinToBase64()
+
+def getBase64ToBin():
+  base64dict = {ord(k):v for v, k in
+                enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                          "abcdefghijklmnopqrstuvwxyz0123456789+/")}
   padChar = ord('=')
-  bitLen, res = len(bin) << 3, []
-  for i in range(0, bitLen, 6):
-    startByte, startBit = i >> 3, i & 7
-    val = bin[startByte] & ((1 << (8 - startBit)) - 1) #trim left bits
-    if startBit > 2:
-      val <<= startBit - 2 #shift to left-most position
-      if ((startByte + 1) << 3) < bitLen: #another byte available
-        #10 - startBit comes from 8 - (startBit + 6 - 8)
-        val |= bin[startByte + 1] >> (10 - startBit) #shift right and add on
-    else: val = (val >> (2 - startBit)) #shift to right-most position
-    res.append(ord(base64table[val]))
-  remBits = bitLen % 24
-  if remBits <= 18 and remBits != 0: res.append(padChar)
-  if remBits <= 12 and remBits != 0: res.append(padChar)
-  return bytes(res)
+  def base64ToBinInner(base64, strictPad=False):
+    if not isinstance(base64, (bytes, bytearray)): raise ValueError
+    if strictPad and len(base64) & 3 != 0: raise ValueError
+    pos, res = 0, []
+    for i in range(0, len(base64)):
+      v = base64[i]
+      if v == padChar:
+        if strictPad and (i != len(base64) - 1 and
+              (i != len(base64) - 2 or base64[i + 1] != padChar)) or (
+           i & 3 == 1 or i & 3 == 2 and (
+               i == len(base64) - 1 or base64[i + 1] != padChar)):
+          import binascii
+          raise binascii.Error
+        if i & 3 != 0: res = res[:-1]
+        break
+      elif v == padChar and i == len(base64) - 1: break
+      if not v in base64dict: return None
+      val = base64dict[v]
+      if pos == 0: res.append(val << 2)
+      elif pos == 6:
+        res[-1] |= val >> 4
+        res.append((val & 0xF) << 4)
+      elif pos == 12:
+        res[-1] |= val >> 2
+        res.append((val & 3) << 6)
+      elif pos == 18: res[-1] |= val
+      pos = (pos + 6) % 24
+    return bytes(res)
+  return base64ToBinInner
+base64ToBin = getBase64ToBin()
 
 def hexToBase64Alt(str):
   res = hexStrToBin(str)
@@ -377,7 +444,7 @@ class SHA1Context:
     self.message_block_index = 0
     self.message_block = bytearray(64)
     self.computed = 0
-    self. corrupted = 0
+    self.corrupted = 0
 class SHA1_Algo:
   hashSize = 20
   shaSuccess = 0
@@ -1970,12 +2037,9 @@ def gaussianElimZZ(x):
       k += 1
     else:
       #swap rows h and i_max
-      if (h != i_max):
-        vect = x[i_max * n:i_max * (n + 1)]
-        x[i_max * n:i_max * (n + 1)] = x[h * n:h * (n + 1)]
-        x[h * n:h * (n + 1)] = vect
+      if (h != i_max): x[[h, i_max]] = x[[i_max, h]]
       #Do for all rows below pivot
-      #for (int i = h + 1; i < m; i++) {
+      #for i in range(h+1, m):
       #reduced row echelon form (RREF) is obtained without a back substitution step by starting from 0 and skipping h
       for i in range(m):
         if (h == i): continue
@@ -2763,18 +2827,20 @@ def schoofElkiesAtkin(ea, eb, gf, useModPolyGF, expectedBase):
 
 def testUtility():
   def testHexPartToInt():
+    import binascii
     for i in range(0, 256):
-      import binascii
-      part = hexPartToInt(chr(i))
+      part = hexPartToInt(chr(i))      
       if part != None and part != int.from_bytes(
-                        codecs.decode('0' + chr(i), "hex"), byteorder='little'):
+        codecs.decode('0' + chr(i), "hex"), byteorder='little'):
         return False
       elif part == None:
         try:
           codecs.decode('0' + chr(i), "hex")
           return False
         except ValueError: pass
-        except binascii.Error: pass        
+        #except binascii.Error: pass
+      if (hexPartToIntFaster(chr(i)) != part or
+          hexPartToIntTable(chr(i)) != part): return False
     return True
   def testHexStrToBin():
     for i in range(0, 256):
@@ -2788,9 +2854,29 @@ def testUtility():
       if binToBase64(testStr[:-i]) != codecs.encode(testStr[:-i],"base64")[:-1]:
         return False
     return True
+  def testBase64ToBin():
+    import binascii
+    testStr = b"I'm killing your brain like a poisonous mushroom"
+    e = binToBase64(testStr)
+    for i in range(0, len(testStr)):
+      enc = binToBase64(testStr[:-i])
+      if base64ToBin(enc) != testStr[:-i]:
+        return False
+      for j in range(1, 5):
+        passed, e = True, enc[:-i] + bytes([ord('=')] * j)
+        try: d = codecs.decode(e, "base64")
+        except binascii.Error:
+          try:
+            base64ToBin(e)
+            return False
+          except binascii.Error: passed = False
+        if passed and d != base64ToBin(e): return False
+    return True
+    
   testSet = [(testHexPartToInt, "hexPartToInt"),
              (testHexStrToBin, "hexStrToBin"),
-             (testBinToBase64, "binToBase64")]
+             (testBinToBase64, "binToBase64"),
+             (testBase64ToBin, "base64ToBin")]
   bPassAll = True
   for s in testSet:
     if not s[0]():
